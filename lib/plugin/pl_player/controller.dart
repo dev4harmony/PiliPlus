@@ -746,7 +746,7 @@ class PlPlayerController {
   late final isAnim = _pgcType == 1 || _pgcType == 4;
   late final Rx<SuperResolutionType> superResolutionType =
       (isAnim ? Pref.superResolutionType : SuperResolutionType.disable).obs;
-  
+
   /// setShader is not supported by video_player, this is a no-op stub
   Future<void> setShader([SuperResolutionType? type, dynamic pp]) async {
     if (type != null) {
@@ -815,8 +815,8 @@ class PlPlayerController {
     // Set looping
     await controller.setLooping(looping);
 
-    // Set initial volume for desktop
-    if (Utils.isDesktop) {
+    // Set initial volume for desktop 和鸿蒙
+    if (Utils.isDesktop || Utils.isHarmony) {
       await controller.setVolume(this.volume.value);
     }
 
@@ -846,7 +846,7 @@ class PlPlayerController {
       final currentPosition = position.value;
       removeListeners();
       _videoPlayerController?.dispose();
-      
+
       _videoPlayerController = VideoPlayerController.networkUrl(
         Uri.parse(dataSource.videoSource!),
         httpHeaders: dataSource.httpHeaders ?? {},
@@ -923,14 +923,14 @@ class PlPlayerController {
   /// video_player listener callback
   void _onVideoPlayerUpdate() {
     if (_videoPlayerController == null) return;
-    
+
     final value = _videoPlayerController!.value;
-    
+
     // Handle playing state changes
     if (value.isPlaying != _wasPlaying) {
       _wasPlaying = value.isPlaying;
       WakelockPlus.toggle(enable: value.isPlaying);
-      
+
       if (value.isPlaying) {
         if (_shouldSetPip) {
           if (_isCurrVideoPage) {
@@ -946,7 +946,7 @@ class PlPlayerController {
           playerStatus.value = PlayerStatus.paused;
         }
       }
-      
+
       videoPlayerServiceHandler?.onStatusChange(
         playerStatus.value,
         isBuffering.value,
@@ -957,12 +957,12 @@ class PlPlayerController {
       for (var element in _statusListeners) {
         element(value.isPlaying ? PlayerStatus.playing : PlayerStatus.paused);
       }
-      
+
       if (value.position.inSeconds != 0) {
         makeHeartBeat(positionSeconds.value, type: HeartBeatType.status);
       }
     }
-    
+
     // Handle completed state
     if (value.isCompleted != _wasCompleted) {
       _wasCompleted = value.isCompleted;
@@ -976,7 +976,7 @@ class PlPlayerController {
         makeHeartBeat(positionSeconds.value, type: HeartBeatType.completed);
       }
     }
-    
+
     // Handle position updates
     if (value.position != _lastPosition) {
       _lastPosition = value.position;
@@ -993,13 +993,13 @@ class PlPlayerController {
       }
       makeHeartBeat(value.position.inSeconds);
     }
-    
+
     // Handle duration updates
     if (value.duration != _lastDuration) {
       _lastDuration = value.duration;
       duration.value = value.duration;
     }
-    
+
     // Handle buffered updates
     if (value.buffered.isNotEmpty) {
       final lastBuffered = value.buffered.last.end;
@@ -1008,7 +1008,7 @@ class PlPlayerController {
         updateBufferedSecond();
       }
     }
-    
+
     // Handle buffering state
     if (value.isBuffering != _wasBuffering) {
       _wasBuffering = value.isBuffering;
@@ -1019,7 +1019,7 @@ class PlPlayerController {
         isLive,
       );
     }
-    
+
     // Handle errors - Requirements 5.1, 5.2
     if (value.hasError) {
       final errorMsg = value.errorDescription ?? '未知错误';
@@ -1043,10 +1043,10 @@ class PlPlayerController {
     _lastPosition = Duration.zero;
     _lastDuration = Duration.zero;
     _wasBuffering = false;
-    
+
     // Add listener to video player controller
     _videoPlayerController?.addListener(_onVideoPlayerUpdate);
-    
+
     // Setup media service listeners using subscriptions
     subscriptions = {};
     if (videoPlayerServiceHandler != null) {
@@ -1236,7 +1236,7 @@ class PlPlayerController {
     if (this.volume.value != volume) {
       this.volume.value = volume;
       try {
-        if (Utils.isDesktop) {
+        if (Utils.isDesktop || Utils.isHarmony) {
           // video_player uses 0.0-1.0 range
           await _videoPlayerController?.setVolume(volume);
         } else {
@@ -1386,7 +1386,8 @@ class PlPlayerController {
   }
 
   void onForwardBackward(Duration duration) {
-    final maxDuration = videoPlayerController?.value.duration ?? this.duration.value;
+    final maxDuration =
+        videoPlayerController?.value.duration ?? this.duration.value;
     seekTo(
       duration.clamp(Duration.zero, maxDuration),
       isSeek: false,
@@ -1683,7 +1684,9 @@ class PlPlayerController {
     // Note: video_player does not support setting video track
     // This feature is not available in video_player
     if (kDebugMode) {
-      debugPrint('setOnlyPlayAudio: video_player does not support video track selection');
+      debugPrint(
+        'setOnlyPlayAudio: video_player does not support video track selection',
+      );
     }
   }
 

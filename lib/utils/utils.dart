@@ -8,6 +8,7 @@ import 'package:catcher_2/catcher_2.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -24,6 +25,8 @@ abstract class Utils {
   @pragma("vm:platform-const")
   static final bool isDesktop =
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
+  static final bool isHarmony = defaultTargetPlatform.name == 'ohos';
 
   static const jsonEncoder = JsonEncoder.withIndent('    ');
 
