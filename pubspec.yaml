@@ -240,7 +240,7 @@ dependencies:
     git:
       url: https://gitcode.com/openharmony-tpc/flutter_packages.git
       path: packages/video_player/video_player
-      ref: br_video_player-v2.10.0_ohos
+      ref: br_video_player-v2.9.2_ohos
 
 dependency_overrides:
   flutter_inappwebview:

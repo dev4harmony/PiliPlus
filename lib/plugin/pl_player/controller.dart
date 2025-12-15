@@ -608,6 +608,7 @@ class PlPlayerController {
   String? typeTag;
   int? mediaType;
 
+  // TODO 控制器的视频资源在这里设置
   // 初始化资源
   Future<void> setDataSource(
     DataSource dataSource, {
@@ -761,6 +762,32 @@ class PlPlayerController {
     }
   }
 
+  Future<String> _getVideoUrlWithSound() async {
+    final headers = {
+      'Referer': 'https://www.bilibili.com',
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    };
+
+    final queryParams = {
+      'avid': _aid,
+      'cid': cid.toString(),
+      'qn': cacheVideoQa ?? 64, // 64 720P
+      'fnval': 16,
+      'fnver': '0',
+      'fourk': '1',
+    };
+
+    final res = await Request().get(
+      'https://api.bilibili.com/x/player/playurl',
+      queryParameters: queryParams,
+      options: Options(headers: headers),
+    );
+    final videoData = res.data['data'];
+    final dash = videoData['dash'];
+    return dash['video'][0]['baseUrl'];
+  }
+
   // 配置播放器
   Future<VideoPlayerController> _createVideoController(
     DataSource dataSource,
@@ -780,8 +807,12 @@ class PlPlayerController {
     // Dispose existing controller if any
     _videoPlayerController?.dispose();
 
+    // TODO 没有声音的原因，只设置了视频url，没有处理音频
     // Determine video URI
     late final String videoUri;
+
+    // Create VideoPlayerController based on source type
+    VideoPlayerController controller;
     if (isFileSource) {
       videoUri = path.join(
         dirPath!,
@@ -792,17 +823,18 @@ class PlPlayerController {
             ? PathUtils.audioNameType2
             : PathUtils.videoNameType2,
       );
-    } else {
-      videoUri = dataSource.videoSource!;
-    }
-
-    // Create VideoPlayerController based on source type
-    VideoPlayerController controller;
-    if (isFileSource) {
       controller = VideoPlayerController.file(
         File(videoUri),
       );
     } else {
+      try {
+        videoUri = await _getVideoUrlWithSound();
+        print('成功获取VideoUrlWithSound');
+        print('视频清晰度: $cacheVideoQa');
+      } catch (e) {
+        print('获取VideoUrlWithSound: $e');
+        videoUri = dataSource.videoSource!;
+      }
       controller = VideoPlayerController.networkUrl(
         Uri.parse(videoUri),
         httpHeaders: dataSource.httpHeaders ?? {},
