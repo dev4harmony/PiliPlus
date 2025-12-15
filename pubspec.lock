@@ -1936,7 +1936,7 @@ packages:
     source: hosted
     version: "2.1.4"
   video_player:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       path: "packages/video_player/video_player"
       ref: "br_video_player-v2.9.2_ohos"

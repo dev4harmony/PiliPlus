@@ -319,7 +319,7 @@ class _PostPanelState extends State<PostPanel>
       SmartDialog.showToast('提交成功');
       list.clear();
       videoDetailController.handleSBData(response);
-      if (videoDetailController.positionSubscription == null) {
+      if (!videoDetailController.hasPositionListener) {
         videoDetailController.initSkip();
       }
     } else {
@@ -471,15 +471,15 @@ class _PostPanelState extends State<PostPanel>
               if (videoCtr != null) {
                 final start = (item.segment.first * 1000).round();
                 final seek = max(0, start - 2000);
-                await videoCtr.seek(Duration(milliseconds: seek));
-                if (!videoCtr.state.playing) {
+                await videoCtr.seekTo(Duration(milliseconds: seek));
+                if (!videoCtr.value.isPlaying) {
                   await videoCtr.play();
                 }
                 final delay = start - seek;
                 if (delay > 0) {
                   await Future.delayed(Duration(milliseconds: delay));
                 }
-                videoCtr.seek(
+                videoCtr.seekTo(
                   Duration(
                     milliseconds: (item.segment.second * 1000).round(),
                   ),

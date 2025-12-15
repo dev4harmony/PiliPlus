@@ -102,7 +102,7 @@ class LocalIntroController extends CommonIntroController {
       if (playCtr.playRepeat == PlayRepeat.listCycle) {
         if (list.length == 1) {
           if (playCtr.videoPlayerController case final ctr?) {
-            ctr.seek(Duration.zero).whenComplete(ctr.play);
+            ctr.seekTo(Duration.zero).whenComplete(ctr.play);
           }
         } else {
           playIndex(0);

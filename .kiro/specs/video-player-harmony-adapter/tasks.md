@@ -1,0 +1,109 @@
+# Implementation Plan
+
+- [x] 1. 适配 PlPlayerController 核心
+  - [x] 1.1 替换导入和成员变量
+    - 移除 `media_kit` 和 `media_kit_video` 导入
+    - 添加 `video_player` 导入
+    - 将 `Player? _videoPlayerController` 替换为 `VideoPlayerController? _videoPlayerController`
+    - 移除 `VideoController? _videoController`
+    - _Requirements: 1.1, 1.2_
+  - [x] 1.2 适配 `_createVideoController` 方法
+    - 使用 `VideoPlayerController.networkUrl()` 或 `VideoPlayerController.file()` 创建控制器
+    - 配置 HTTP headers
+    - 调用 `initialize()` 初始化
+    - 移除 media_kit 特有的配置（音轨、shader等）
+    - _Requirements: 1.1, 1.2, 1.5_
+  - [x] 1.3 适配状态监听 `startListeners` 方法
+    - 使用 `addListener` 替代 Stream 监听
+    - 创建 `_onVideoPlayerUpdate` 回调方法
+    - 映射 `VideoPlayerValue` 状态到 `PlayerStatus`
+    - 更新 position, duration, buffered observables
+    - _Requirements: 1.3, 1.4, 1.5_
+  - [x] 1.4 适配 `removeListeners` 方法
+    - 使用 `removeListener` 移除监听
+    - _Requirements: 9.2_
+
+- [x] 2. 适配播放控制方法
+  - [x] 2.1 适配 `play` 方法
+    - 调用 `_videoPlayerController?.play()`
+    - _Requirements: 2.1_
+  - [x] 2.2 适配 `pause` 方法
+    - 调用 `_videoPlayerController?.pause()`
+    - _Requirements: 2.2_
+  - [x] 2.3 适配 `seekTo` 方法
+    - 调用 `_videoPlayerController?.seekTo(position)`
+    - _Requirements: 2.3_
+  - [x] 2.4 适配 `setPlaybackSpeed` 方法
+    - 调用 `_videoPlayerController?.setPlaybackSpeed(speed)`
+    - _Requirements: 2.4_
+  - [x] 2.5 适配 `setVolume` 方法
+    - 调用 `_videoPlayerController?.setVolume(volume)`
+    - 注意 video_player 音量范围是 0.0-1.0
+    - _Requirements: 4.1, 4.2_
+  - [x] 2.6 适配循环播放
+    - 使用 `setLooping(bool)` 替代 `setPlaylistMode`
+    - _Requirements: 8.1, 8.2_
+
+- [x] 3. 适配 getter 和辅助方法
+  - [x] 3.1 适配 `videoController` getter
+    - 返回 `_videoPlayerController` 或创建兼容的包装器
+    - _Requirements: 3.1_
+  - [x] 3.2 移除或适配不支持的功能
+    - 移除 `setShader` 相关代码（超分辨率）
+    - 移除外部音轨加载逻辑
+    - 移除 `setAudioTrack`、`setVideoTrack` 调用
+    - 简化 `refreshPlayer` 方法
+    - _Requirements: 7.2_
+  - [x] 3.3 适配 `screenshot` 方法
+    - video_player 不直接支持截图，需要移除或使用其他方案
+    - _Requirements: 7.2_
+  - [x] 3.4 适配 `dispose` 方法
+    - 调用 `_videoPlayerController?.dispose()`
+    - _Requirements: 9.1, 9.2_
+
+- [x] 4. 适配视频渲染视图
+  - [x] 4.1 修改 `view.dart` 中的视频组件
+    - 移除 `media_kit_video` 导入
+    - 添加 `video_player` 导入
+    - 将 `SimpleVideo` 替换为 `VideoPlayer`
+    - _Requirements: 3.1_
+  - [x] 4.2 适配视频适配模式 (VideoFit)
+    - 使用 `FittedBox` 包装 `VideoPlayer` 实现不同的适配模式
+    - _Requirements: 3.3_
+  - [x] 4.3 移除或适配字幕视图
+    - 移除 `SubtitleView` (media_kit_video 组件)
+    - 如需字幕功能，需自行实现
+    - _Requirements: 7.2_
+
+- [x] 5. 清理和兼容性处理
+  - [x] 5.1 移除 media_kit 特有的代码
+    - 移除 `NativePlayer` 相关代码
+    - 移除 `PlayerConfiguration` 相关代码
+    - 移除 `VideoControllerConfiguration` 相关代码
+    - 移除 MPV 属性设置代码 (`setProperty`)
+    - _Requirements: 7.1_
+  - [x] 5.2 处理错误情况
+    - 适配 video_player 的错误处理方式
+    - 使用 `value.hasError` 和 `value.errorDescription`
+    - _Requirements: 5.1, 5.2_
+  - [x] 5.3 适配 PiP (画中画) 相关代码
+    - 检查 `videoController` 的使用是否需要调整
+    - _Requirements: 7.2_
+
+- [x] 6. Checkpoint - 确保编译通过
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 7. 功能验证
+  - [x] 7.1 验证基本播放功能
+    - 视频加载和播放
+    - 暂停和恢复
+    - 进度跳转
+    - _Requirements: 2.1, 2.2, 2.3_
+  - [x] 7.2 验证播放控制
+    - 播放速度调节
+    - 音量调节
+    - 全屏切换
+    - _Requirements: 2.4, 4.1_
+
+- [ ] 8. Final Checkpoint
+  - Ensure all tests pass, ask the user if questions arise.

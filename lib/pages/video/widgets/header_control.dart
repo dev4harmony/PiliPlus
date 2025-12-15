@@ -1427,14 +1427,11 @@ class HeaderControlState extends State<HeaderControl>
       SmartDialog.showToast('播放器未初始化');
       return;
     }
-    final hwdec = await player.platform!.getProperty(
-      'hwdec-current',
-    );
     if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) {
-        final state = player.state;
+        final value = player.value;
         return AlertDialog(
           title: const Text('播放信息'),
           contentPadding: const EdgeInsets.only(top: 16),
@@ -1456,101 +1453,67 @@ class HeaderControlState extends State<HeaderControl>
                       dense: true,
                       title: const Text("Resolution"),
                       subtitle: Text(
-                        '${state.width}x${state.height}',
+                        '${value.size.width.toInt()}x${value.size.height.toInt()}',
                       ),
                       onTap: () => Utils.copyText(
-                        'Resolution\n${state.width}x${state.height}',
+                        'Resolution\n${value.size.width.toInt()}x${value.size.height.toInt()}',
                       ),
                     ),
                     ListTile(
                       dense: true,
-                      title: const Text("VideoParams"),
+                      title: const Text("Duration"),
                       subtitle: Text(
-                        state.videoParams.toString(),
+                        value.duration.toString(),
                       ),
                       onTap: () => Utils.copyText(
-                        'VideoParams\n${state.videoParams}',
+                        'Duration\n${value.duration}',
                       ),
                     ),
                     ListTile(
                       dense: true,
-                      title: const Text("AudioParams"),
+                      title: const Text("Position"),
                       subtitle: Text(
-                        state.audioParams.toString(),
+                        value.position.toString(),
                       ),
                       onTap: () => Utils.copyText(
-                        'AudioParams\n${state.audioParams}',
+                        'Position\n${value.position}',
                       ),
                     ),
                     ListTile(
                       dense: true,
-                      title: const Text("Media"),
-                      subtitle: Text(
-                        state.playlist.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Media\n${state.playlist}',
-                      ),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("AudioTrack"),
-                      subtitle: Text(
-                        state.track.audio.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioTrack\n${state.track.audio}',
-                      ),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("VideoTrack"),
-                      subtitle: Text(
-                        state.track.video.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoTrack\n${state.track.audio}',
-                      ),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("pitch"),
-                      subtitle: Text(state.pitch.toString()),
-                      onTap: () => Utils.copyText(
-                        'pitch\n${state.pitch}',
-                      ),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("rate"),
-                      subtitle: Text(state.rate.toString()),
-                      onTap: () => Utils.copyText('rate\n${state.rate}'),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("AudioBitrate"),
-                      subtitle: Text(
-                        state.audioBitrate.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioBitrate\n${state.audioBitrate}',
-                      ),
+                      title: const Text("PlaybackSpeed"),
+                      subtitle: Text(value.playbackSpeed.toString()),
+                      onTap: () => Utils.copyText('PlaybackSpeed\n${value.playbackSpeed}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("Volume"),
                       subtitle: Text(
-                        state.volume.toString(),
+                        value.volume.toString(),
                       ),
                       onTap: () => Utils.copyText(
-                        'Volume\n${state.volume}',
+                        'Volume\n${value.volume}',
                       ),
                     ),
                     ListTile(
                       dense: true,
-                      title: const Text('hwdec'),
-                      subtitle: Text(hwdec),
-                      onTap: () => Utils.copyText('hwdec\n$hwdec'),
+                      title: const Text("IsPlaying"),
+                      subtitle: Text(
+                        value.isPlaying.toString(),
+                      ),
+                      onTap: () => Utils.copyText(
+                        'IsPlaying\n${value.isPlaying}',
+                      ),
+                    ),
+                    ListTile(
+                      dense: true,
+                      title: const Text("IsBuffering"),
+                      subtitle: Text(
+                        value.isBuffering.toString(),
+                      ),
+                      onTap: () => Utils.copyText(
+                        'IsBuffering\n${value.isBuffering}',
+                      ),
                     ),
                   ],
                 ),

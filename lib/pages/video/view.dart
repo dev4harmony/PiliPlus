@@ -325,7 +325,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
     videoDetailController
       ..cancelSkipTimer()
-      ..positionSubscription?.cancel()
+      ..cancelPositionListener()
       ..cid.close()
       ..animController?.removeListener(animListener);
 
@@ -384,7 +384,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       ScreenBrightnessPlatform.instance.resetApplicationScreenBrightness();
     }
 
-    videoDetailController.positionSubscription?.cancel();
+    videoDetailController.cancelPositionListener();
 
     introController.cancelTimer();
 
@@ -825,18 +825,21 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                                       } else {
                                         if (plPlayerController!
                                             .videoPlayerController!
-                                            .state
-                                            .completed) {
+                                            .value
+                                            .isCompleted) {
                                           await plPlayerController!
                                               .videoPlayerController!
-                                              .seek(Duration.zero);
+                                              .seekTo(Duration.zero);
                                           plPlayerController!
                                               .videoPlayerController!
                                               .play();
                                         } else {
-                                          plPlayerController!
-                                              .videoPlayerController!
-                                              .playOrPause();
+                                          final ctr = plPlayerController!.videoPlayerController!;
+                                          if (ctr.value.isPlaying) {
+                                            ctr.pause();
+                                          } else {
+                                            ctr.play();
+                                          }
                                         }
                                       }
                                     },

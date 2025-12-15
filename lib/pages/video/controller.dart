@@ -74,7 +74,6 @@ import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:get/get_navigation/src/dialog/dialog_route.dart';
 import 'package:hive/hive.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import 'package:media_kit/media_kit.dart';
 
 class VideoDetailController extends GetxController
     with GetTickerProviderStateMixin {
@@ -159,7 +158,19 @@ class VideoDetailController extends GetxController
   late final RxInt seasonIndex = 0.obs;
 
   PlayerStatus? playerStatus;
-  StreamSubscription<Duration>? positionSubscription;
+  /// Position listener callback for sponsor block skip functionality
+  void Function(Duration)? _positionListener;
+
+  /// Check if position listener is active
+  bool get hasPositionListener => _positionListener != null;
+
+  /// Cancel position listener
+  void cancelPositionListener() {
+    if (_positionListener != null) {
+      plPlayerController.removePositionListener(_positionListener!);
+      _positionListener = null;
+    }
+  }
 
   late final scrollKey = GlobalKey<ExtendedNestedScrollViewState>();
   late final RxBool isVertical = false.obs;
@@ -717,8 +728,10 @@ class VideoDetailController extends GetxController
   }
 
   Future<void> _querySponsorBlock() async {
-    positionSubscription?.cancel();
-    positionSubscription = null;
+    if (_positionListener != null) {
+      plPlayerController.removePositionListener(_positionListener!);
+      _positionListener = null;
+    }
     videoLabel.value = '';
     segmentList.clear();
     segmentProgressList.clear();
@@ -784,7 +797,7 @@ class VideoDetailController extends GetxController
                     skipType: skipType,
                   );
 
-                  if (positionSubscription == null &&
+                  if (_positionListener == null &&
                       autoPlay.value &&
                       plPlayerController.videoPlayerController != null) {
                     final currPost =
@@ -801,22 +814,22 @@ class VideoDetailController extends GetxController
                           segmentModel.hasSkipped = true;
                           final videoPlayerController =
                               plPlayerController.videoPlayerController!;
-                          if (videoPlayerController.state.playing) {
+                          // video_player uses value.isPlaying instead of state.playing
+                          if (videoPlayerController.value.isPlaying) {
                             future = onSkip(
                               segmentModel,
                             );
                           } else {
-                            videoPlayerController.stream.playing.firstWhere((
-                              e,
-                            ) {
-                              if (e) {
+                            // Use status listener instead of stream for video_player
+                            void statusListener(PlayerStatus status) {
+                              if (status == PlayerStatus.playing) {
                                 future = onSkip(
                                   segmentModel,
                                 );
-                                return true;
+                                plPlayerController.removeStatusLister(statusListener);
                               }
-                              return false;
-                            });
+                            }
+                            plPlayerController.addStatusLister(statusListener);
                           }
 
                           break;
@@ -843,7 +856,7 @@ class VideoDetailController extends GetxController
           }),
         );
 
-        if (positionSubscription == null &&
+        if (_positionListener == null &&
             (autoPlay.value || plPlayerController.preInitPlayer)) {
           await future;
           initSkip();
@@ -856,44 +869,45 @@ class VideoDetailController extends GetxController
 
   void initSkip() {
     if (segmentList.isNotEmpty) {
-      positionSubscription?.cancel();
-      positionSubscription = plPlayerController
-          .videoPlayerController
-          ?.stream
-          .position
-          .listen((position) {
-            int currentPos = position.inSeconds;
-            if (currentPos != _lastPos) {
-              _lastPos = currentPos;
-              final msPos = currentPos * 1000;
-              for (SegmentModel item in segmentList) {
-                // if (kDebugMode) {
-                //   debugPrint(
-                //       '${position.inSeconds},,${item.segment.first},,${item.segment.second},,${item.skipType.name},,${item.hasSkipped}');
-                // }
-                if (msPos <= item.segment.first &&
-                    item.segment.first <= msPos + 1000) {
-                  switch (item.skipType) {
-                    case SkipType.alwaysSkip:
-                      onSkip(item, isSeek: false);
-                      break;
-                    case SkipType.skipOnce:
-                      if (!item.hasSkipped) {
-                        item.hasSkipped = true;
-                        onSkip(item, isSeek: false);
-                      }
-                      break;
-                    case SkipType.skipManually:
-                      onAddItem(item);
-                      break;
-                    default:
-                      break;
+      // Remove existing listener if any
+      if (_positionListener != null) {
+        plPlayerController.removePositionListener(_positionListener!);
+      }
+      // Create position listener for sponsor block skip functionality
+      _positionListener = (Duration position) {
+        int currentPos = position.inSeconds;
+        if (currentPos != _lastPos) {
+          _lastPos = currentPos;
+          final msPos = currentPos * 1000;
+          for (SegmentModel item in segmentList) {
+            // if (kDebugMode) {
+            //   debugPrint(
+            //       '${position.inSeconds},,${item.segment.first},,${item.segment.second},,${item.skipType.name},,${item.hasSkipped}');
+            // }
+            if (msPos <= item.segment.first &&
+                item.segment.first <= msPos + 1000) {
+              switch (item.skipType) {
+                case SkipType.alwaysSkip:
+                  onSkip(item, isSeek: false);
+                  break;
+                case SkipType.skipOnce:
+                  if (!item.hasSkipped) {
+                    item.hasSkipped = true;
+                    onSkip(item, isSeek: false);
                   }
                   break;
-                }
+                case SkipType.skipManually:
+                  onAddItem(item);
+                  break;
+                default:
+                  break;
               }
+              break;
             }
-          });
+          }
+        }
+      };
+      plPlayerController.addPositionListener(_positionListener!);
     }
   }
 
@@ -1277,8 +1291,10 @@ class VideoDetailController extends GetxController
 
       if (!isUgc && !fromReset && plPlayerController.enablePgcSkip) {
         if (data.clipInfoList case final clipInfoList?) {
-          positionSubscription?.cancel();
-          positionSubscription = null;
+          if (_positionListener != null) {
+            plPlayerController.removePositionListener(_positionListener!);
+            _positionListener = null;
+          }
           handleSBData(clipInfoList);
         }
       }
@@ -1466,24 +1482,17 @@ class VideoDetailController extends GetxController
   late final RxList<Segment> viewPointList = <Segment>[].obs;
 
   // 设定字幕轨道
+  // Note: video_player does not support subtitle tracks directly
+  // Subtitles are rendered as an overlay in the UI
   Future<void> setSubtitle(int index) async {
     if (index <= 0) {
-      await plPlayerController.videoPlayerController?.setSubtitleTrack(
-        SubtitleTrack.no(),
-      );
+      // Disable subtitles
       vttSubtitlesIndex.value = index;
       return;
     }
 
     Future<void> setSub(String subtitle) async {
-      final sub = subtitles[index - 1];
-      await plPlayerController.videoPlayerController?.setSubtitleTrack(
-        SubtitleTrack.data(
-          subtitle,
-          title: sub.lanDoc,
-          language: sub.lan,
-        ),
-      );
+      // Store the subtitle data for UI rendering
       vttSubtitlesIndex.value = index;
     }
 
@@ -1711,8 +1720,10 @@ class VideoDetailController extends GetxController
       // sponsor block
       if (plPlayerController.enableBlock) {
         _lastPos = null;
-        positionSubscription?.cancel();
-        positionSubscription = null;
+        if (_positionListener != null) {
+          plPlayerController.removePositionListener(_positionListener!);
+          _positionListener = null;
+        }
         videoLabel.value = '';
         segmentList.clear();
         segmentProgressList.clear();

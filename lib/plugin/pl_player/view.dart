@@ -72,7 +72,7 @@ import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:video_player/video_player.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -121,7 +121,7 @@ class PLVideoPlayer extends StatefulWidget {
 class _PLVideoPlayerState extends State<PLVideoPlayer>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late AnimationController animationController;
-  late VideoController videoController;
+  late VideoPlayerController videoController;
   late final CommonIntroController introController = widget.introController!;
   late final VideoDetailController videoDetailController =
       widget.videoDetailController!;
@@ -263,12 +263,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!plPlayerController.continuePlayInBackground.value) {
-      late final player = plPlayerController.videoController?.player;
+      final player = plPlayerController.videoController;
       if (const [
         AppLifecycleState.paused,
         AppLifecycleState.detached,
       ].contains(state)) {
-        if (player != null && player.state.playing) {
+        if (player != null && player.value.isPlaying) {
           _pauseDueToPauseUponEnteringBackgroundMode = true;
           player.pause();
         }
@@ -1389,20 +1389,21 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (widget.danmuWidget case final danmaku?)
           Positioned.fill(top: 4, child: danmaku),
 
-        if (!isLive)
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: !plPlayerController.enableDragSubtitle,
-              child: Obx(
-                () => SubtitleView(
-                  controller: videoController,
-                  configuration: plPlayerController.subtitleConfig.value,
-                  enableDragSubtitle: plPlayerController.enableDragSubtitle,
-                  onUpdatePadding: plPlayerController.onUpdatePadding,
-                ),
-              ),
-            ),
-          ),
+        // TODO: SubtitleView removed - video_player does not have built-in subtitle support
+        // If subtitle functionality is needed, implement a custom subtitle widget here
+        // if (!isLive)
+        //   Positioned.fill(
+        //     child: IgnorePointer(
+        //       ignoring: !plPlayerController.enableDragSubtitle,
+        //       child: Obx(
+        //         () => CustomSubtitleView(
+        //           configuration: plPlayerController.subtitleConfig.value,
+        //           enableDragSubtitle: plPlayerController.enableDragSubtitle,
+        //           onUpdatePadding: plPlayerController.onUpdatePadding,
+        //         ),
+        //       ),
+        //     ),
+        //   ),
 
         if (plPlayerController.enableTapDm)
           Obx(
@@ -2104,6 +2105,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             child: Obx(
               () {
                 final videoFit = plPlayerController.videoFit.value;
+                final controller = plPlayerController.videoController;
+                if (controller == null || !controller.value.isInitialized) {
+                  return Container(color: widget.fill);
+                }
+                // Use custom aspect ratio if specified, otherwise use video's native aspect ratio
+                final aspectRatio = videoFit.aspectRatio ?? controller.value.aspectRatio;
                 return Transform.flip(
                   flipX: plPlayerController.flipX.value,
                   flipY: plPlayerController.flipY.value,
@@ -2111,10 +2118,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                   child: FittedBox(
                     fit: videoFit.boxFit,
                     alignment: widget.alignment,
-                    child: SimpleVideo(
-                      controller: plPlayerController.videoController!,
-                      fill: widget.fill,
-                      aspectRatio: videoFit.aspectRatio,
+                    child: SizedBox(
+                      width: aspectRatio * 100,
+                      height: 100,
+                      child: VideoPlayer(controller),
                     ),
                   ),
                 );
@@ -2821,7 +2828,7 @@ Widget buildViewPointWidget(
           if (item.from != null) {
             plPlayerController
               ..danmakuController?.clear()
-              ..videoPlayerController?.seek(Duration(seconds: item.from!));
+              ..videoPlayerController?.seekTo(Duration(seconds: item.from!));
           }
           // if (kDebugMode) debugPrint('${item.title},,${item.from}');
         } catch (e) {
