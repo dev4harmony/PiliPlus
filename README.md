@@ -1,3 +1,21 @@
+# 当前分支(oh_video_player)说明
+
+这是一个适配鸿蒙的分支
+
+此分支使用video_player实现视频播放
+
+## 已知问题
+
+- 不知道video_player怎么单独设置音频url所以没有声音
+
+- 好像登录后选择列表没写出来所以也不能登录成功(近期会修复，应该很好修复)
+
+- ······其它未列出或未发现的问题
+
+## 顺带说一下希望有大佬们接手这个适配项目
+
+# 以下是原分支readme
+
 <div align="center">
     <img width="200" height="200" src="assets/images/logo/logo.png">
 </div>
@@ -11,6 +29,7 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/bggRGjQaUbCoE/PiliPlus) 
 ![GitHub Repo stars](https://img.shields.io/github/stars/bggRGjQaUbCoE/PiliPlus) 
 ![GitHub all releases](https://img.shields.io/github/downloads/bggRGjQaUbCoE/PiliPlus/total) 
+
 </div>
     <p>使用Flutter开发的BiliBili第三方客户端</p>
     
