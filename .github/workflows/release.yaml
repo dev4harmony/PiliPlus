@@ -75,6 +75,6 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ env.tag }}-ohos
+          name: ${{ env.tag }}
           draft: true
           files: PiliPlus_ohos_*.hap
