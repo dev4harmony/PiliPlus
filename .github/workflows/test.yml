@@ -1,4 +1,4 @@
-name: build
+name: build-test
 
 on:
   pull_request:
@@ -59,9 +59,6 @@ jobs:
         shell: bash
         env:
           GIT_LFS_SKIP_SMUDGE: 1
-      - name: Create Flutter project for ohos
-        run: flutter create --platforms ohos .
-        shell: bash
       - name: Set and Extract version
         shell: pwsh
         run: lib/scripts/build.ps1
@@ -69,6 +66,9 @@ jobs:
         run: |
           sed -i "s/name: PiliPlus/name: piliplus/g" pubspec.yaml
           find lib -type f -name "*.dart" -exec sed -i "s/import 'package:PiliPlus/import 'package:piliplus/g" {} \;
+        shell: bash
+      - name: Add ohos platform
+        run: flutter create --platforms ohos .
         shell: bash
       - name: Build Flutter for ohos
         run: flutter build hap --release --dart-define-from-file=pili_release.json
