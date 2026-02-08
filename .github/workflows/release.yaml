@@ -57,6 +57,9 @@ jobs:
         shell: bash
         env:
           GIT_LFS_SKIP_SMUDGE: 1
+      - name: Create Flutter project for ohos
+        run: flutter create --platforms ohos .
+        shell: bash
       - name: Set and Extract version
         shell: pwsh
         run: lib/scripts/build.ps1
