@@ -96,3 +96,8 @@ jobs:
       #     name: ${{ env.tag }}
       #     draft: true
       #     files: PiliPlus_ohos_*.hap
+      - name: Upload ohos release
+        uses: actions/upload-artifact@v5
+        with:
+          name: ohos-release
+          path: PiliPlus_ohos_*.hap
