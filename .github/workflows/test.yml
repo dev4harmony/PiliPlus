@@ -88,16 +88,10 @@ jobs:
         shell: bash
         continue-on-error: true
       - name: Package ohos build output
-        run: cp ./ohos/entry/build/default/outputs/default/entry-default-unsigned.hap PiliPlus_ohos_test_unsigned.hap
+        run: cp ./ohos/entry/build/default/outputs/default/entry-default-unsigned.hap PiliPlus_ohos_canary.hap
         shell: bash
-      # - name: Create release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     name: ${{ env.tag }}
-      #     draft: true
-      #     files: PiliPlus_ohos_*.hap
-      - name: Upload ohos release
-        uses: actions/upload-artifact@v5
+      - name: Upload ohos outputs
+        uses: actions/upload-artifact@v4
         with:
-          name: ohos-release
+          name: ohos_outputs
           path: PiliPlus_ohos_*.hap
