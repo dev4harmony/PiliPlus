@@ -1,17 +1,17 @@
 name: build-test
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-    paths-ignore:
-      - 'static/**'
-      - '**.md'
-      - '.gitignore'
-      - '.github/ISSUE_TEMPLATE/**'
+  # pull_request:
+  #   types:
+  #     - opened
+  #     - synchronize
+  #     - reopened
+  #     - ready_for_review
+  #   paths-ignore:
+  #     - 'static/**'
+  #     - '**.md'
+  #     - '.gitignore'
+  #     - '.github/ISSUE_TEMPLATE/**'
   workflow_dispatch:
     inputs:
       logLevel:
@@ -26,31 +26,14 @@ on:
 
 jobs:
   flutter_build_ohos:
-    name: Release for ohos
+    name: Build for ohos
     runs-on: ubuntu-latest
     permissions: write-all
-
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: 替换包名
-        run: |
-          export LC_ALL=C
-          sed -i 's/com\.example\.piliplus/com\.example\.pilitest/g' \
-            ohos/AppScope/app.json5 \
-            lib/services/audio_handler.dart
-        shell: bash
-
-      - name: Extract tag name
-        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-        shell: bash
-
-      - name: Echo build progress
-        run: echo "PiliPlus_ohos_${{ env.tag }}_unsigned.hap build progress"
-        shell: bash
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -92,11 +75,10 @@ jobs:
         shell: bash
         continue-on-error: true
       - name: Package ohos build output
-        run: cp ./ohos/entry/build/default/outputs/default/entry-default-unsigned.hap PiliPlus_ohos_${{ env.tag }}_unsigned.hap
+        run: cp ./ohos/entry/build/default/outputs/default/entry-default-unsigned.hap PiliPlus_ohos_canary.hap
         shell: bash
-      # - name: Create release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     name: ${{ env.tag }}
-      #     draft: true
-      #     files: PiliPlus_ohos_*.hap
+      - name: Upload ohos outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ohos_outputs
+          path: PiliPlus_ohos_*.hap
