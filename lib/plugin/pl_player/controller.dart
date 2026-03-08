@@ -227,8 +227,7 @@ class PlPlayerController {
 
   late final bool autoPiP = Pref.autoPiP;
   bool get isPipMode =>
-      ((Platform.isAndroid || PlatformUtils.isHarmony) &&
-          Floating().isPipMode) ||
+      ((Platform.isAndroid || PlatformUtils.isHarmony) && Floating().isPipMode) ||
       (PlatformUtils.isDesktop && isDesktopPip);
   late bool isDesktopPip = false;
   late Rect _lastWindowBounds;
@@ -1372,14 +1371,6 @@ class PlPlayerController {
   }
 
   void volumeUpdated() {
-    if (PlatformUtils.isHarmony) {
-      volumeIndicator.value = true;
-      volumeTimer?.cancel();
-      volumeTimer = Timer(const Duration(seconds: 1), () {
-        volumeIndicator.value = false;
-      });
-      return;
-    }
     showVolumeStatus.value = true;
     _timerForShowingVolume?.cancel();
     _timerForShowingVolume = Timer(const Duration(seconds: 1), () {
