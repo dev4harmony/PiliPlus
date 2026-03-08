@@ -1200,7 +1200,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   void _onInteractionEnd(ScaleEndDetails details) {
     // 鸿蒙滑动结束之后，恢复显示音量条
-    if (PlatformUtils.isHarmony) HarmonyVolumeView.cntlr.setPanleVisible(true);
+    // if (PlatformUtils.isHarmony) HarmonyVolumeView.cntlr.setPanleVisible(true);
     if (plPlayerController.showSeekPreview) {
       plPlayerController.showPreview.value = false;
     }
@@ -1430,7 +1430,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
     // 鸿蒙滑动结束之后，恢复显示音量条
-    if (PlatformUtils.isHarmony) HarmonyVolumeView.cntlr.setPanleVisible(true);
+    // if (PlatformUtils.isHarmony) HarmonyVolumeView.cntlr.setPanleVisible(true);
     _gestureType = null;
   }
 
