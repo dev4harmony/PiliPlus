@@ -78,7 +78,7 @@ class VideoCardV extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Card(
-          clipBehavior: Clip.hardEdge, // 鸿蒙版移除
+          clipBehavior: Clip.hardEdge,
           child: InkWell(
             onTap: () => onPushDetail(Utils.makeHeroTag(videoItem.aid)),
             onLongPress: onLongPress,
