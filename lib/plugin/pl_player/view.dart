@@ -1202,6 +1202,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onInteractionEnd(ScaleEndDetails details) {
+    if (PlatformUtils.isHarmony) plPlayerController.volumeUpdated();
     if (plPlayerController.showSeekPreview) {
       plPlayerController.showPreview.value = false;
     }
@@ -1430,6 +1431,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
+    if (PlatformUtils.isHarmony) plPlayerController.volumeUpdated();
     _gestureType = null;
   }
 
