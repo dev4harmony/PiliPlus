@@ -78,7 +78,6 @@ class PlayerFocus extends StatelessWidget {
           );
       }
     } else if (event is KeyUpEvent) {
-      if (PlatformUtils.isHarmony) plPlayerController.volumeUpdated();
       if (plPlayerController.longPressTimer?.tick == 0 && hasPlayer) {
         _setVolume(isIncrease: isIncrease);
       }

@@ -205,7 +205,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             if (mounted &&
                 !plPlayerController.volumeInterceptEventStream.value) {
               plPlayerController.volume.value = value;
-              if (Platform.isIOS && !FlutterVolumeController.showSystemUI) {
+              if (Platform.isIOS && !FlutterVolumeController.showSystemUI || PlatformUtils.isHarmony) {
                 plPlayerController
                   ..volumeIndicator.value = true
                   ..volumeTimer?.cancel()
