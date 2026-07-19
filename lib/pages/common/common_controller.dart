@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:PiliPlus/common/utils/status_bar_tap.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:easy_debounce/easy_throttle.dart';
@@ -33,6 +34,11 @@ abstract class CommonController<R, T> extends GetxController
   @override
   final ScrollController scrollController = ScrollController();
 
+  late final StatusBarTapObserver statusBarTap = StatusBarTapObserver(
+    scrollController: scrollController,
+    animateToTop: animateToTop,
+  );
+
   bool isLoading = false;
   Rx<LoadingState> get loadingState;
 
@@ -62,7 +68,16 @@ abstract class CommonController<R, T> extends GetxController
   }
 
   @override
+  void onInit() {
+    super.onInit();
+    statusBarTap
+      ..routeName = Get.currentRoute
+      ..register();
+  }
+
+  @override
   void onClose() {
+    statusBarTap.dispose();
     scrollController.dispose();
     super.onClose();
   }

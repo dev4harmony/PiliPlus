@@ -35,10 +35,11 @@ class MemberPage extends StatefulWidget {
   State<MemberPage> createState() => _MemberPageState();
 }
 
-class _MemberPageState extends State<MemberPage> {
+class _MemberPageState extends State<MemberPage> with WidgetsBindingObserver {
   late final int _mid;
   late final String _heroTag;
   late final MemberController _userController;
+  late final String _routeName;
   PageController? _headerController;
   PageController getHeaderController() =>
       _headerController ??= PageController();
@@ -52,13 +53,29 @@ class _MemberPageState extends State<MemberPage> {
       MemberController(mid: _mid),
       tag: _heroTag,
     );
+    _routeName = Get.currentRoute;
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     _headerController?.dispose();
     _headerController = null;
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void handleStatusBarTap() {
+    if (Get.currentRoute != _routeName) return;
+    final outerCtr = _userController.key.currentState?.outerController;
+    if (outerCtr?.hasClients == true) {
+      outerCtr!.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutCirc,
+      );
+    }
   }
 
   @override
