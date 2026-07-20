@@ -35,23 +35,15 @@
       },
       {
         name: "ohos.permission.READ_PASTEBOARD",
-        reason: "$string:no_matter",
+        reason: "$string:read_pasteboard_reason",
         usedScene: {
           abilities: ["EntryAbility"],
-          when: "inuse",
+          when: "always",
         }
       },
       {
         name: "ohos.permission.GET_NETWORK_INFO",
         reason: "$string:perm_get_network_info_reason",
-        usedScene: {
-          abilities: ["EntryAbility"],
-          when: "inuse",
-        },
-      },
-      {
-        name: "ohos.permission.WRITE_IMAGEVIDEO",
-        reason: "$string:write_imagevideo_reason",
         usedScene: {
           abilities: ["EntryAbility"],
           when: "inuse",

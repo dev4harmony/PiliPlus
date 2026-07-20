@@ -1,6 +1,27 @@
 import 'dart:convert';
 import 'dart:io';
 
+Future<void> _updatePubspecVersion(int versionCode) async {
+  final pubspecPath = './pubspec.yaml';
+  final file = File(pubspecPath);
+  if (!await file.exists()) return;
+  
+  final content = await file.readAsString();
+  final lines = content.split('\n');
+  
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('version:')) {
+      final match = RegExp(r'version:\s*([\d.]+)(\+[\d]+)?').firstMatch(lines[i]);
+      if (match != null) {
+        final versionName = match.group(1)!;
+        lines[i] = 'version: $versionName+$versionCode';
+        await file.writeAsString(lines.join('\n'));
+        break;
+      }
+    }
+  }
+}
+
 void main() async {
   // 手动指定 versionName
   const versionName = '2.0.1-ohos-3';
@@ -8,6 +29,8 @@ void main() async {
   // 通过 git 命令获取 hash 和 code
   final versionCode = await _getGitCommitCount();
   final commitHash = await _getGitCommitHash();
+  
+  await _updatePubspecVersion(versionCode);
 
   final env = {
     '此环境变量由脚本自动生成': '请勿编辑',

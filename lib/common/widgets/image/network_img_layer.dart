@@ -13,8 +13,8 @@ class NetworkImgLayer extends StatelessWidget {
     required this.width,
     required this.height,
     this.type = ImageType.def,
-    this.fadeOutDuration = const Duration(milliseconds: 120),
-    this.fadeInDuration = const Duration(milliseconds: 120),
+    this.fadeOutDuration = Duration.zero,
+    this.fadeInDuration = Duration.zero,
     this.quality = 1,
     this.borderRadius = StyleString.mdRadius,
     this.getPlaceHolder,
@@ -69,30 +69,34 @@ class NetworkImgLayer extends StatelessWidget {
     } else {
       memCacheHeight = height.cacheSize(context);
     }
-   
-    return CachedNetworkImage(
-      imageUrl: (isEmote) ? ImageUtils.thumbnailUrl(src, quality) :ImageUtils.thumbnailUrlWithSize(
-        src,
-        memCacheWidth,
-        memCacheHeight,
-        quality,
+
+    return RepaintBoundary(
+      child: CachedNetworkImage(
+        imageUrl: (isEmote)
+            ? ImageUtils.thumbnailUrl(src, quality)
+            : ImageUtils.thumbnailUrlWithSize(
+                src,
+                memCacheWidth,
+                memCacheHeight,
+                quality,
+              ),
+        width: width,
+        height: height,
+        memCacheWidth: memCacheWidth,
+        memCacheHeight: memCacheHeight,
+        fit: fit,
+        alignment: alignment,
+        fadeOutDuration: fadeOutDuration,
+        fadeInDuration: fadeInDuration,
+        filterQuality: FilterQuality.low,
+        placeholder: (_, _) =>
+            getPlaceHolder?.call() ??
+            _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
+        errorBuilder: (_, _, _) =>
+            _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
+        colorBlendMode: reduce ? BlendMode.modulate : null,
+        color: reduce ? reduceLuxColor : null,
       ),
-      width: width,
-      height: height,
-      memCacheWidth: memCacheWidth,
-      memCacheHeight: memCacheHeight,
-      fit: fit,
-      alignment: alignment,
-      fadeOutDuration: fadeOutDuration,
-      fadeInDuration: fadeInDuration,
-      filterQuality: FilterQuality.low,
-      placeholder: (_, _) =>
-          getPlaceHolder?.call() ??
-          _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
-      errorBuilder: (_, _, _) =>
-          _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
-      colorBlendMode: reduce ? BlendMode.modulate : null,
-      color: reduce ? reduceLuxColor : null,
     );
   }
 

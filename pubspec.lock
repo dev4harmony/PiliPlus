@@ -281,8 +281,8 @@ packages:
     description:
       path: "."
       ref: main
-      resolved-ref: "697d4516df2fc3ba7417c7ce9aba079d34ba13e5"
-      url: "https://github.com/bggRGjQaUbCoE/canvas_danmaku.git"
+      resolved-ref: "3947b1fec9d89a8bb11b6feda7a43787ed1e73a9"
+      url: "https://github.com/Starfallan/canvas_danmaku.git"
     source: git
     version: "0.2.6"
   catcher_2:
