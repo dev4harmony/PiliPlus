@@ -37,10 +37,6 @@
       "value": "用于读取剪贴板内容。"
     },
     {
-      "name": "perm_distributed_datasync_reason",
-      "value": "用于在多设备间接续视频播放进度。"
-    },
-    {
       "name": "no_matter",
       "value": "no matter"
     }

@@ -1,4 +1,4 @@
-import { abilityAccessCtrl, common } from "@kit.AbilityKit";
+import { common } from "@kit.AbilityKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { fileIo, fileUri, picker } from "@kit.CoreFileKit";
 import AbilityConstant from "@ohos.app.ability.AbilityConstant";
@@ -104,14 +104,6 @@ export default class EntryAbility extends FlutterAbility {
 
   async onWindowStageCreate(windowStage: window.WindowStage): Promise<void> {
     super.onWindowStageCreate(windowStage);
-    // 跨设备接续要求两端均授予多设备协同权限（user_grant，需弹窗授权；
-    // 已授权或已被拒绝时系统不再弹窗）
-    abilityAccessCtrl
-      .createAtManager()
-      .requestPermissionsFromUser(this.context, ["ohos.permission.DISTRIBUTED_DATASYNC"])
-      .catch((err: BusinessError) => {
-        console.error(`request DISTRIBUTED_DATASYNC failed: ${err.code} ${err.message}`);
-      });
     let w = windowStage.getMainWindowSync();
     w.on("windowStatusChange", (type) => {
       if (type == window.WindowStatusType.FLOATING && !this.wasFloatingWindow) {

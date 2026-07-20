@@ -17,10 +17,6 @@
       "value": "Allow saving images/videos to gallery."
     },
     {
-      "name": "perm_distributed_datasync_reason",
-      "value": "Used to continue video playback across your devices."
-    },
-    {
       "name": "no_matter",
       "value": "no matter"
     }

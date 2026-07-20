@@ -73,14 +73,6 @@
           when: "inuse",
         },
       },
-      {
-        name: "ohos.permission.DISTRIBUTED_DATASYNC",
-        reason: "$string:perm_distributed_datasync_reason",
-        usedScene: {
-          abilities: ["EntryAbility"],
-          when: "inuse",
-        },
-      },
     ],
   },
 }
