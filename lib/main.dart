@@ -251,6 +251,8 @@ void main() async {
     // 顺带注册 method channel handler，保证热启动接续推送可达
     WidgetsBinding.instance.addPostFrameCallback((_) {
       HarmonyChannel.checkPendingContinuation();
+      // 获取系统初始字重值
+      HarmonyChannel.initSystemFontWeight();
     });
   }
 }

@@ -41,6 +41,10 @@ export default class HarmonyChannel implements FlutterPlugin {
     this.channel?.setMethodCallHandler(null);
   }
 
+  public getChannel(): MethodChannel | null {
+    return this.channel;
+  }
+
   async csy(call: MethodCall) {
     this.lastWindow ??= await window.getLastWindow(getContext());
     return this.lastWindow.setSpecificSystemBarEnabled("status", call.argument("value"), true);
@@ -75,6 +79,10 @@ export default class HarmonyChannel implements FlutterPlugin {
       case "setContinuationActive": {
         const active: boolean = call.argument("active") ?? false;
         this.setMissionContinueState(active);
+        result.success(true);
+        break;
+      }
+      case "getSystemFontWeightScale": {
         result.success(true);
         break;
       }

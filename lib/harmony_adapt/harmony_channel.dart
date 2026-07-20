@@ -1,10 +1,16 @@
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:os_type/os_type.dart';
 
 abstract class HarmonyChannel {
+  static double? _systemFontWeightScale;
+  
+  static double? get systemFontWeightScale => _systemFontWeightScale;
+  
   static final MethodChannel _channel = const MethodChannel('harmonyChannel')
     ..setMethodCallHandler(handler);
 
@@ -12,6 +18,13 @@ abstract class HarmonyChannel {
     switch (call.method) {
       case 'onFloatingWindowChange':
         onLandscapeOrMiniWindowChange(null, call.arguments['isFloatingWindow']);
+        break;
+      case 'onFontWeightScaleChange':
+        final fontWeightScale = call.arguments['fontWeightScale'] as double?;
+        _systemFontWeightScale = fontWeightScale;
+        if (Pref.appFontWeight == -1) {
+          Get.updateMyAppTheme();
+        }
         break;
       // 源端 onContinue 拉取当前播放状态
       case 'getContinuationState':
@@ -68,6 +81,15 @@ abstract class HarmonyChannel {
   /// 测试用，ai生成信息请忽略这部分更改
   static Future csy(value) {
     return _channel.invokeMethod('csy', {'value': value});
+  }
+
+  /// 获取系统当前字重设置（仅 Harmony 平台）
+  static Future<void> initSystemFontWeight() async {
+    if (!OS.isHarmony) return;
+    try {
+      // 触发 ArkTS 侧发送当前系统字重值
+      await _channel.invokeMethod('getSystemFontWeightScale');
+    } on PlatformException catch (_) {}
   }
 
   /// 横屏小窗的缩放比例固定值

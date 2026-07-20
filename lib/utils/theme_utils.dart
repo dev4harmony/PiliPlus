@@ -1,9 +1,11 @@
 import 'package:PiliPlus/common/constants.dart';
+import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/main.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:os_type/os_type.dart';
 
 abstract final class ThemeUtils {
   static ThemeData getThemeData({
@@ -15,9 +17,48 @@ abstract final class ThemeUtils {
       -1,
       FontWeight.values.length - 1,
     );
-    final fontWeight = appFontWeight == -1
-        ? null
-        : FontWeight.values[appFontWeight];
+
+    FontWeight? fontWeight;
+    if (appFontWeight == -1) {
+      // 跟随系统设置
+      double systemScale;
+      if (OS.isHarmony && HarmonyChannel.systemFontWeightScale != null) {
+        final raw = HarmonyChannel.systemFontWeightScale!;
+        // 如果取到的值无效（NaN、Infinity），回退到默认值 1
+        if (raw.isNaN || raw.isInfinite) {
+          systemScale = 1.0;
+        } else {
+          systemScale = raw;
+        }
+      } else {
+        // 完全取不到值时，使用默认值 1
+        systemScale = 1.0;
+      }
+
+      // 按区间直接映射到 FontWeight，超出范围的值自动取下限(w100)或上限(w900)
+      if (systemScale <= 0.75) {
+        fontWeight = FontWeight.w100;
+      } else if (systemScale <= 0.85) {
+        fontWeight = FontWeight.w200;
+      } else if (systemScale <= 0.95) {
+        fontWeight = FontWeight.w300;
+      } else if (systemScale <= 1.05) {
+        fontWeight = FontWeight.w400;
+      } else if (systemScale <= 1.15) {
+        fontWeight = FontWeight.w500;
+      } else if (systemScale <= 1.3) {
+        fontWeight = FontWeight.w600;
+      } else if (systemScale <= 1.35) {
+        fontWeight = FontWeight.w700;
+      } else if (systemScale <= 1.45) {
+        fontWeight = FontWeight.w800;
+      } else {
+        fontWeight = FontWeight.w900;
+      }
+    } else {
+      fontWeight = FontWeight.values[appFontWeight];
+    }
+
     late final textStyle = TextStyle(
       fontWeight: fontWeight,
       fontFamily: "HarmonyOS_Sans",

@@ -4,7 +4,7 @@ import { fileIo, fileUri, picker } from "@kit.CoreFileKit";
 import AbilityConstant from "@ohos.app.ability.AbilityConstant";
 import type Want from "@ohos.app.ability.Want";
 import window from "@ohos.window";
-import { FlutterAbility, FlutterEngine } from "@ohos/flutter_ohos";
+import { FlutterAbility, FlutterEngine, MethodChannel } from "@ohos/flutter_ohos";
 import { GeneratedPluginRegistrant } from "../plugins/GeneratedPluginRegistrant";
 import HarmonyChannel from "../plugins/HarmonyChannel";
 
@@ -14,11 +14,33 @@ const CONTINUATION_KEY = "pili_continuation";
 export default class EntryAbility extends FlutterAbility {
   harmonyChannel: HarmonyChannel = new HarmonyChannel();
   wasFloatingWindow: boolean = false;
+  private flutterChannel: MethodChannel | null = null;
+  private envChangeListener: number | null = null;
 
   configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine);
     GeneratedPluginRegistrant.registerWith(flutterEngine);
     flutterEngine.getPlugins()?.add(this.harmonyChannel);
+    this.flutterChannel = this.harmonyChannel.getChannel();
+    this.initFontWeightListener();
+  }
+
+  private initFontWeightListener(): void {
+    // 监听系统字重变化
+    this.envChangeListener = this.context.getApplicationContext().on('environment', {
+      onConfigurationUpdated: (config) => {
+        const fontWeightScale = config.fontWeightScale;
+        console.info(`EntryAbility: fontWeightScale changed to ${fontWeightScale}`);
+        this.flutterChannel?.invokeMethod("onFontWeightScaleChange", { fontWeightScale: fontWeightScale });
+      },
+      onMemoryLevel: () => {
+      }
+    });
+
+    // 获取初始系统字重值
+    const initialFontWeightScale = this.context.config.fontWeightScale;
+    console.info(`EntryAbility: initial fontWeightScale is ${initialFontWeightScale}`);
+    this.flutterChannel?.invokeMethod("onFontWeightScaleChange", { fontWeightScale: initialFontWeightScale });
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam) {
@@ -114,5 +136,12 @@ export default class EntryAbility extends FlutterAbility {
         });
       console.log('测试：' + '创建下载文件夹成功')
     }, 100)
+  }
+
+  onDestroy(): void {
+    if (this.envChangeListener !== null) {
+      this.context.getApplicationContext().off('environment', this.envChangeListener);
+    }
+    super.onDestroy();
   }
 }
