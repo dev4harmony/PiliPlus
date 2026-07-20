@@ -5,7 +5,7 @@ extension ScrollControllerExt on ScrollController {
 
   void animTo(
     double offset, {
-    Duration duration = const Duration(milliseconds: 1000),
+    Duration duration = const Duration(milliseconds: 800),
   }) {
     if (!hasClients) return;
     if ((offset - this.offset).abs() >= position.viewportDimension * 7) {

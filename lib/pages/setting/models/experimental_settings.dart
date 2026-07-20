@@ -21,4 +21,11 @@ List<SettingsModel> experimentalSettings = [
     setKey: SettingBoxKey.showActualVolume,
     defaultVal: false,
   ),
+  const SwitchModel(
+    title: '点击系统状态栏快速返回顶部',
+    subtitle: '开启后在鸿蒙/iOS设备上，绝大部分列表点击状态栏可以快速回顶。\n关闭后除了部分原生支持的界面，均不再响应状态栏点击。',
+    leading: Icon(Icons.vertical_align_top_outlined),
+    setKey: SettingBoxKey.enableStatusBarTapToTop,
+    defaultVal: false,
+  ),
 ];

@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -29,6 +30,7 @@ class StatusBarTapObserver with WidgetsBindingObserver {
 
   @override
   void handleStatusBarTap() {
+    if (!Pref.enableStatusBarTapToTop) return;
     if (routeName == null) return;
     if (Get.currentRoute != routeName) return;
     if (scrollController.hasClients) {

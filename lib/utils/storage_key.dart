@@ -2,6 +2,7 @@
 
 abstract final class SettingBoxKey {
   static const String enableLGBar = 'enableLGBar',
+      enableStatusBarTapToTop = 'enableStatusBarTapToTop',
       showActualVolume = 'showActualVolume';
 
   static const String btmProgressBehavior = 'btmProgressBehavior',

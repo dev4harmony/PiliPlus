@@ -739,6 +739,9 @@ abstract final class Pref {
   static bool get enableLGBar =>
       _setting.get(SettingBoxKey.enableLGBar, defaultValue: false);
 
+  static bool get enableStatusBarTapToTop =>
+      _setting.get(SettingBoxKey.enableStatusBarTapToTop, defaultValue: false);
+
   static bool get showActualVolume =>
       _setting.get(SettingBoxKey.showActualVolume, defaultValue: false);
 
