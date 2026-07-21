@@ -30,17 +30,17 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
-  os_type: ^0.2.2
-  liquid_glass_widgets: ^0.8.2 # 液态玻璃
+  os_type: 0.2.2
+  liquid_glass_widgets: 0.8.4 # 液态玻璃
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  cupertino_icons: 1.0.9
   # 动态取色
-  dynamic_color: ^1.8.1
+  dynamic_color: 1.8.1
 
   # get: ^4.7.2
   get:
@@ -50,33 +50,33 @@ dependencies:
 
   # 网络
   dio: 5.9.2
-  cookie_jar: ^4.0.8
-  connectivity_plus: ^5.0.2
-  connectivity_plus_ohos: ^0.0.3
-  dio_http2_adapter: ^2.5.3
+  cookie_jar: 4.0.9
+  connectivity_plus: 5.0.2
+  connectivity_plus_ohos: 0.0.3
+  dio_http2_adapter: 2.7.1
 
   # 图片
-  cached_network_image: ^3.4.1
+  cached_network_image: 3.4.1
   # extended_image: ^9.0.7
-  saver_gallery: ^4.1.0 # 已适配鸿蒙
+  saver_gallery: 4.1.2 # 已适配鸿蒙
 
   # QRCode
   # qr_flutter: ^4.1.0
-  pretty_qr_code: ^3.3.0
+  pretty_qr_code: 3.6.0
 
   # 存储
   path_provider: ^2.1.5
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
+  hive: 2.2.3
+  hive_flutter: 1.1.0
 
   # 设备信息
   device_info_plus: ^10.1.0
   # 权限
   # permission_handler: ^12.0.0+1
-  permission_handler_apple: ^9.4.7
-  permission_handler_android: ^13.0.1
-  permission_handler_platform_interface: ^4.3.0
-  permission_handler_ohos: ^0.0.8
+  permission_handler_apple: 9.4.10
+  permission_handler_android: 13.0.1
+  permission_handler_platform_interface: 4.3.0
+  permission_handler_ohos: 0.0.8
   # 分享
   share_plus: ^10.1.1
   # cookie 管理
@@ -110,8 +110,8 @@ dependencies:
   # dismissible_page: ^1.0.2
   # custom_sliding_segmented_control: ^1.8.4
   # 加密
-  crypto: ^3.0.6
-  encrypt: ^5.0.3
+  crypto: 3.0.7
+  encrypt: 5.0.3
 
   # 视频播放器
   media_kit: # overridden
@@ -138,9 +138,9 @@ dependencies:
       ref: br_v0.2.2_ohos
 
   # 音量、亮度、屏幕控制
-  flutter_volume_controller: ^2.0.1 # 已支持鸿蒙
+  flutter_volume_controller: 2.0.1 # 已支持鸿蒙
   wakelock_plus: 1.3.3
-  wakelock_plus_ohos: ^0.0.3
+  wakelock_plus_ohos: 0.0.3
   # universal_platform: ^1.1.0
   # auto_orientation:
   #   git:
@@ -149,17 +149,17 @@ dependencies:
   auto_orientation: # 自动旋转.鸿蒙适配
     git:
       url: "https://gitcode.com/CPF-Flutter/fluttertpc_auto_orientation"
-  protobuf: ^6.0.0
+  protobuf: 6.0.0
   # animations: ^2.0.11
 
   url_launcher: ^6.3.1
   # 防抖节流
-  easy_debounce: ^2.0.3
+  easy_debounce: 2.0.3
   # 高帧率
-  flutter_displaymode: ^0.7.0
+  flutter_displaymode: 0.7.0
   # scheme跳转
-  app_links: ^6.4.0
-  app_links_ohos: ^0.2.0
+  app_links: 6.4.1
+  app_links_ohos: 0.2.0
   # 弹幕
   # ns_danmaku:
   #   git:
@@ -181,18 +181,18 @@ dependencies:
       ref: 3eefccb759c4ea8114e722f1511fe1dbce70dc9f
       
     # html解析
-  html: ^0.15.4
+  html: 0.15.6
   # html渲染
-  flutter_html: ^3.0.0-beta.2
+  flutter_html: 3.0.0
   # 极验
-  gt3_flutter_plugin: ^0.1.0
-  uuid: ^4.5.1
+  gt3_flutter_plugin: 0.1.1
+  uuid: 4.5.3
   # scrollable_positioned_list: ^0.3.8
   # nil: ^1.1.1
-  catcher_2: ^2.1.0
-  logger: ^2.5.0
+  catcher_2: 2.1.9
+  logger: 2.7.0
   #瀑布流
-  waterfall_flow: ^3.1.0
+  waterfall_flow: 3.1.1
   #跑马灯
   # marquee: ^2.3.0
   #富文本
@@ -204,29 +204,29 @@ dependencies:
       ref: dba2bf10db4a6f89564d9be63ce17b18f0f7e3e5
       path: packages/chat_bottom_container
   image_picker: ^1.1.2
-  intl: ^0.20.2
-  archive: ^4.0.0
-  flutter_svg: ^2.0.14
+  intl: 0.20.2
+  archive: 4.0.9
+  flutter_svg: 2.3.0
   image_cropper: ^11.0.0
   #解压直播消息
-  brotli: ^0.6.0
-  expandable: ^5.0.1
-  flex_seed_scheme: ^3.6.1
-  live_photo_maker: ^0.0.6
-  fl_chart: ^1.0.0
-  synchronized: ^3.3.0
+  brotli: 0.6.0
+  expandable: 5.0.1
+  flex_seed_scheme: 3.6.1
+  live_photo_maker: 0.0.6
+  fl_chart: 1.2.0
+  synchronized: 3.4.0+1
   # document_file_save_plus: ^2.0.0
   # webdav_client: ^1.2.2
   webdav_client:
     git:
       url: https://github.com/wgh136/webdav_client.git
       ref: main
-  re_highlight: ^0.0.3
+  re_highlight: 0.0.3
   flutter_sortable_wrap:
     git:
       url: https://github.com/bggRGjQaUbCoE/flutter_sortable_wrap.git
       ref: master
-  web_socket_channel: ^3.0.3
+  web_socket_channel: 3.0.3
   # image: ^4.7.1
   # window_manager: ^0.5.1
   window_manager:
@@ -234,7 +234,7 @@ dependencies:
       url: https://github.com/bggRGjQaUbCoE/window_manager.git
       path: packages/window_manager
       ref: main
-  tray_manager: ^0.5.1
+  tray_manager: 0.5.3
   # file_picker: ^10.3.3
   file_picker:
     git:
@@ -244,28 +244,28 @@ dependencies:
     git:
       url: https://github.com/bggRGjQaUbCoE/super_sliver_list.git
       ref: mod
-  dlna_dart: ^0.1.0
-  battery_plus: ^7.0.0
-  battery_plus_ohos: ^0.0.3
+  dlna_dart: 0.1.1
+  battery_plus: 7.1.0
+  battery_plus_ohos: 0.0.3
 
-  vector_math: any
-  fixnum: any
-  json_annotation: any
-  stream_transform: any
-  screen_brightness: ^2.1.7
-  screen_brightness_platform_interface: ^2.1.0
-  mime: any
-  path: any
-  collection: any
-  material_color_utilities: any
-  flutter_cache_manager: any
-  http2: any
-  screen_retriever: any
-  characters: any
-  cached_network_image_ce: any
+  vector_math: 2.2.0
+  fixnum: 1.1.1
+  json_annotation: 4.12.0
+  stream_transform: 2.1.1
+  screen_brightness: 2.1.11
+  screen_brightness_platform_interface: 2.1.2
+  mime: 2.0.0
+  path: 1.9.1
+  collection: 1.19.1
+  material_color_utilities: 0.13.0
+  flutter_cache_manager: 3.4.1
+  http2: 2.3.1
+  screen_retriever: 0.2.1
+  characters: 1.4.1
+  cached_network_image_ce: 4.6.4
 
 dependency_overrides:
-  meta: ^1.16.0 # 兼容液态玻璃
+  meta: 1.18.3 # 兼容液态玻璃
   device_info_plus:
     git:
       url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
@@ -299,9 +299,9 @@ dependency_overrides:
       url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
       path: packages/share_plus/share_plus
       ref: br_share_plus-v10.1.1_ohos
-  path: ^1.9.1
-  mime: ^2.0.0
-  rxdart: ^0.28.0
+  path: 1.9.1
+  mime: 2.0.0
+  rxdart: 0.28.0
   media_kit:
     git:
       url: https://github.com/Predidit/media-kit.git
@@ -371,11 +371,11 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.14.4
+  flutter_lints: 2.0.3
+  flutter_launcher_icons: 0.14.4
   # hive_generator: ^2.0.1
-  build_runner: ^2.10.3
-  flutter_native_splash: ^2.4.6
+  build_runner: 2.15.0
+  flutter_native_splash: 2.4.8
 
 flutter_launcher_icons:
   android: true
