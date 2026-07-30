@@ -26,6 +26,7 @@ jobs:
         run: |
           git clone -b oh-3.41.9-release https://gitcode.com/CPF-Flutter/flutter_flutter.git $GITHUB_WORKSPACE/flutter
           echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
+          $GITHUB_WORKSPACE/flutter/bin/flutter --version
         shell: bash
 
       # 用 dart pub get 而非 flutter pub get：仓库带 ohos/ 目录，flutter pub get
