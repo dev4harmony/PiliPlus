@@ -28,9 +28,6 @@ jobs:
           echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
         shell: bash
 
-      # 用 dart pub get 而非 flutter pub get：仓库带 ohos/ 目录，flutter pub get
-      # 会走 flutter_tools 的鸿蒙平台准备流程，缺 HOS_SDK_HOME 时直接 throwToolExit
-      # （No Hmos SDK found）。分析只需要 package_config.json，不需要鸿蒙 SDK。
       - name: Get dependencies
         run: dart pub get
         env:
