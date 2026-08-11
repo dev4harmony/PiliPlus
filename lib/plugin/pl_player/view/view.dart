@@ -1408,6 +1408,19 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     }
   }
 
+  /// 竖屏全屏时给弹幕加与顶部控件同一套的顶部避让（统一 topInset）
+  Widget _danmakuWithTopInset(Widget danmaku) {
+    final inset = portraitFullscreenTopInset(
+      isFullScreen: isFullScreen,
+      isPortrait: maxHeight >= maxWidth,
+      removeSafeArea: plPlayerController.removeSafeArea,
+      topInset: widget.topInset,
+    );
+    return inset == null
+        ? danmaku
+        : Padding(padding: EdgeInsets.only(top: inset), child: danmaku);
+  }
+
   @override
   Widget build(BuildContext context) {
     maxWidth = widget.maxWidth;
@@ -1431,7 +1444,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         _videoWidget,
 
         if (widget.danmuWidget case final danmaku?)
-          Positioned.fill(top: 4, child: danmaku),
+          Positioned.fill(
+            top: 4,
+            child: _danmakuWithTopInset(danmaku),
+          ),
 
         if (!isLive)
           // 鸿蒙 media_kit fork 的 SubtitleView 没有上游 fork 的

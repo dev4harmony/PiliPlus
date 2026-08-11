@@ -1,4 +1,5 @@
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:flutter/material.dart';
 
 class AppBarAni extends StatelessWidget {
@@ -53,6 +54,13 @@ class AppBarAni extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final top = portraitFullscreenTopInset(
+      isFullScreen: isFullScreen,
+      isPortrait:
+          MediaQuery.sizeOf(context).height >= MediaQuery.sizeOf(context).width,
+      removeSafeArea: removeSafeArea,
+      topInset: topInset,
+    );
     Widget result = child;
     if (!removeSafeArea) {
       result = ViewSafeArea(
@@ -62,12 +70,9 @@ class AppBarAni extends StatelessWidget {
       );
       // 竖屏全屏时用进全屏前捕获的固定高度避让挖孔/状态栏，
       // 不依赖全屏下已归零的 MediaQuery padding
-      if (isTop &&
-          isFullScreen &&
-          MediaQuery.sizeOf(context).height >= MediaQuery.sizeOf(context).width &&
-          (topInset ?? 0) > 0) {
+      if (isTop && top != null) {
         result = Padding(
-          padding: EdgeInsets.only(top: topInset!),
+          padding: EdgeInsets.only(top: top),
           child: result,
         );
       }

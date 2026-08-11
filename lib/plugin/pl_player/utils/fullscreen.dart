@@ -14,6 +14,20 @@ import 'package:os_type/os_type.dart';
 /// 才“长高”导致整体下移一跳。
 const Duration kSystemBarSettleDelay = Duration(milliseconds: 120);
 
+/// 竖屏全屏时的顶部避让高度：仅在全屏 + 竖屏 + 未移除安全边距时返回
+/// [topInset]（进全屏前捕获的状态栏/挖孔高度），否则返回 null（不避让）。
+/// 播控顶部组件与弹幕共用这一套判断，保证两处行为一致。
+double? portraitFullscreenTopInset({
+  required bool isFullScreen,
+  required bool isPortrait,
+  required bool removeSafeArea,
+  required double? topInset,
+}) {
+  if (!isFullScreen || !isPortrait || removeSafeArea) return null;
+  final inset = topInset ?? 0;
+  return inset > 0 ? inset : null;
+}
+
 bool _isDesktopFullScreen = false;
 
 @pragma('vm:notify-debugger-on-exception')
