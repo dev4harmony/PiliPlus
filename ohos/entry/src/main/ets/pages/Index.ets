@@ -1,4 +1,4 @@
-import { SymbolGlyphModifier, uiMaterial } from '@kit.ArkUI';
+import { LengthMetrics, SymbolGlyphModifier, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { HdsAnimationMode, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import common from '@ohos.app.ability.common';
@@ -325,7 +325,6 @@ struct Index {
         .onClick(() => {
           this.context.eventHub.emit(EVENT_TOP_MINE);
         })
-        .systemMaterial(topBarMaterial(true))
     } else {
       this.circleIconButton($r('sys.symbol.person_crop_circle_fill'), 44, 26, () => {
         this.context.eventHub.emit(EVENT_TOP_MINE);
@@ -415,14 +414,50 @@ struct Index {
       .hitTestBehavior(HitTestMode.Default)
       .align(Alignment.Top)
     }
-    .height(this.homeHideTopBar && this.topBarCollapsed
-      ? TOP_BAR_COLLAPSED_HEIGHT
-      : TOP_BAR_EXPANDED_HEIGHT)
+    .height(this.topBarHeight())
     .animation({ duration: 220, curve: Curve.EaseInOut })
     .width('100%')
     .hitTestBehavior(HitTestMode.Default)
-    .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
     .align(Alignment.Top)
+  }
+
+  /// 沉浸式系统材质仅在 Navigation/NavDestination 标题栏或 BarPosition.End 的
+  /// 底部 TabBar 内生效（API 26 正式版起校验，超范围时日志打印
+  /// Material inactive: out of scope），故顶栏整体挂进一个只占顶栏高度的
+  /// Navigation 标题栏，内容区留空，不遮挡下方 FlutterPage。
+  @Builder
+  homeTopBarHost() {
+    Navigation() {
+      // 空内容区：BarStyle.STACK 下被标题栏完全覆盖，不参与触摸测试
+      Column()
+        .width('100%')
+        .height('100%')
+        .hitTestBehavior(HitTestMode.None)
+    }
+    // 宽窗口下默认的 Auto 会分栏，强制 Stack 保持单栏标题栏布局
+    .mode(NavigationMode.Stack)
+    .hideBackButton(true)
+    .hideToolBar(true)
+    // 显式给出标题栏高度，避免自定义标题被压回默认 56vp；
+    // 不设 menus，paddingStart/paddingEnd 才能把标题栏默认左右边距清零
+    .title({ builder: this.homeTopBar, height: this.topBarHeight() }, {
+      barStyle: BarStyle.STACK,
+      paddingStart: LengthMetrics.vp(0),
+      paddingEnd: LengthMetrics.vp(0)
+    })
+    // 状态栏避让由顶栏内部的 statusBarHeight padding 负责，避免重复加一层
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .backgroundColor(Color.Transparent)
+    .width('100%')
+    .height(this.topBarHeight())
+    .animation({ duration: 220, curve: Curve.EaseInOut })
+    .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
+  }
+
+  private topBarHeight(): number {
+    return this.homeHideTopBar && this.topBarCollapsed
+      ? TOP_BAR_COLLAPSED_HEIGHT
+      : TOP_BAR_EXPANDED_HEIGHT;
   }
 
   @Builder
@@ -448,7 +483,7 @@ struct Index {
       adaptToHandedness: true,
       systemMaterialEffect: {
         materialType: hdsMaterial.MaterialType.IMMERSIVE,
-        materialLevel: hdsMaterial.MaterialLevel.EXQUISITE
+        materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
       }
     })
     .visibility(this.navTabs.length <= 1 || this.shellBarsHidden
@@ -468,7 +503,7 @@ struct Index {
         this.hdsMainTabs()
       }
       if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 26) {
-        this.homeTopBar()
+        this.homeTopBarHost()
       }
     }
     .width(this.winWidth > 0 ? this.winWidth : '100%')

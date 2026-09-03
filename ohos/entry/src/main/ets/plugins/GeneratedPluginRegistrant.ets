@@ -13,7 +13,7 @@ import NativeDeviceOrientationPlugin from 'native_device_orientation';
 import MediaKitVideoPlugin from 'media_kit_video';
 import MediaKitLibsOhosPlugin from 'media_kit_libs_ohos';
 import ImagePickerPlugin from 'image_picker_ohos';
-import ImagecropperOhosPlugin from 'image_cropper';
+import ImageCropperPlugin from 'image_cropper';
 import FlutterVolumeControllerPlugin from 'flutter_volume_controller';
 import InAppWebViewFlutterPlugin from 'flutter_inappwebview_ohos';
 import FloatingPlugin from 'floating';
@@ -51,7 +51,7 @@ export class GeneratedPluginRegistrant {
       flutterEngine.getPlugins()?.add(new MediaKitVideoPlugin());
       flutterEngine.getPlugins()?.add(new MediaKitLibsOhosPlugin());
       flutterEngine.getPlugins()?.add(new ImagePickerPlugin());
-      flutterEngine.getPlugins()?.add(new ImagecropperOhosPlugin());
+      flutterEngine.getPlugins()?.add(new ImageCropperPlugin());
       flutterEngine.getPlugins()?.add(new FlutterVolumeControllerPlugin());
       flutterEngine.getPlugins()?.add(new InAppWebViewFlutterPlugin());
       flutterEngine.getPlugins()?.add(new FloatingPlugin());
