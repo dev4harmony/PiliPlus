@@ -30,6 +30,12 @@ class NativeTopSpacer extends StatelessWidget {
   static const double barExpandedHeight = 172;
   static const double barCollapsedHeight = 107;
 
+  /// 留白高度的过渡节奏，须与 Index.ets 的 TOP_BAR_MOTION_DURATION /
+  /// TOP_BAR_MOTION_CURVE 一一对应：两侧不同步时，列表内容与 ArkTS 顶栏
+  /// 会以两种节奏收缩，重合处出现相对滑动。
+  static const Duration _motionDuration = Duration(milliseconds: 300);
+  static const Cubic _motionCurve = Cubic(0.2, 0, 0, 1);
+
   /// 原生顶栏当前是否真正生效（响应式读取，供 Obx 依赖）。
   /// 仅鸿蒙的 _initHdsBar 会置位 nativeTopBarActive，无需再判平台；
   /// 横屏/侧栏布局下 ArkTS 顶栏已被隐藏，此处同样返回 false。
@@ -83,13 +89,11 @@ class NativeTopSpacer extends StatelessWidget {
   Widget build(BuildContext context) {
     // 各 Tab 页处于 keepAlive 状态，不随 HomePage 重建，需用 Obx
     // 确保 useNativeTopBar 异步就绪/顶栏收起状态变化后高度自动更新。
-    // 高度变化应用线性动画 0.220s，与 ArkTS 顶栏收起/展开的
-    // TransitionEffect（220ms）节奏一致。
     return SliverToBoxAdapter(
       child: Obx(
         () => AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.linear,
+          duration: _motionDuration,
+          curve: _motionCurve,
           height: staticHeight(context),
         ),
       ),
