@@ -458,7 +458,7 @@ class _MainAppState extends PopScopeState<MainApp>
   }
 
   Widget _sideBar(ThemeData theme) {
-    return _mainController.navigationBars.length > 1
+    final Widget sideBar = _mainController.navigationBars.length > 1
         ? context.isTablet && _mainController.optTabletNav
               ? Column(
                   children: [
@@ -524,6 +524,23 @@ class _MainAppState extends PopScopeState<MainApp>
             padding: const .only(top: 10),
             child: userAndSearchVertical(theme),
           );
+    // NavigationDrawer / NavigationRail 内部各自带一层 SafeArea，会吃掉
+    // padding.left；而它们上方的头像/消息/搜索列不在 SafeArea 内。鸿蒙横屏
+    // 挖孔避让并入 padding 后（见 HarmonyChannel.cutoutInsets），左侧有挖孔的
+    // 机型上这两组控件就一个右移一个不动，视觉错位。改为在侧栏整体上做一次
+    // 左侧避让，并移除子树里的 padding.left 避免重复避让。
+    final left = MediaQuery.paddingOf(context).left;
+    if (left <= 0) {
+      return sideBar;
+    }
+    return Padding(
+      padding: EdgeInsets.only(left: left),
+      child: MediaQuery.removePadding(
+        context: context,
+        removeLeft: true,
+        child: sideBar,
+      ),
+    );
   }
 
   @override

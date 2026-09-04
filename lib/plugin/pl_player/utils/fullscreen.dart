@@ -4,6 +4,7 @@ import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:flutter/services.dart'
     show SystemChrome, MethodChannel, SystemUiOverlay, DeviceOrientation;
+import 'package:flutter/widgets.dart' show BuildContext, MediaQuery;
 import 'package:os_type/os_type.dart';
 
 /// 竖屏全屏时的顶部避让高度：仅在全屏 + 竖屏 + 未移除安全边距时返回
@@ -19,6 +20,23 @@ double? portraitFullscreenTopInset({
   if (!isFullScreen || !isPortrait || removeSafeArea) return null;
   final inset = topInset ?? 0;
   return inset > 0 ? inset : null;
+}
+
+/// 鸿蒙自由多窗/悬浮窗内播控顶栏的额外避让高度。
+///
+/// 这类窗口的系统装饰栏已被隐藏以实现顶部沉浸（见
+/// HarmonyChannel._syncWindowDecor），但最小化/最大化/关闭三键仍由系统悬浮
+/// 绘制在窗口右上角，embedding 把该区域高度钉进 viewPadding.top。全屏时页面
+/// 不再为播放器留顶部黑边，播控顶栏若不自己避开这一带，右上角那两排图标
+/// （空降助手/弹幕/画中画/点赞/投币/收藏…）就压在三键下面，点不到。
+///
+/// 只认自由窗口（[HarmonyChannel.isMiniWindow]）：分屏等其它受限窗口没有这排
+/// 按钮，viewPadding.top 只是引擎照搬的设备状态栏高度，避让了反而会平白多出
+/// 一条空白。返回 null 表示不需要额外避让。
+double? harmonyDecorTopInset(BuildContext context) {
+  if (!OS.isHarmony || !HarmonyChannel.isMiniWindow) return null;
+  final top = MediaQuery.viewPaddingOf(context).top;
+  return top > 0 ? top : null;
 }
 
 bool _isDesktopFullScreen = false;

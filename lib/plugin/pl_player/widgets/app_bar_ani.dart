@@ -56,13 +56,21 @@ class AppBarAni extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = portraitFullscreenTopInset(
+    var top = portraitFullscreenTopInset(
       isFullScreen: isFullScreen,
       isPortrait:
           MediaQuery.sizeOf(context).height >= MediaQuery.sizeOf(context).width,
       removeSafeArea: removeSafeArea,
       topInset: topInset,
     );
+    // 鸿蒙自由多窗全屏：顶部沉浸后系统三键仍悬浮在窗口右上角，顶栏得避开，
+    // 否则右上角图标点不到。见 [harmonyDecorTopInset]。
+    if (isTop && isFullScreen && !removeSafeArea) {
+      final decorTop = harmonyDecorTopInset(context);
+      if (decorTop != null && decorTop > (top ?? 0)) {
+        top = decorTop;
+      }
+    }
     Widget result = child;
     if (!removeSafeArea) {
       result = ViewSafeArea(

@@ -106,7 +106,7 @@ export default class EntryAbility extends FlutterAbility {
       .catch((err: BusinessError) => {
         console.error(`setMissionContinueState failed: ${err.code} ${err.message}`);
       });
-    if (this.handleContinuation(want, launchParam)) {
+    if (this.handleContinuation(want, launchParam, false)) {
       // 接续冷启动时系统在 onCreate 后触发 onWindowStageRestore 而非
       // onWindowStageCreate，必须调用 restoreWindowStage 才会加载窗口内容
       this.context.restoreWindowStage(new LocalStorage());
@@ -119,7 +119,7 @@ export default class EntryAbility extends FlutterAbility {
     super.onNewWant(want, launchParam);
     // 热启动时窗口与 Flutter 引擎均已就绪，不走 restoreWindowStage，
     // 由 setPendingContinuation 推送通知 Dart 直接跳转
-    this.handleContinuation(want, launchParam);
+    this.handleContinuation(want, launchParam, true);
   }
 
   /**
@@ -133,14 +133,20 @@ export default class EntryAbility extends FlutterAbility {
   /**
    * 对端（接收方）：由接续拉起/唤醒时，从 want 中取出源端保存的播放状态，
    * 暂存后由 Dart 侧拉取并跳转视频页。返回是否为接续启动。
+   *
+   * notify 仅热启动（onNewWant）为 true：此时 Dart 已挂载，可直接推送让其
+   * 立即跳转。冷启动（onCreate）必须为 false——推送会被引擎的 channel
+   * buffer 缓存，并在 Dart 注册 handler 的瞬间（首帧、GetMaterialApp 挂载前）
+   * 回放，导致数据被提前取走而无处跳转；冷启动统一由 Dart 首帧后主动拉取。
    */
-  private handleContinuation(want: Want, launchParam: AbilityConstant.LaunchParam): boolean {
+  private handleContinuation(want: Want, launchParam: AbilityConstant.LaunchParam,
+    notify: boolean): boolean {
     if (launchParam.launchReason !== AbilityConstant.LaunchReason.CONTINUATION) {
       return false;
     }
     const data = want.parameters?.[CONTINUATION_KEY];
     if (typeof data === "string" && data.length > 0) {
-      this.harmonyChannel.setPendingContinuation(data);
+      this.harmonyChannel.setPendingContinuation(data, notify);
     }
     return true;
   }

@@ -228,6 +228,10 @@ abstract class HarmonyChannel {
   /// 取走 ETS 侧暂存的接续数据并跳转视频页。冷启动在首帧后调用，
   /// 热启动由 onContinuationRestore 推送触发；数据取走即清除，不会重复跳转。
   static Future<void> checkPendingContinuation() async {
+    // 路由未就绪（首帧前）时不消费，否则数据取走即丢；留给首帧后的主动拉取
+    if (Get.key.currentState == null) {
+      return;
+    }
     try {
       final data = await _channel.invokeMethod<String>(
         'getPendingContinuation',
@@ -392,6 +396,9 @@ abstract class HarmonyChannel {
   /// embedding 会把 cutout 并进 viewPadding，上上游代码按该语义写，故在
   /// main.dart 的根 MediaQuery 里把这里的值按边取 max 合并进
   /// padding/viewPadding，让下游无需感知平台差异。
+  ///
+  /// 仅手机上报：平板/2in1 的摄像头在边框上，避让只会平白让出一条空带，
+  /// 原生侧直接不报（见 ETS HarmonyChannel.cutoutEnabled），此处恒为 zero。
   static final ValueNotifier<EdgeInsets> cutoutInsets = ValueNotifier(
     EdgeInsets.zero,
   );

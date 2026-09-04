@@ -83,39 +83,41 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
         style: const TextStyle(fontSize: 15, height: 1, color: Colors.white),
       ),
     );
+    // 全屏时的第二行信息（主播名/人看过/高能观众/开播时长）。
+    // 它原先和标题叠在同一列里，而那一列只有右侧那排按钮排完后剩下的宽度，
+    // 内容排不下时 Row 溢出又不裁剪，文字会直接画到按钮底下糊成一团。改为
+    // 单独放到标题行下面占满整行：按钮与标题同处一行（视觉齐平），第二行
+    // 也不再被按钮挤。
+    Widget? infoRow;
     if (isFullScreen) {
-      child = Column(
-        spacing: 5,
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      infoRow = Row(
+        spacing: 10,
         children: [
-          child,
-          Row(
-            spacing: 10,
-            children: [
-              if (widget.upName case final upName?)
-                Text(
-                  upName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              liveController.watchedWidget,
-              widget.onlineWidget,
-              liveController.timeWidget,
-            ],
-          ),
+          if (widget.upName case final upName?)
+            Text(
+              upName,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.white,
+              ),
+            ),
+          liveController.watchedWidget,
+          widget.onlineWidget,
+          liveController.timeWidget,
         ],
       );
     }
     child = Expanded(child: child);
-    return AppBar(
+    final appBar = AppBar(
       backgroundColor: Colors.transparent,
       foregroundColor: Colors.white,
       primary: false,
       automaticallyImplyLeading: false,
       titleSpacing: 14,
+      // 全屏时标题行只有一行文字，用默认的 56 会在挖孔和标题之间空出一大
+      // 截、两行之间也被撑开；收紧到按钮实际高度（ComBtn 30 + 上下各 2），
+      // 标题与第二行的位置和拆行前保持一致。
+      toolbarHeight: isFullScreen ? 34 : null,
       title: Row(
         children: [
           if (isFullScreen || plPlayerController.isDesktopPip)
@@ -306,6 +308,26 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
             ),
         ],
       ),
+    );
+    if (infoRow == null) {
+      return appBar;
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        appBar,
+        Padding(
+          // 左端与标题文字对齐：AppBar 的 titleSpacing + 返回按钮宽度
+          padding: const EdgeInsets.only(
+            left: 14 + 34,
+            right: 14,
+            top: 3,
+            bottom: 4,
+          ),
+          child: infoRow,
+        ),
+      ],
     );
   }
 

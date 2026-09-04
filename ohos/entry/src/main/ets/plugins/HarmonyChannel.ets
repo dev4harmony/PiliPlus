@@ -18,7 +18,7 @@ import {
   MethodResult,
 } from "@ohos/flutter_ohos";
 
-// import display from "@ohos.display";
+import display from "@ohos.display";
 
 const colorModeMap: Record<string, ConfigurationConstant.ColorMode> = {
   "light": ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT,
@@ -72,12 +72,28 @@ export default class HarmonyChannel implements FlutterPlugin {
    * Android embedding 会把 cutout 并进 viewPadding，上上游代码都按这个语义
    * 写。这里把窗口相对的 TYPE_CUTOUT 避让区（物理像素）交给 Dart，在根
    * MediaQuery 里按边取 max 合并，见 Dart 侧 HarmonyChannel.cutoutInsets。
+   *
+   * 只在手机上做：手机前摄挖孔开在屏幕内，横屏时压住左侧控件、竖屏全屏时
+   * 压住顶部控件，必须避让。平板/2in1 的摄像头在边框上，系统虽然同样会报一
+   * 块 TYPE_CUTOUT 避让区，但按它避让只会平白让出一条空带——侧栏页签相对上方
+   * 头像/搜索错位（两者一个在 SafeArea 内一个不在）、播放页左侧多出一条底色
+   * 竖条。故非手机设备一律上报 0，Dart 侧 mergeCutout 原样返回 padding。
    */
+  private static readonly cutoutEnabled: boolean = deviceInfo.deviceType === 'phone';
+  /**
+   * 挖孔矩形的下沿（物理像素，自然竖屏坐标系）。-1 = 尚未取到，0 = 无挖孔。
+   *
+   * 系统 TYPE_CUTOUT 避让区给的是一条"安全带"，高度按状态栏对齐（要让状态栏
+   * 文字整体避开挖孔），比挖孔本身低一截。顶栏照它避让就会在挖孔和标题之间
+   * 空出一块。boundingRects 给的是挖孔矩形本身，用它把避让收紧到刚好贴着挖
+   * 孔下沿。挖孔位置不随旋转变化，取一次缓存即可。
+   */
+  private static exactCutoutBottom: number = -1;
   private cutoutListening: boolean = false;
   private lastCutout: Record<string, number> | null = null;
   private cutoutAvoidAreaCallback = (data: window.AvoidAreaOptions): void => {
     if (data.type === window.AvoidAreaType.TYPE_CUTOUT) {
-      this.pushCutout(HarmonyChannel.cutoutToRecord(data.area));
+      this.pushCutout(this.cutoutToRecord(data.area));
     }
   };
   // 旋转/窗口尺寸变化后兜底重读一次：部分机型旋转时不会单独推送
@@ -86,21 +102,106 @@ export default class HarmonyChannel implements FlutterPlugin {
     this.pushCutout(this.readCutout());
   };
 
-  private static cutoutToRecord(area: window.AvoidArea): Record<string, number> {
+  /**
+   * 读一次挖孔矩形，缓存到 [exactCutoutBottom]。只认屏幕上半部的矩形（手机
+   * 前摄挖孔），下半部（个别机型的下巴避让）与顶部避让无关。
+   */
+  private async loadCutoutRects(): Promise<void> {
+    if (HarmonyChannel.exactCutoutBottom >= 0) {
+      return;
+    }
+    HarmonyChannel.exactCutoutBottom = 0;
+    try {
+      const disp = display.getDefaultDisplaySync();
+      const info = await disp.getCutoutInfo();
+      const half = disp.height / 2;
+      let bottom = 0;
+      for (const rect of info.boundingRects) {
+        if (rect.top < half) {
+          bottom = Math.max(bottom, rect.top + rect.height);
+        }
+      }
+      HarmonyChannel.exactCutoutBottom = bottom;
+      console.info("HarmonyChannel", `cutout boundingRect bottom=${bottom}px`);
+    } catch (err) {
+      console.error("HarmonyChannel", `getCutoutInfo failed: ${err}`);
+    }
+  }
+
+  /**
+   * 窗口是否正贴着自然竖屏的屏幕顶部：只有此时 [exactCutoutBottom]
+   * （自然竖屏、屏幕坐标系）才等于窗口坐标系里的挖孔下沿，可用来收紧避让。
+   * 旋转后 boundingRects 的坐标系各版本不一致，分屏/自由多窗时窗口也不在
+   * 屏幕顶部，这些情况一律退回系统避让区。
+   */
+  private canUseExactCutout(winTop: number): boolean {
+    if (HarmonyChannel.exactCutoutBottom <= 0 || winTop !== 0) {
+      return false;
+    }
+    try {
+      // display.Orientation.PORTRAIT === 0，即自然方向（手机为竖屏）
+      return display.getDefaultDisplaySync().rotation === 0;
+    } catch (err) {
+      console.error("HarmonyChannel", `getDefaultDisplaySync failed: ${err}`);
+      return false;
+    }
+  }
+
+  /**
+   * 把 TYPE_CUTOUT 避让区换算成"从窗口某条边到挖孔外沿"的安全距离。
+   *
+   * 系统给的 topRect/leftRect… 是**挖孔本身那个矩形**，不是安全距离：竖屏挖
+   * 孔并不贴着屏幕顶边，topRect.top 通常大于 0，只取 height 会少让出 top 这
+   * 一段。少的这一段在顶部控件上看不出来（挖孔居中，按钮在左右两侧），但
+   * 横穿整幅宽度的弹幕会正好从挖孔下沿飘过去。右/下两边同理：矩形左上角坐
+   * 标离对边的距离才是安全距离，取不到窗口尺寸时退化为矩形宽/高。
+   */
+  private cutoutToRecord(area: window.AvoidArea): Record<string, number> {
+    let winWidth = 0;
+    let winHeight = 0;
+    let winTop = -1;
+    try {
+      const winRect = this.lastWindow?.getWindowProperties().windowRect;
+      if (winRect) {
+        winWidth = winRect.width;
+        winHeight = winRect.height;
+        winTop = winRect.top;
+      }
+    } catch (err) {
+      console.error("HarmonyChannel", `getWindowProperties failed: ${err}`);
+    }
+    const avoidTop = area.topRect.height > 0 ? area.topRect.top + area.topRect.height : 0;
+    let top = avoidTop;
+    // 系统这条安全带按状态栏高度给，比挖孔低一截；能拿到挖孔矩形本身时收紧到
+    // 它的下沿，让竖屏全屏的顶栏/弹幕贴着挖孔。见 [exactCutoutBottom]。
+    if (top > 0 && this.canUseExactCutout(winTop)) {
+      top = Math.min(top, HarmonyChannel.exactCutoutBottom);
+    }
+    console.info("HarmonyChannel",
+      `cutout top: avoid=${avoidTop} exact=${HarmonyChannel.exactCutoutBottom}` +
+        ` winTop=${winTop} -> ${top}`);
     const rec: Record<string, number> = {
-      'left': area.leftRect.width,
-      'top': area.topRect.height,
-      'right': area.rightRect.width,
-      'bottom': area.bottomRect.height,
+      'left': area.leftRect.width > 0 ? area.leftRect.left + area.leftRect.width : 0,
+      'top': top,
+      'right': area.rightRect.width > 0
+        ? (winWidth > 0 ? winWidth - area.rightRect.left : area.rightRect.width)
+        : 0,
+      'bottom': area.bottomRect.height > 0
+        ? (winHeight > 0 ? winHeight - area.bottomRect.top : area.bottomRect.height)
+        : 0,
     };
     return rec;
   }
 
   private readCutout(): Record<string, number> {
+    if (!HarmonyChannel.cutoutEnabled) {
+      const zero: Record<string, number> = { 'left': 0, 'top': 0, 'right': 0, 'bottom': 0 };
+      return zero;
+    }
     try {
       const area = this.lastWindow?.getWindowAvoidArea(window.AvoidAreaType.TYPE_CUTOUT);
       if (area) {
-        return HarmonyChannel.cutoutToRecord(area);
+        return this.cutoutToRecord(area);
       }
     } catch (err) {
       console.error("HarmonyChannel", `getWindowAvoidArea(TYPE_CUTOUT) failed: ${err}`);
@@ -121,11 +222,12 @@ export default class HarmonyChannel implements FlutterPlugin {
   }
 
   private async startCutoutListener(): Promise<void> {
-    if (this.cutoutListening) {
+    if (this.cutoutListening || !HarmonyChannel.cutoutEnabled) {
       return;
     }
     this.cutoutListening = true;
     this.lastWindow ??= await window.getLastWindow(getContext());
+    await this.loadCutoutRects();
     try {
       this.lastWindow.on('avoidAreaChange', this.cutoutAvoidAreaCallback);
       this.lastWindow.on('windowSizeChange', this.cutoutSizeCallback);
@@ -664,12 +766,18 @@ export default class HarmonyChannel implements FlutterPlugin {
   }
 
   /**
-   * 对端收到接续数据：暂存并通知 Dart。冷启动时 Dart 尚未就绪，
-   * 通知会丢失，但 Dart 首帧后会主动拉取暂存数据。
+   * 对端收到接续数据：暂存，并按需通知 Dart。
+   *
+   * 仅热启动（notify=true）推送通知；冷启动不能推送：Dart 尚未注册 handler，
+   * 推送会进引擎 channel buffer，在 Dart 注册 handler 的瞬间（首帧前）回放，
+   * 此时 GetMaterialApp 尚未挂载，取走的数据无处跳转即被丢弃。冷启动由 Dart
+   * 首帧后主动拉取暂存数据。
    */
-  public setPendingContinuation(data: string) {
+  public setPendingContinuation(data: string, notify: boolean) {
     this.pendingContinuation = data;
-    this.channel?.invokeMethod("onContinuationRestore", null);
+    if (notify) {
+      this.channel?.invokeMethod("onContinuationRestore", null);
+    }
   }
 
   /**

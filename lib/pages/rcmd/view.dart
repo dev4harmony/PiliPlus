@@ -24,10 +24,29 @@ class _RcmdPageState extends State<RcmdPage>
     with AutomaticKeepAliveClientMixin {
   final RcmdController controller = Get.put(RcmdController());
 
+  Worker? _fillWorker;
+
   @override
   void initState() {
     super.initState();
     controller.scrollController.addListener(_onScroll);
+    // 大屏多列下一页数据可能填不满视口：此时列表不可滚动，_onScroll 永远不会
+    // 触发，页面就一直空着下半屏，只有手动下拉刷新才会变多。每次数据变化后
+    // 补一次判断，不可滚动就继续拉下一页，直到出现可滚动区域。
+    _fillWorker = ever(controller.loadingState, (_) => _fillViewport());
+  }
+
+  void _fillViewport() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || controller.isLoading) return;
+      // 只在已有数据时续拉：错误态下列表同样不可滚动，重试交给 HttpError
+      if (controller.loadingState.value.dataOrNull?.isNotEmpty != true) return;
+      final scrollController = controller.scrollController;
+      if (scrollController.hasClients &&
+          scrollController.position.maxScrollExtent <= 0) {
+        controller.onLoadMore();
+      }
+    });
   }
 
   void _onScroll() {
@@ -42,6 +61,7 @@ class _RcmdPageState extends State<RcmdPage>
 
   @override
   void dispose() {
+    _fillWorker?.dispose();
     controller.scrollController.removeListener(_onScroll);
     super.dispose();
   }
@@ -163,11 +183,21 @@ class _RcmdPageState extends State<RcmdPage>
     };
   }
 
-  Widget get _buildSkeleton => SliverGrid(
-    gridDelegate: gridDelegate,
-    delegate: const SliverSingleChildDelegate(
-      count: 10,
-      child: VideoCardVSkeleton(),
+  /// 骨架数量按视口实际能放下的格子数算：固定 10 个在大屏多列下只能占到
+  /// 页面上半部分，加载中看着像“只加载了半页”。
+  Widget get _buildSkeleton => SliverLayoutBuilder(
+    builder: (context, constraints) => SliverGrid(
+      gridDelegate: gridDelegate,
+      delegate: SliverSingleChildDelegate(
+        count:
+            gridDelegate
+                .getLayout(constraints)
+                .getMaxChildIndexForScrollOffset(
+                  constraints.remainingPaintExtent,
+                ) +
+            1,
+        child: const VideoCardVSkeleton(),
+      ),
     ),
   );
 }
