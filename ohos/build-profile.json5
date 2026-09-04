@@ -10,9 +10,14 @@
         targetSdkVersion: "26.0.0",
         buildOption: {
           packOptions: {
-            enableIncrementalSoCompress: true
+            enableIncrementalSoCompress: true,
+            fastBuildApp: true
           },
-          "nativeCompiler": "BiSheng"
+          "nativeCompiler": "BiSheng",
+          "preloadSystemSo": true,
+          "arkOptions": {
+            "autoLazyImport": true,
+          }
         }
       },
     ],

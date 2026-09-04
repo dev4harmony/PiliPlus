@@ -2,5 +2,11 @@
 {
   "modelVersion": "5.1.0",
   "dependencies": {
+  },
+  "properties": {
+    "ohos.pack.compressLevel": "ultimate",
+    "ohos.arkCompile.noEmitJs": true,
+    "hvigor.task.schedule.optimization": true,
+    "ohos.defaults.autoLazyImport": true
   }
 }
