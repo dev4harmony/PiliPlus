@@ -19,12 +19,12 @@ class NativeTopSpacer extends StatelessWidget {
   const NativeTopSpacer({super.key});
 
   /// 多个分类标签时：顶栏展开/收起对应的留白高度
-  static const double expandedHeight = 137;
-  static const double collapsedHeight = 82;
+  static const double expandedHeight = 123;
+  static const double collapsedHeight = 68;
 
   /// 仅一个分类标签时：顶栏展开/收起对应的留白高度。
-  static const double singleExpandedHeight = 107;
-  static const double singleCollapsedHeight = 52;
+  static const double singleExpandedHeight = 93;
+  static const double singleCollapsedHeight = 38;
 
   /// ArkTS 顶栏自身的高度，含状态栏，用于启用原生顶栏时调整刷新指示器高度
   static const double barExpandedHeight = 172;

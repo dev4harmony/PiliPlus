@@ -19,8 +19,8 @@ const EVENT_HOME_TAB_CHANGE = 'EVENT_HOME_TAB_CHANGE';
 const NAV_UNSELECTED = $r('sys.color.comp_focused_primary');
 const BOTTOM_NORMAL_AVOID_AREA_VALUE = 1;
 const BOTTOM_SPECIAL_AVOID_AREA_VALUE = 12;
-const TOP_BAR_BLUR_RADIUS = 18;
-const TOP_BAR_FRACTION_STOPS: [number, number][] = [[0, 0], [0.9, 0.08], [1, 0.4], [1, 1]];
+const TOP_BAR_BLUR_RADIUS = 15;
+const TOP_BAR_FRACTION_STOPS: [number, number][] = [[0, 0], [0.8, 0.2], [1, 0.4], [1, 1]];
 const TOP_BAR_COLLAPSED_HEIGHT = 80;
 const TOP_BAR_EXPANDED_HEIGHT = 144;
 /// 顶栏收缩曲线：重减速的三次贝塞尔，起步轻、尾段长距离滑停，
@@ -349,6 +349,15 @@ struct Index {
       Column() {
       }
       .constraintSize({ maxHeight: TOP_BAR_EXPANDED_HEIGHT })
+      .linearGradient({
+          direction: GradientDirection.Bottom, // 渐变方向
+          colors: [
+                [$r('app.color.top_bar_mask_start'), 0],
+                [$r('app.color.top_bar_mask_mid'), 0.8],
+                [$r('app.color.top_bar_mask_end'), 0.95],
+                [$r('app.color.top_bar_mask_end'), 1],
+              ],
+        })
       .linearGradientBlur(TOP_BAR_BLUR_RADIUS, {
         fractionStops: TOP_BAR_FRACTION_STOPS,
         direction: GradientDirection.Top
