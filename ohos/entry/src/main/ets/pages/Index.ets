@@ -32,7 +32,7 @@ const TOP_BAR_MOTION_CURVE: ICurve = curves.cubicBezierCurve(0.2, 0, 0, 1);
 /// 搜索行淡出/淡入：收起时抢在高度压扁之前淡出，展开时等高度让出空间后
 /// 再淡入，避免文字在被压扁的行内闪现（旧实现同时做，观感发硬）
 const TOP_BAR_FADE_DURATION = 120;
-const TOP_BAR_FADE_IN_DELAY = 160;
+const TOP_BAR_FADE_IN_DELAY = 60;
 
 function topBarMaterial(interactive: boolean): uiMaterial.ImmersiveMaterial {
   return new uiMaterial.ImmersiveMaterial({
