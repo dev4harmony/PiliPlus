@@ -170,6 +170,20 @@ struct Index {
         console.error(TAG, `windowRectChange listener failed: ${err}`);
       }
 
+      try {
+        this.rotationCallback = (info: window.RotationChangeInfo) => {
+          if (info.type === window.RotationChangeType.WINDOW_WILL_ROTATE) {
+            this.bgColor = Color.Black;
+
+          } else if (info.type === window.RotationChangeType.WINDOW_DID_ROTATE) {
+            this.bgColor = $r("app.color.start_window_background");
+          }
+        };
+        w.on('rotationChange', this.rotationCallback);
+      } catch (err) {
+        console.error(TAG, `rotationChange listener failed: ${err}`);
+      }
+
       let windowBottomAvoidArea = w.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
       let uiContext = this.getUIContext();
       this.bottomAvoidAreaHeight = windowBottomAvoidArea.bottomRect.height === 0
@@ -186,9 +200,6 @@ struct Index {
     }).catch((err: Object) => {
       console.error(TAG, `getLastWindow failed: ${err}`);
     });
-    setTimeout((): void => {
-      this.bgColor = Color.Black
-    }, 3000)
   }
 
   aboutToDisappear(): void {
