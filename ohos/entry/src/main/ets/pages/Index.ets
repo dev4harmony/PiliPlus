@@ -285,6 +285,12 @@ struct Index {
     this.clearRotationMaskTimers();
   }
 
+  onPageShow(): void {
+    //防止退出后台计数出错
+    this.rotatingCount = 0;
+    this.bgColor = $r("app.color.start_window_background");
+  }
+
   @Builder
   categoryTabBuilder(index: number, name: string) {
     Text(name)
@@ -631,9 +637,9 @@ struct Index {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor(Color.Black)
+          .backgroundColor("#80000000")
           .opacity(this.rotationMaskOpacity)
-          .animation({ duration: ROTATION_MASK_FADE_DURATION, curve: Curve.EaseOut })
+          .animation({ duration: ROTATION_MASK_FADE_DURATION-30, curve: Curve.EaseOut })
         Image(this.rotationMask)
           .objectFit(ImageFit.TOP)
           .opacity(this.rotationMaskOpacity)
