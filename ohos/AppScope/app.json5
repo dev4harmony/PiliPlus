@@ -5,6 +5,11 @@
     "versionCode": 1000000,
     "versionName": "1.0.0",
     "icon": "$media:app_layered_image",
-    "label": "$string:app_name"
+    "label": "$string:app_name",
+    "appPreloadPhase": "windowStageCreated",
+    "multiAppMode": {
+      "multiAppModeType": "appClone",
+      "maxCount": 5
+    }
   }
 }
