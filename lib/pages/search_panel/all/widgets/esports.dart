@@ -115,7 +115,10 @@ class SearchEsportsItem extends StatelessWidget {
                     children: [
                       if (contest.gameStage != null)
                         TextSpan(text: contest.gameStage),
-                      if (contest.contestStatus == 1 && contest.stime != null)
+                      if (contest.contestStatus == 3)
+                        const TextSpan(text: '  已结束')
+                      else if (contest.contestStatus == 1 &&
+                          contest.stime != null)
                         TextSpan(
                           text: '  ${DateFormatUtils.format(contest.stime)}',
                         ),
@@ -136,7 +139,7 @@ class SearchEsportsItem extends StatelessWidget {
                   Text(
                     contest.contestStatus == 1
                         ? 'VS'
-                        : '${contest.homeScore} : ${contest.awayScore}',
+                        : '${contest.homeScore ?? 0} : ${contest.awayScore ?? 0}',
                     style: const TextStyle(
                       fontSize: 25,
                       fontWeight: .bold,
