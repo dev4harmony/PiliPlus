@@ -305,12 +305,12 @@ dependency_overrides:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
       path: "flutter_inappwebview"
-      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      ref: "br_v6.1.5_ohos_dev"
   flutter_inappwebview_platform_interface:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
       path: "flutter_inappwebview_platform_interface"
-      ref: "br_v6.1.5_ohos"
+      ref: "br_v6.1.5_ohos_dev"
   video_player: # 视频播放器.鸿蒙适配
     git:
       url: https://gitcode.com/openharmony-tpc/flutter_packages.git
