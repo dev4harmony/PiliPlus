@@ -74,11 +74,11 @@ import 'package:dio/dio.dart' show Options;
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart'
     show ExtendedNestedScrollViewState;
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as path;
 
@@ -403,10 +403,6 @@ class VideoDetailController extends GetxController
       length: 2,
       vsync: this,
       initialIndex: Pref.defaultShowComment ? 1 : 0,
-    );
-
-    _networkScopeSub = ConnectivityUtils.onScopeChanged.listen(
-      _onNetworkScopeChanged,
     );
   }
 
@@ -967,17 +963,15 @@ class VideoDetailController extends GetxController
       querySponsorBlock(bvid: bvid, cid: cid.value);
     }
     if (plPlayerController.cacheVideoQa == null) {
-      final useCellular = await ConnectivityUtils.useCellularPrefs;
+      final isWiFi = await ConnectivityUtils.isWiFi;
       plPlayerController
-        ..cacheVideoQa = useCellular
-            ? Pref.defaultVideoQaCellular
-            : Pref.defaultVideoQa
-        ..cacheAudioQa = useCellular
-            ? Pref.defaultAudioQaCellular
-            : Pref.defaultAudioQa;
-      preferCodecs = useCellular
-          ? Pref.preferCodecsCellular
-          : Pref.preferCodecs;
+        ..cacheVideoQa = isWiFi
+            ? Pref.defaultVideoQa
+            : Pref.defaultVideoQaCellular
+        ..cacheAudioQa = isWiFi
+            ? Pref.defaultAudioQa
+            : Pref.defaultAudioQaCellular;
+      preferCodecs = isWiFi ? Pref.preferCodecs : Pref.preferCodecsCellular;
     }
 
     final result = await _getVideoUrl(VideoQuality.hdrVivid.code);

@@ -48,9 +48,9 @@ import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:fixnum/fixnum.dart' show Int64;
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
 class AudioController extends GetxController
@@ -189,14 +189,8 @@ class AudioController extends GetxController
         volume: _videoDetailController?.volume,
       );
     }
-    ConnectivityUtils.useCellularPrefs.then((useCellular) {
-      if (isClosed) return;
-      cacheAudioQa = useCellular
-          ? Pref.defaultAudioQaCellular
-          : Pref.defaultAudioQa;
-      _networkScopeSub = ConnectivityUtils.onScopeChanged.listen(
-        _onNetworkScopeChanged,
-      );
+    ConnectivityUtils.isWiFi.then((isWiFi) {
+      cacheAudioQa = isWiFi ? Pref.defaultAudioQa : Pref.defaultAudioQaCellular;
       if (!hasAudioUrl) {
         _queryPlayUrl();
       }

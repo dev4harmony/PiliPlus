@@ -324,26 +324,27 @@ packages:
     dependency: "direct main"
     description:
       name: connectivity_plus
-      sha256: "224a77051d52a11fbad53dd57827594d3bd24f945af28bd70bab376d68d437f0"
+      sha256: "762c99f890ca8bf87f7337236f99edd42793843bc6c3631da294a76653a54bd0"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "5.0.2"
+    version: "7.3.1"
   connectivity_plus_ohos:
     dependency: "direct main"
     description:
-      name: connectivity_plus_ohos
-      sha256: "83e1f434b1cd2a179e42aa4396928321957b894c1d187da63102518313bff8da"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "0.0.3"
+      path: "."
+      ref: main
+      resolved-ref: b9e6af46262e9414db3ab1b5fba50dfc79bba8ee
+      url: "https://github.com/HelloZeroNick/connectivity_plus_ohos.git"
+    source: git
+    version: "0.0.4"
   connectivity_plus_platform_interface:
     dependency: transitive
     description:
       name: connectivity_plus_platform_interface
-      sha256: cf1d1c28f4416f8c654d7dc3cd638ec586076255d407cef3ddbdaf178272a71a
+      sha256: "3c09627c536d22fd24691a905cdd8b14520de69da52c7a97499c8be5284a32ed"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "1.2.4"
+    version: "2.1.0"
   convert:
     dependency: transitive
     description:

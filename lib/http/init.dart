@@ -20,7 +20,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:dio_http2_adapter/dio_http2_adapter.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, listEquals;
 
 class Request {
   static const _gzipDecoder = GZipDecoder();
@@ -118,9 +118,8 @@ class Request {
 
   static Timer? _networkChangeDebounce;
 
-  // connectivity_plus 5.x 回调单值（鸿蒙适配版本），非上游 7.x 的 List
-  static void _onConnectivityChanged(ConnectivityResult result) {
-    if (result == ConnectivityResult.none) {
+  static void _onConnectivityChanged(List<ConnectivityResult> result) {
+    if (listEquals(result, const [ConnectivityResult.none])) {
       return;
     }
     _networkChangeDebounce?.cancel();

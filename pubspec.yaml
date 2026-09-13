@@ -59,8 +59,11 @@ dependencies:
   # 网络
   dio: 5.9.2
   cookie_jar: ^4.0.9
-  connectivity_plus: ^5.0.2
-  connectivity_plus_ohos: ^0.0.3
+  connectivity_plus: ^7.1.1
+  connectivity_plus_ohos: 
+    git:
+      url: https://github.com/HelloZeroNick/connectivity_plus_ohos.git
+      ref: main
   dio_http2_adapter: ^2.7.1
 
   # 图片
