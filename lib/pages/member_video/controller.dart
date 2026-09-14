@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart'
+    show RefreshIndicatorState;
 import 'package:PiliPlus/common/widgets/scroll_physics.dart' show ReloadMixin;
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/member.dart';
@@ -14,12 +16,14 @@ import 'package:PiliPlus/utils/extension/dimension_ext.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:flutter/widgets.dart' show GlobalKey;
 import 'package:get/get.dart';
 
 class MemberVideoCtr
     extends CommonListController<SpaceArchiveData, SpaceArchiveItem>
     with ReloadMixin {
   MemberVideoCtr({
+    required this.heroTag,
     required this.type,
     required this.mid,
     required this.seasonId,
@@ -28,6 +32,7 @@ class MemberVideoCtr
     this.title,
   }) : isVideo = type == .video;
 
+  final String? heroTag;
   final ContributeType type;
   final bool isVideo;
   int? seasonId;
@@ -44,26 +49,36 @@ class MemberVideoCtr
   String? firstAid;
   String? lastAid;
   String? fromViewAid;
-  RxBool isLocating = false.obs;
+  final RxBool _isLocating = false.obs;
+  bool get isLocating => _isLocating.value;
+  void setIsLocating(bool value, {bool isOnlyInnerScroll = true}) {
+    _isLocating.value = value;
+    if (isOnlyInnerScroll) {
+      onlyInnerScroll = value;
+    }
+  }
+
+  // 上游 04fe7be29「定位视频时只滚动内层列表」依赖 extended_nested_scroll_view
+  // fork 的 dev 分支（d9136d5 起才有 `ExtendedNestedScrollViewState.onlyInnerScroll`）；
+  // 鸿蒙锁在 161cd202 不升（dev 已去掉鸿蒙仍在用的 ExtendedVisibilityDetector），
+  // 这里保留调用形态、实现为空操作，日后升 fork 时恢复为
+  // `scrollKey.currentState?.onlyInnerScroll = value`。
+  set onlyInnerScroll(bool value) {}
+
   bool isLoadPrevious = false;
   bool? hasPrev;
 
+  GlobalKey<RefreshIndicatorState>? refreshKey;
+
   @override
   Future<void> onRefresh() async {
-    if (isLocating.value) {
-      if (hasPrev == true) {
-        isLoadPrevious = true;
-        await queryData();
-      }
-    } else {
-      isLoadPrevious = false;
-      firstAid = null;
-      lastAid = null;
-      next = null;
-      isEnd = false;
-      page = 0;
-      await queryData();
-    }
+    isLoadPrevious = false;
+    firstAid = null;
+    lastAid = null;
+    next = null;
+    isEnd = false;
+    page = 0;
+    await queryData();
   }
 
   @override
@@ -71,6 +86,9 @@ class MemberVideoCtr
     super.onInit();
     if (isVideo) {
       fromViewAid = Get.parameters['from_view_aid'];
+      if (fromViewAid?.isNotEmpty ?? false) {
+        refreshKey = GlobalKey();
+      }
     }
     page = 0;
     queryData();
@@ -86,6 +104,9 @@ class MemberVideoCtr
     next = data.next;
     if (page == 0 || isLoadPrevious) {
       hasPrev = data.hasPrev;
+      if (isLoadPrevious && hasPrev != true) {
+        onlyInnerScroll = false;
+      }
     }
     if (page == 0 || !isLoadPrevious) {
       if ((isVideo ? data.hasNext == false : data.next == 0) ||
@@ -131,13 +152,13 @@ class MemberVideoCtr
         next: next,
         seasonId: seasonId,
         seriesId: seriesId,
-        includeCursor: isLocating.value && page == 0,
+        includeCursor: isLocating && page == 0,
       );
 
   void queryBySort() {
     if (isLoading) return;
     if (isVideo) {
-      isLocating.value = false;
+      setIsLocating(false);
       order = order == .pubdate ? .click : .pubdate;
     } else {
       sort = sort == .desc ? .asc : .desc;
@@ -228,7 +249,7 @@ class MemberVideoCtr
   @override
   Future<void> onReload() {
     reload = true;
-    isLocating.value = false;
+    setIsLocating(false);
     return super.onReload();
   }
 }

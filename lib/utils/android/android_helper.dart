@@ -4,6 +4,8 @@
 /// `floating` 插件提供。
 library;
 
+import 'package:PiliPlus/utils/page_utils.dart';
+
 abstract final class PiliAndroidHelper {
   static void back() {}
 
@@ -44,4 +46,10 @@ abstract final class PiliAndroidHelper {
     String label,
     String path,
   ) {}
+
+  /// 上游在 Android 12+ 上按已验证的 App Links 域名直接拉起系统处理；鸿蒙无此机制，
+  /// 统一走 [PageUtils.launchURL]。
+  static void openUrl(String url, {String domain = '*.bilibili.com'}) {
+    PageUtils.launchURL(url);
+  }
 }

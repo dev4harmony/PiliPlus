@@ -140,7 +140,7 @@ class _SearchTrendingPageState extends State<SearchTrendingPage> {
                     onTap: () => Get.toNamed(
                       '/searchResult',
                       parameters: {
-                        'keyword': item.keyword!,
+                        'keyword': item.keyword,
                       },
                     ),
                     leading: index < _controller.topCount
@@ -165,7 +165,7 @@ class _SearchTrendingPageState extends State<SearchTrendingPage> {
                       children: [
                         Flexible(
                           child: Text(
-                            item.keyword!,
+                            item.showName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             strutStyle: const StrutStyle(height: 1, leading: 0),

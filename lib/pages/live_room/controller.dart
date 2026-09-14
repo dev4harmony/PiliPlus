@@ -434,13 +434,11 @@ class LiveRoomController extends GetxController {
     );
   }
 
-  void scrollToBottom([_]) {
+  void scrollToBottom() {
     EasyThrottle.throttle(
       'liveDm',
       const Duration(milliseconds: 500),
-      () => WidgetsBinding.instance.addPostFrameCallback(
-        _scrollToBottom,
-      ),
+      () => WidgetsBinding.instance.addPostFrameCallback(_scrollToBottom),
     );
   }
 
@@ -762,16 +760,13 @@ class LiveRoomController extends GetxController {
     likeClickTimer = null;
   }
 
-  void onLikeTapDown([_]) {
+  void onLikeTapDown(_) {
     cancelLikeTimer();
     likeClickTime.value++;
   }
 
   void onLikeTapUp([_]) {
-    likeClickTimer ??= Timer(
-      const Duration(milliseconds: 800),
-      onLike,
-    );
+    likeClickTimer ??= Timer(const Duration(milliseconds: 800), onLike);
   }
 
   Future<void> onLike() async {
@@ -793,9 +788,13 @@ class LiveRoomController extends GetxController {
     likeClickTime.value = 0;
   }
 
+  void toastNotLogin() {
+    SmartDialog.showToast('账号未登录');
+  }
+
   void onSendDanmaku([bool fromEmote = false]) {
     if (kReleaseMode && !isLogin) {
-      SmartDialog.showToast('账号未登录');
+      toastNotLogin();
       return;
     }
     Get.key.currentState!.push(
@@ -829,9 +828,21 @@ class LiveRoomController extends GetxController {
     );
   }
 
+  void onAtUser(DanmakuMsg item) {
+    savedDanmaku = [
+      RichTextItem.fromStart(
+        '@${item.name} ',
+        rawText: item.extra.mid.toString(),
+        type: .at,
+        id: item.extra.id.toString(),
+      ),
+    ];
+    onSendDanmaku();
+  }
+
   void reportSC(SuperChatItem item) {
     if (!isLogin) {
-      SmartDialog.showToast('账号未登录');
+      toastNotLogin();
       return;
     }
     autoWrapReportDialog(
