@@ -7,7 +7,6 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/route_manager.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
@@ -108,23 +107,7 @@ class BiliDownloadEntryInfo with MultiSelectData {
           PopupMenuItem(
             height: 38,
             child: const Text('打开本地文件夹', style: TextStyle(fontSize: 13)),
-            onTap: () async {
-              try {
-                final String executable;
-                if (Platform.isWindows) {
-                  executable = 'explorer';
-                } else if (Platform.isMacOS) {
-                  executable = 'open';
-                } else if (Platform.isLinux) {
-                  executable = 'xdg-open';
-                } else {
-                  throw UnimplementedError();
-                }
-                await Process.run(executable, [entryDirPath]);
-              } catch (e) {
-                SmartDialog.showToast(e.toString());
-              }
-            },
+            onTap: () => PathUtils.openDir(entryDirPath),
           )
         else
           PopupMenuItem(
