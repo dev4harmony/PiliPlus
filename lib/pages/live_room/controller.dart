@@ -316,7 +316,7 @@ class LiveRoomController extends GetxController {
           autoplay: autoplay,
           autoFullScreenFlag: autoFullScreenFlag,
         ),
-        if (isLogin && !isLoaded.value) _fetchBlockRules(),
+        if (!isLoaded.value && Accounts.heartbeat.isLogin) _fetchBlockRules(),
       ]);
       isLoaded.value = true;
     } else {
