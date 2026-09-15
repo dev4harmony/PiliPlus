@@ -781,9 +781,6 @@ abstract final class Pref {
   static bool get showActualVolume =>
       _setting.get(SettingBoxKey.showActualVolume, defaultValue: false);
 
-  static bool get useBuiltInFont =>
-      _setting.get(SettingBoxKey.useBuiltInFont, defaultValue: true);
-
   static bool get enableHeroCoverAnimation =>
       _setting.get(SettingBoxKey.enableHeroCoverAnimation, defaultValue: false);
 

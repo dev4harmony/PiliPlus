@@ -5,8 +5,8 @@ import 'package:PiliPlus/utils/font_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoThemeData;
 import 'package:flutter/foundation.dart' show PlatformDispatcher;
-import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:os_type/os_type.dart';
 
 abstract final class ThemeUtils {
@@ -102,8 +102,7 @@ abstract final class ThemeUtils {
     // null，回落到鸿蒙一贯的 HarmonyOS Sans；在本仓库的安卓 / Windows / Linux
     // 构建上则由用户的选择覆盖。
     late final fontFamily =
-        FontUtils.fontFamily ??
-        (Pref.useBuiltInFont ? "HarmonyOS_Sans" : "HarmonyOS Sans");
+        FontUtils.fontFamily ?? "HarmonyOS Sans";
     late final textStyle = TextStyle(
       fontWeight: fontWeight,
       fontFamily: fontFamily,

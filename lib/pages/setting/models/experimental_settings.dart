@@ -39,14 +39,6 @@ List<SettingsModel> experimentalSettings = [
     defaultVal: false,
   ),
   SwitchModel(
-    title: '使用内置字体',
-    subtitle: '使用内置HarmonyOS Sans字体，与系统默认字体相同\n关闭后用系统字体，可能卡顿，未修改系统字体不建议关闭',
-    leading: const Icon(Icons.font_download_outlined),
-    setKey: SettingBoxKey.useBuiltInFont,
-    defaultVal: true,
-    onChanged: (_) => Get.updateMyAppTheme(),
-  ),
-  SwitchModel(
     title: '视频封面一镜到底动画',
     subtitle: '点击视频卡片时封面平滑展开，返回时飞回原位\n仅支持首页的部分视频卡片和番剧/影视卡片',
     leading: const Icon(Icons.motion_photos_on_outlined),
