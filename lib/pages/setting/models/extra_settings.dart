@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Directory;
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
@@ -775,7 +775,9 @@ void _showDownPathDialog(BuildContext context, VoidCallback setState) {
           onPressed: () async {
             Get.back();
             final path = await FilePicker.platform.getDirectoryPath(
-              initialDirectory: downloadPath,
+              initialDirectory: Directory(downloadPath).existsSync()
+                  ? downloadPath
+                  : null,
             );
             if (path == null || path == downloadPath) return;
             downloadPath = path;

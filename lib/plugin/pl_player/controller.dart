@@ -1140,6 +1140,19 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   final Set<ValueChanged<PlayerStatus>> _statusListeners = {};
 
   Timer? _wakeLockTimer;
+  void _stopWakeLockTimer() {
+    _wakeLockTimer?.cancel();
+    _wakeLockTimer = null;
+  }
+
+  void _stopWakeLock() {
+    WakelockPlus.disable();
+    videoPlayerServiceHandler?.onStatusChange(
+      playerStatus.value,
+      isBuffering.value,
+      isLive,
+    );
+  }
 
   /// 播放事件监听
   void _startListeners(NativePlayer player) {
@@ -1158,8 +1171,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       /// playing
       stream.playing.listen((bool playing) {
         if (playing) {
-          _wakeLockTimer?.cancel();
-          _wakeLockTimer = null;
+          _stopWakeLockTimer();
           WakelockPlus.enable();
 
           if (_isAutoEnterPip) {
@@ -1171,12 +1183,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           }
           playerStatus.value = .playing;
         } else {
-          _wakeLockTimer?.cancel();
-          _wakeLockTimer = Timer(
-            const Duration(milliseconds: 500),
-            WakelockPlus.disable,
-          );
-
           // 鸿蒙：退后台引发的暂停不取消自动画中画，否则该取消操作会与系统
           // 自动小窗的启动赛跑，导致自动小窗时灵时不灵（Android 的 PiP
           // auto-enter 与离开手势原子执行，无此问题）。仅在应用处于前台
@@ -1199,17 +1205,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
               _pipAutoResumeAllowed()) {
             play();
           }
+
+          _wakeLockTimer?.cancel();
+          _wakeLockTimer = Timer(
+            const Duration(milliseconds: 500),
+            _stopWakeLock,
+          );
         }
         if (OS.isHarmony) {
           // 同步鸿蒙小窗控制面板的播放/暂停图标
           Floating().updatePipControlStatus(playing: playing);
         }
-
-        videoPlayerServiceHandler?.onStatusChange(
-          playerStatus.value,
-          isBuffering.value,
-          isLive,
-        );
 
         for (final element in _statusListeners) {
           element(playing ? .playing : .paused);
@@ -2091,7 +2097,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       AndroidHelper$ToDart.onUserLeaveHint = null;
     }
     _timer?.cancel();
-    _wakeLockTimer?.cancel();
     // _position.close();
     // _playerEventSubs?.cancel();
     // _sliderPosition.close();
@@ -2112,9 +2117,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     _removeListeners();
     _positionListeners.clear();
     _statusListeners.clear();
-    if (playerStatus.isPlaying) {
-      WakelockPlus.disable();
-    }
+    _stopWakeLockTimer();
+    WakelockPlus.disable();
     if (kDebugMode) {
       debugPrint('dispose player');
     }
