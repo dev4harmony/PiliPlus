@@ -1985,7 +1985,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                           onLongPress:
                               (Platform.isAndroid || OS.isHarmony || kDebugMode) &&
                                   !isLive
-                              ? screenshotWebp
+                              ? _screenshotWebp
                               : null,
                           onTap: plPlayerController.takeScreenshot,
                         ),
@@ -2192,14 +2192,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     );
   }
 
-  Future<void> screenshotWebp() async {
+  Future<void> _screenshotWebp() async {
     final videoInfo = videoDetailController.data;
     final ids = videoInfo.dash!.video!.availableVideoQualities;
     final video = videoDetailController.findVideoByQa(ids.min);
 
-    VideoQuality qa = video.quality;
     String? url = video.baseUrl;
     if (url == null) return;
+    VideoQuality qa = video.quality;
 
     final ctr = plPlayerController;
     final theme = Theme.of(context);

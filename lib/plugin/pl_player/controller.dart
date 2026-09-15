@@ -19,8 +19,6 @@ import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:PiliPlus/models_new/video/video_shot/data.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
-import 'package:PiliPlus/pages/setting/models/play_settings.dart'
-    show kMaxVolume;
 import 'package:PiliPlus/pages/sponsor_block/block_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
@@ -942,7 +940,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       'volume':
           (PlatformUtils.isMobile ? Pref.playerVolume : volume.value * 100)
               .toString(),
-      'volume-max': kMaxVolume.toString(),
     };
     final autosync = Pref.autosync;
     if (autosync != '0') {
@@ -1137,6 +1134,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   final Set<ValueChanged<Duration>> _positionListeners = {};
   final Set<ValueChanged<PlayerStatus>> _statusListeners = {};
 
+  Timer? _wakeLockTimer;
+
   /// 播放事件监听
   void _startListeners(NativePlayer player) {
     assert(_subscriptions == null);
@@ -1153,8 +1152,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     _subscriptions = [
       /// playing
       stream.playing.listen((bool playing) {
-        WakelockPlus.toggle(enable: playing);
         if (playing) {
+          _wakeLockTimer?.cancel();
+          _wakeLockTimer = null;
+          WakelockPlus.enable();
+
           if (_isAutoEnterPip) {
             if (_isCurrVideoPage) {
               enterPip(isAuto: true);
@@ -1164,6 +1166,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           }
           playerStatus.value = .playing;
         } else {
+          _wakeLockTimer?.cancel();
+          _wakeLockTimer = Timer(
+            const Duration(milliseconds: 500),
+            WakelockPlus.disable,
+          );
+
           // 鸿蒙：退后台引发的暂停不取消自动画中画，否则该取消操作会与系统
           // 自动小窗的启动赛跑，导致自动小窗时灵时不灵（Android 的 PiP
           // auto-enter 与离开手势原子执行，无此问题）。仅在应用处于前台
@@ -2078,6 +2086,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       AndroidHelper$ToDart.onUserLeaveHint = null;
     }
     _timer?.cancel();
+    _wakeLockTimer?.cancel();
     // _position.close();
     // _playerEventSubs?.cancel();
     // _sliderPosition.close();
