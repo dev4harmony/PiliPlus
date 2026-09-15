@@ -446,7 +446,8 @@ export default class HarmonyChannel implements FlutterPlugin {
         break;
       }
       case "setShellTopBar": {
-        if (deviceInfo.sdkApiVersion < 26) {
+        // API 23~25 由 HdsNavigation 承载，API 26+ 由 Navigation 承载（见 Index.ets）
+        if (deviceInfo.sdkApiVersion < 23) {
           result.success(true);
           break;
         }

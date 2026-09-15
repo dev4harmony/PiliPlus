@@ -184,8 +184,10 @@ class MainController extends GetxController
     }
     final sdkApiVersion =
         (await DeviceInfoPlugin().ohosInfo).sdkApiVersion ?? 0;
+    // 底栏/顶栏均自 API 23（鸿蒙 6.1）起可用：ArkTS 侧 API 26+ 走 Navigation
+    // 标题栏 + ArkUI systemMaterial，API 23~25 走 HdsNavigation 标题栏材质
     final useHdsBar = Pref.enableHdsBar && sdkApiVersion > 22;
-    final useHdsTopBar = Pref.enableHdsTopBar && sdkApiVersion > 25;
+    final useHdsTopBar = Pref.enableHdsTopBar && sdkApiVersion > 22;
     useNativeTabs.value = useHdsBar;
     useNativeTopBar.value = useHdsTopBar;
     _syncNativeTopBarActive();

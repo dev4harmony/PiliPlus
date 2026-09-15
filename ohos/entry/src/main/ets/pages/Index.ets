@@ -34,6 +34,10 @@ const TOP_BAR_MOTION_CURVE: ICurve = curves.cubicBezierCurve(0.2, 0, 0, 1);
 /// 再淡入，避免文字在被压扁的行内闪现（旧实现同时做，观感发硬）
 const TOP_BAR_FADE_DURATION = 120;
 const TOP_BAR_FADE_IN_DELAY = 48;
+/// API 23~25 顶栏：消息按钮（单页签 HdsTabs 悬浮栏）边长，与 API 26+ 的
+/// 44vp 圆形按钮一致
+const HDS_MSG_BUTTON_SIZE = 44;
+const CATEGORY_TABS_HEIGHT = 32;
 /// 转屏动画参数
 const ROTATION_MASK_FADE_DURATION = 130;
 const ROTATION_MASK_FADE_DELAY = 75;
@@ -129,6 +133,10 @@ struct Index {
       this.categoryCurrentIndex = this.homeActiveTabIndex;
       this.categoryController.changeIndex(this.homeActiveTabIndex);
     }
+  }
+
+  private isTopBarCollapsed(): boolean {
+    return this.homeHideTopBar && this.topBarCollapsed;
   }
 
   onScrollHiddenChanged(): void {
@@ -426,6 +434,27 @@ struct Index {
     }
   }
 
+  /// 首页分类栏（直播/推荐/热门/分区…），API 26+ 与 API 23~25 两条顶栏路径共用
+  @Builder
+  categoryTabs() {
+    Tabs({ barPosition: BarPosition.Start, controller: this.categoryController }) {
+      ForEach(this.homeTabs, (tab: string, index: number) => {
+        TabContent() { // empty
+        }
+        .tabBar(this.categoryTabBuilder(index, tab))
+      }, (tab: string, index: number) => index + '_' + tab)
+    }
+    .barMode(BarMode.Scrollable)
+    .fadingEdge(false)
+    .scrollable(false)
+    .width('100%')
+    .height(CATEGORY_TABS_HEIGHT)
+    .onTabBarClick((index: number) => {
+      this.context.eventHub.emit(EVENT_HOME_TAB_CHANGE, index);
+      this.categoryCurrentIndex = index;
+    })
+  }
+
   @Builder
   homeTopBar() {
     RelativeContainer() {
@@ -500,22 +529,7 @@ struct Index {
         .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
 
         if (this.homeTabs.length > 1) {
-          Tabs({ barPosition: BarPosition.Start, controller: this.categoryController }) {
-            ForEach(this.homeTabs, (tab: string, index: number) => {
-              TabContent() { // empty
-              }
-              .tabBar(this.categoryTabBuilder(index, tab))
-            }, (tab: string, index: number) => index + '_' + tab)
-          }
-          .barMode(BarMode.Scrollable)
-          .fadingEdge(false)
-          .scrollable(false)
-          .width('100%')
-          .height(32)
-          .onTabBarClick((index: number) => {
-            this.context.eventHub.emit(EVENT_HOME_TAB_CHANGE, index);
-            this.categoryCurrentIndex = index;
-          })
+          this.categoryTabs()
         }
       }
       .width('100%')
@@ -581,9 +595,215 @@ struct Index {
   }
 
   private topBarHeight(): number {
-    return this.homeHideTopBar && this.topBarCollapsed
+    return this.isTopBarCollapsed()
       ? TOP_BAR_COLLAPSED_HEIGHT
       : TOP_BAR_EXPANDED_HEIGHT;
+  }
+
+  @Builder
+  hdsMsgTabBuilder() {
+    SymbolGlyph($r('sys.symbol.bell'))
+      .fontSize(22)
+      .width(22)
+      .height(22)
+      .fontColor([this.navSelected])
+      .align(Alignment.Center)
+  }
+
+  /// API 23~25：消息按钮由一个只含单个页签的 HdsTabs 悬浮栏承载——悬浮栏
+  /// 的 systemMaterialEffect 就是底栏在 6.1 上拿沉浸光感的同一套机制，
+  /// 而且栏宽/栏高/边距全部可指定，几何完全可控（不像 HdsNavigation
+  /// 标题栏有最小宽度和自带遮罩）。44×44 + barOverlap 使悬浮栏铺满组件，
+  /// 圆角随栏高变成正圆。角标与 API 26+ 的 msgButton 同一画法。
+  @Builder
+  hdsMsgButton() {
+    Stack() {
+      HdsTabs() {
+        TabContent() { // empty
+        }
+        .tabBar(this.hdsMsgTabBuilder())
+      }
+      .scrollable(false)
+      .barOverlap(true)
+      .barPosition(BarPosition.End)
+      .vertical(false)
+      .barMode(BarMode.Fixed)
+      .barHeight(HDS_MSG_BUTTON_SIZE)
+      .barFloatingStyle({
+        barWidth: {
+          smallWidth: HDS_MSG_BUTTON_SIZE,
+          mediumWidth: HDS_MSG_BUTTON_SIZE,
+          largeWidth: HDS_MSG_BUTTON_SIZE
+        },
+        barSideMargin: 0,
+        barBottomMargin: 0,
+        // 不要悬浮栏底部默认的渐变遮罩（默认高度为组件高 + 32vp，会露出直角块）。
+        // 注意不能写 Color.Transparent / 0：二者都是 falsy，HDS 会当作未设置而回退默认，
+        // 主题切换后默认遮罩色未刷新就成了按钮旁的灰色方块
+        gradientMask: { maskColor: '#00000000', maskHeight: 1 },
+        systemMaterialEffect: {
+          materialType: hdsMaterial.MaterialType.IMMERSIVE,
+          // 浅色模式下 ADAPTIVE 几乎看不出材质，按钮很小，直接用最高等级
+          materialLevel: hdsMaterial.MaterialLevel.EXQUISITE
+        }
+      })
+      .barBackgroundColor('#00000000')
+      .onTabBarClick(() => {
+        this.context.eventHub.emit(EVENT_TOP_MSG);
+      })
+      .width(HDS_MSG_BUTTON_SIZE)
+      .height(HDS_MSG_BUTTON_SIZE)
+      // 兜底：无论 HDS 在组件范围内画了什么底/遮罩，都裁成与悬浮栏同样的正圆
+      .clipShape(new Circle({ width: HDS_MSG_BUTTON_SIZE, height: HDS_MSG_BUTTON_SIZE }))
+      if (this.homeUnreadCount !== '') {
+        Text(this.homeUnreadCount)
+          .fontSize(9)
+          .fontColor(Color.White)
+          .padding({
+            left: 5,
+            right: 5,
+            top: 1,
+            bottom: 1
+          })
+          .backgroundColor(this.navSelected)
+          .borderRadius(8)
+          .offset({ x: 6, y: -8 })
+      }
+    }
+    .width(HDS_MSG_BUTTON_SIZE)
+    .height(HDS_MSG_BUTTON_SIZE)
+    // 角标可能探出按钮右缘，压在后绘制的头像之上
+    .zIndex(1)
+  }
+
+  /// API 23~25（鸿蒙 6.1）顶栏。ArkUI 通用组件的 systemMaterial / uiMaterial
+  /// 要到 API 26 才有，6.1 上沉浸光感只在 HDS 组件内可用：消息按钮走
+  /// hdsMsgButton（HdsTabs 悬浮栏）拿材质；搜索框用组件级模糊做半透明胶囊，头像是普通圆形
+  /// 图片按钮。布局、收起动画与 homeTopBar 逐项对应，仅材质相关属性不同。
+  @Builder
+  homeTopBarHds() {
+    RelativeContainer() {
+      //渐变模糊底层
+      Column() {
+      }
+      .constraintSize({ maxHeight: TOP_BAR_EXPANDED_HEIGHT })
+      .linearGradient({
+          direction: GradientDirection.Bottom, // 渐变方向
+          colors: [
+                [$r('app.color.top_bar_mask_start'), 0],
+                [$r('app.color.top_bar_mask_mid'), 0.8],
+                [$r('app.color.top_bar_mask_end'), 0.95],
+                [$r('app.color.top_bar_mask_end'), 1],
+              ],
+        })
+      .linearGradientBlur(TOP_BAR_BLUR_RADIUS, {
+        fractionStops: TOP_BAR_FRACTION_STOPS,
+        direction: GradientDirection.Top
+      })
+      .alignRules({
+        top: { anchor: 'topBarContent', align: VerticalAlign.Top },
+        bottom: { anchor: 'topBarContent', align: VerticalAlign.Bottom },
+        left: { anchor: 'topBarContent', align: HorizontalAlign.Start },
+        right: { anchor: 'topBarContent', align: HorizontalAlign.End }
+      })
+      .id('topBarBg')
+      .hitTestBehavior(HitTestMode.Transparent)
+      .align(Alignment.Top)
+
+      Column() {
+        Row({ space: 8 }) {
+          Search({ value: this.homeSearchText, placeholder: '搜索' })
+            .cancelButton({ style: CancelButtonStyle.INVISIBLE })
+            .focusable(false)
+            .enableKeyboardOnFocus(false)
+            .searchIcon(new SymbolGlyphModifier($r('sys.symbol.magnifyingglass'))
+              .fontColor([this.navSelected]).fontSize(16))
+            .placeholderColor($r('app.color.placeholder_text'))
+            .placeholderFont({ size: 16, weight: 600 })
+            .fontColor($r('app.color.placeholder_text'))
+            .textFont({ size: 16, weight: 600 })
+            .backgroundColor(Color.Transparent)
+            .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+            .borderRadius(22)
+            .layoutWeight(1)
+            .height(44)
+            .onClick(() => {
+              this.context.eventHub.emit(EVENT_TOP_SEARCH);
+            })
+          this.hdsMsgButton()
+          if (this.homeFaceUrl !== '') {
+            Image(this.homeFaceUrl)
+              .width(41)
+              .height(41)
+              .borderRadius(20.5)
+              .onClick(() => {
+                this.context.eventHub.emit(EVENT_TOP_MINE);
+              })
+          } else {
+            Stack() {
+              SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
+                .fontSize(26)
+                .width(26)
+                .height(26)
+                .fontColor([this.navSelected])
+                .align(Alignment.Center)
+            }
+            .width(44)
+            .height(44)
+            .borderRadius(22)
+            .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+            .onClick(() => {
+              this.context.eventHub.emit(EVENT_TOP_MINE);
+            })
+          }
+        }
+        .width('100%')
+        .padding({
+          left: 14,
+          right: 14,
+        })
+        .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
+        .animation({
+          duration: TOP_BAR_FADE_DURATION,
+          curve: Curve.Sharp,
+          delay: this.homeHideTopBar && this.topBarCollapsed ? 0 : TOP_BAR_FADE_IN_DELAY
+        })
+        .margin({
+          top: this.homeHideTopBar && this.topBarCollapsed ? 0 : 5,
+          bottom: this.homeHideTopBar && this.topBarCollapsed ? -5 : 5
+        })
+        .height(this.homeHideTopBar && this.topBarCollapsed ? 0 : 44)
+        .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+
+        if (this.homeTabs.length > 1) {
+          this.categoryTabs()
+        }
+      }
+      .width('100%')
+      .padding({ top: this.statusBarHeight})
+      .id('topBarContent')
+      .hitTestBehavior(HitTestMode.Default)
+      .align(Alignment.Top)
+    }
+    .height(this.topBarHeight())
+    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+    .width('100%')
+    .hitTestBehavior(HitTestMode.Default)
+    .align(Alignment.Top)
+  }
+
+  /// API 23~25 顶栏宿主：与 API 26+ 宿主同样由外层裁剪容器承担收缩与显隐
+  @Builder
+  homeTopBarHdsHost() {
+    Column() {
+      this.homeTopBarHds()
+    }
+    .width('100%')
+    .height(this.topBarHeight())
+    .clip(true)
+    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+    .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
+    .align(Alignment.Top)
   }
 
   @Builder
@@ -629,8 +849,12 @@ struct Index {
       if (this.useNativeTabs && deviceInfo.sdkApiVersion >= 23) {
         this.hdsMainTabs()
       }
+      // API 26+：Navigation 标题栏 + ArkUI systemMaterial（全部元素带材质）
+      // API 23~25：自绘顶栏，仅消息按钮（HdsTabs 悬浮栏）带 HDS 材质
       if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 26) {
         this.homeTopBarHost()
+      } else if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 23) {
+        this.homeTopBarHdsHost()
       }
       // 转屏遮罩
       if (this.rotationMask !== null) {

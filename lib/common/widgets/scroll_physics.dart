@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:flutter/gestures.dart' show HorizontalDragGestureRecognizer;
 import 'package:material_ui/material_ui.dart';
 import 'package:os_type/os_type.dart';
 
@@ -10,12 +11,16 @@ Widget tabBarView({
   HitTestBehavior hitTestBehavior = .opaque,
 }) => RawGestureDetector(
   behavior: hitTestBehavior,
+  // CustomHorizontalDragGestureRecognizer 把 runtimeType 覆盖成了
+  // HorizontalDragGestureRecognizer（上游为了顶替 Scrollable 内置识别器），
+  // RawGestureDetector 在 debug 下断言「实例 runtimeType == map 的 key」，
+  // 因此这里必须以 HorizontalDragGestureRecognizer 为 key，否则 debug 包首页直接红屏
   gestures: {
-    CustomHorizontalDragGestureRecognizer:
-        GestureRecognizerFactoryWithHandlers<CustomHorizontalDragGestureRecognizer>(
-      CustomHorizontalDragGestureRecognizer.new,
-      (_) {},
-    ),
+    HorizontalDragGestureRecognizer:
+        GestureRecognizerFactoryWithHandlers<HorizontalDragGestureRecognizer>(
+          CustomHorizontalDragGestureRecognizer.new,
+          (_) {},
+        ),
   },
   child: TabBarView(
     controller: controller,

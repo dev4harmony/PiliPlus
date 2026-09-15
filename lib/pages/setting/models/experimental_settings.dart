@@ -16,7 +16,8 @@ List<SettingsModel> experimentalSettings = [
   ),
   SwitchModel(
     title: '鸿蒙沉浸光感顶栏',
-    subtitle: '使用鸿蒙沉浸光感顶栏\n仅鸿蒙7及以上支持，不支持则自动回退',
+    subtitle:
+        '使用鸿蒙原生沉浸光感顶栏\n仅鸿蒙6.1及以上支持，不支持则自动回退\n鸿蒙6.1仅消息按钮带光感材质，搜索框为毛玻璃效果；鸿蒙7及以上搜索框、消息与头像按钮均带光感材质',
     leading: const Icon(Icons.blur_on_outlined),
     setKey: SettingBoxKey.enableHdsTopBar,
     defaultVal: false,
