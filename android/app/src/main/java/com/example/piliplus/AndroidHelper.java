@@ -10,8 +10,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
+import android.content.pm.verify.domain.DomainVerificationManager;
+import android.content.pm.verify.domain.DomainVerificationUserState;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Point;
@@ -293,6 +296,48 @@ public final class AndroidHelper {
         final int state = enabled ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                 : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
         context.getPackageManager().setComponentEnabledSetting(componentName, state, PackageManager.DONT_KILL_APP);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    public static boolean isDomainVerified(String domain) {
+        try {
+            Context context = getContext();
+            DomainVerificationManager manager =
+                    context.getSystemService(DomainVerificationManager.class);
+            DomainVerificationUserState userState =
+                    manager.getDomainVerificationUserState(context.getPackageName());
+            if (userState == null) return false;
+            Map<String, Integer> hostToStateMap = userState.getHostToStateMap();
+            Integer stateValue = hostToStateMap.get(domain);
+            if (stateValue == null) return false;
+            return stateValue == DomainVerificationUserState.DOMAIN_STATE_VERIFIED ||
+                    stateValue == DomainVerificationUserState.DOMAIN_STATE_SELECTED;
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    public static String openUrl(String url) {
+        Context context = getContext();
+        String pkg = context.getPackageName();
+        PackageManager pm = context.getPackageManager();
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            for (ResolveInfo info : pm.queryIntentActivities(intent, 0)) {
+                String packageName = info.activityInfo.packageName;
+                if (!packageName.equals(pkg)) {
+                    intent.setPackage(packageName);
+                    context.startActivity(intent);
+                    return null;
+                }
+            }
+            return "package not found";
+        } catch (Exception e) {
+            return e.toString();
+        }
     }
 
     @Keep
