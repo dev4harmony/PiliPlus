@@ -129,6 +129,12 @@ class AudioController extends GetxController
   double? _lastVolume;
   late final RxDouble desktopVolume = RxDouble(Pref.desktopVolume);
 
+  Timer? _statusTimer;
+  void _stopStatusTimer() {
+    _statusTimer?.cancel();
+    _statusTimer = null;
+  }
+
   void toggleVolume() {
     if (_lastVolume == null) {
       _lastVolume = desktopVolume.value;
@@ -470,24 +476,30 @@ class AudioController extends GetxController
         this.duration.value = duration.inSeconds;
       }),
       stream.playing.listen((playing) {
-        final PlayerStatus playerStatus;
         if (playing) {
           animController.forward();
-          playerStatus = PlayerStatus.playing;
+          _stopStatusTimer();
+          videoPlayerServiceHandler?.onStatusChange(.playing, false, false);
         } else {
           animController.reverse();
-          playerStatus = PlayerStatus.paused;
+          _statusTimer?.cancel();
+          _statusTimer = Timer(
+            const Duration(milliseconds: 500),
+            () {
+              // 自然播完且会自动续播时，不向播控中心上报暂停（保持播放态，
+              // 避免后台连续任务被停）；重播窗口内的事件同样跳过
+              final naturalEnd =
+                  _autoContinue &&
+                  duration.value > 2 &&
+                  position.value >= duration.value - 2;
+              if (naturalEnd || _suppressPauseReport) return;
+              videoPlayerServiceHandler?.onStatusChange(.paused, false, false);
+            },
+          );
         }
-        // 自然播完且会自动续播时，不向播控中心上报暂停（保持播放态，
-        // 避免后台连续任务被停）；重播窗口内的事件同样跳过
-        final naturalEnd =
-            !playing &&
-            _autoContinue &&
-            duration.value > 2 &&
-            position.value >= duration.value - 2;
-        if (!naturalEnd && !_suppressPauseReport) {
-          videoPlayerServiceHandler?.onStatusChange(playerStatus, false, false);
-        }
+      }),
+      stream.buffering.listen((buffering) {
+        if (buffering) _stopStatusTimer();
       }),
       stream.completed.listen((completed) {
         _videoDetailController?.playedTime = player!.state.duration;
@@ -887,6 +899,7 @@ class AudioController extends GetxController
   @override
   void onClose() {
     HarmonyChannel.releaseContinuation(this);
+    _stopStatusTimer();
     shutdownTimerService
       ..onPause = null
       ..isPlaying = null
