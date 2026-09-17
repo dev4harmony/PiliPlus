@@ -1182,6 +1182,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             }
           }
           playerStatus.value = .playing;
+
+          videoPlayerServiceHandler?.onStatusChange(
+            .playing,
+            isBuffering.value,
+            isLive,
+          );
         } else {
           // 鸿蒙：退后台引发的暂停不取消自动画中画，否则该取消操作会与系统
           // 自动小窗的启动赛跑，导致自动小窗时灵时不灵（Android 的 PiP
@@ -1262,11 +1268,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       }),
       stream.buffering.listen((bool buffering) {
         isBuffering.value = buffering;
-        videoPlayerServiceHandler?.onStatusChange(
-          playerStatus.value,
-          buffering,
-          isLive,
-        );
+        final playerStatus = this.playerStatus.value;
+        if (!playerStatus.isCompleted) {
+          videoPlayerServiceHandler?.onStatusChange(
+            playerStatus,
+            buffering,
+            isLive,
+          );
+        }
       }),
       if (kDebugMode)
         stream.log.listen(((PlayerLog log) {
