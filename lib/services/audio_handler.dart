@@ -27,8 +27,8 @@ Future<VideoPlayerServiceHandler> initAudioService() {
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.example.piliplus.audio',
       androidNotificationChannelName: 'Audio Service ${Constants.appName}',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
+      androidNotificationOngoing: false,
+      androidStopForegroundOnPause: false,
       fastForwardInterval: Duration(seconds: 10),
       rewindInterval: Duration(seconds: 10),
       androidNotificationChannelDescription: 'Media notification channel',
