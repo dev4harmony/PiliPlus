@@ -344,7 +344,7 @@ class ChatItem extends StatelessWidget {
                           cid: cid,
                           cover: i['cover_url'],
                           dimension: res!.dimension,
-                          title: res.title,
+                          // title: res.title,
                         );
                       }
                     } catch (err) {
@@ -439,7 +439,7 @@ class ChatItem extends StatelessWidget {
                       cid: cid,
                       cover: content['cover'],
                       dimension: res!.dimension,
-                      title: res.title,
+                      // title: res.title,
                     );
                   }
                 } catch (err) {
@@ -543,7 +543,7 @@ class ChatItem extends StatelessWidget {
               cid: cid,
               cover: content['thumb'],
               dimension: res!.dimension,
-              title: res.title,
+              // title: res.title,
             );
           }
         };
