@@ -30,7 +30,6 @@ import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/triple_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
-import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/services/shutdown_timer_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
@@ -499,21 +498,28 @@ class AudioController extends GetxController
         }
       }),
       stream.buffering.listen((buffering) {
-        if (buffering) _stopStatusTimer();
+        if (buffering && !player!.state.completed) _stopStatusTimer();
       }),
       stream.completed.listen((completed) {
         _videoDetailController?.playedTime = player!.state.duration;
         if (completed) {
+          _statusTimer?.cancel();
+          _statusTimer = Timer(
+            const Duration(milliseconds: 500),
+            () {
+              // 自动续播：抑制窗口内不向播控中心上报完成
+              if (_suppressPauseReport) return;
+              videoPlayerServiceHandler?.onStatusChange(
+                .completed,
+                false,
+                false,
+              );
+            },
+          );
           if (_autoContinue) {
             // 自动续播：进入抑制窗口，不向播控中心上报完成/停止
             _suppressPauseUntil = DateTime.now().add(
               const Duration(seconds: 6),
-            );
-          } else {
-            videoPlayerServiceHandler?.onStatusChange(
-              PlayerStatus.completed,
-              false,
-              false,
             );
           }
           if (shutdownTimerService.isWaiting) {
