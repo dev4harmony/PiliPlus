@@ -1,11 +1,11 @@
 import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:io' show Platform;
 
-import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/main.dart';
+import 'package:PiliPlus/plugin/linux_webview.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:dio/dio.dart';
@@ -35,20 +35,19 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
       'https://static.geetest.com/static/js/fullpage.0.0.0.js';
 
   late final Future<LoadingState<String>> _future;
+  String? _linuxHtml;
+  late bool _linuxWebviewLoading = true;
 
   static String _showJs(String response) =>
       't=Geetest($response).onSuccess(()=>R("success",t.getValidate())).onError(o=>R("error",o)).onClose(o=>R("close",o));t.onReady(()=>t.verify())';
-  late final double _previousScaleFactor;
 
   @override
   void initState() {
     super.initState();
-    _previousScaleFactor =
-        ScaledWidgetsFlutterBinding.instance.scaleFactor;
-    if (_previousScaleFactor != 1.0) {
-      ScaledWidgetsFlutterBinding.instance.scaleFactor = 1.0;
-    }
     _future = _getConfig(widget.gt, widget.challenge);
+    if (Platform.isLinux) {
+      _initLinuxWebview();
+    }
   }
 
   static Future<LoadingState<String>> _getConfig(
@@ -94,16 +93,82 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
     return Error(res.data['message']);
   }
 
-  @override
-  void dispose() {
-    if (_previousScaleFactor != 1.0) {
-      ScaledWidgetsFlutterBinding.instance.scaleFactor = _previousScaleFactor;
+  Future<void> _initLinuxWebview() async {
+    final config = await _future;
+
+    if (!mounted) {
+      return;
     }
-    super.dispose();
+
+    if (config is Error) {
+      config.toast();
+      Get.back();
+      return;
+    }
+
+    final html =
+        '''
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width"></head><body>
+<script src="$_geetestJsUri"></script>
+<script>
+  R=(n,o)=>window.webkit.messageHandlers.msgToNative.postMessage(n+':'+JSON.stringify(o))
+  ${_showJs((config as Success<String>).response)}
+</script>
+</body></html>
+''';
+
+    if (mounted) {
+      setState(() {
+        _linuxHtml = html;
+        _linuxWebviewLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isLinux) {
+      return AlertDialog(
+        title: const Text('验证码'),
+        content: SizedBox(
+          width: 300,
+          height: 400,
+          child: _linuxWebviewLoading || _linuxHtml == null
+              ? const Center(child: CircularProgressIndicator())
+              : LinuxWebview(
+                  initialHtml: _linuxHtml,
+                  userAgent: BrowserUa.mob,
+                  incognito: true,
+                  onWebMessageReceived: (msg) {
+                    final msgStr = msg.toString();
+                    if (msgStr.startsWith("success:")) {
+                      final dataStr = msgStr.substring("success:".length);
+                      try {
+                        final data = jsonDecode(dataStr);
+                        Get.back(result: data);
+                      } catch (e) {
+                        debugPrint('geetest decode error: $e');
+                      }
+                    } else if (msgStr.startsWith("error:")) {
+                      debugPrint('geetest error: $msgStr');
+                    } else if (msgStr.startsWith('close:')) {
+                      Get.back();
+                    }
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: Text(
+              '取消',
+              style: TextStyle(color: ColorScheme.of(context).outline),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Stack(
       children: [
         InAppWebView(
@@ -142,44 +207,7 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
           ),
           initialData: InAppWebViewInitialData(
             data:
-                // 之前的html
-                // '<!DOCTYPE html><html><head></head><body><script src="$_geetestJsUri"></script><script>function R(n,o){flutter_inappwebview.callHandler(n,o)}</script></body></html>',
-                // 铺满InAppWebView防止看不清
-                '''<!DOCTYPE html>
-            <html>
-            <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-              <style>
-                body {
-                  margin: 0;
-                  padding: 10px;
-                  display: flex;
-                  justify-content: center;
-                  align-items: center;
-                  min-height: 100vh;
-                  background-color: white;
-                }
-                #geetest_holder {
-                  width: 80%;
-                  max-width: 280px;
-                  display: flex;
-                  justify-content: center;
-                }
-                .geetest_panel {
-                  width: 100% !important;
-                }
-              </style>
-            </head>
-            <body>
-              <div id="geetest_holder"></div>
-              <script src="$_geetestJsUri"></script>
-              <script>
-                function R(n,o){
-                  flutter_inappwebview.callHandler(n,o)
-                }
-              </script>
-            </body>
-            </html>''',
+                '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width"></head><body><script src="$_geetestJsUri"></script><script>R=flutter_inappwebview.callHandler</script></body></html>',
           ),
           onWebViewCreated: (ctr) {
             ctr
