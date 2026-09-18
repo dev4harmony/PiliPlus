@@ -703,7 +703,7 @@ class LiveRoomController extends GetxController {
           );
           break;
         case 'SUPER_CHAT_MESSAGE' when showSuperChat:
-          final item = SuperChatItem.fromJson(obj['data']);
+          final item = SuperChatItem.fromJson(obj['data'], roomId);
           superChatMsg.insert(0, item);
           addDm(item);
           if (Platform.isAndroid && AndroidHelper.isPipMode) return;

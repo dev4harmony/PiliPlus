@@ -623,7 +623,7 @@ abstract final class LiveHttp {
 
   @pragma('vm:notify-debugger-on-exception')
   static Future<LoadingState<SuperChatData>> superChatMsg(
-    Object roomId,
+    int roomId,
   ) async {
     final res = await Request().get(
       Api.superChatMsg,
@@ -633,7 +633,7 @@ abstract final class LiveHttp {
     );
     if (res.data['code'] == 0) {
       try {
-        return Success(SuperChatData.fromJson(res.data['data']));
+        return Success(SuperChatData.fromJson(res.data['data'], roomId));
       } catch (e, s) {
         return Error('$e\n\n$s');
       }
