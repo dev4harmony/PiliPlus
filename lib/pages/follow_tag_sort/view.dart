@@ -1,13 +1,13 @@
 import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/http/follow.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/member/tags.dart';
 import 'package:PiliPlus/pages/follow/controller.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
-import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class FollowTagSortPage extends StatefulWidget {
   const FollowTagSortPage({super.key, required this.controller});
@@ -71,16 +71,14 @@ class _FollowTagSortPageState extends State<FollowTagSortPage>
     );
   }
 
-  void onReorder(int oldIndex, int newIndex) {
-    // Flutter 3.41 的 onReorder 回调需自行修正 newIndex
-    if (newIndex > oldIndex) newIndex -= 1;
+  void onReorderItem(int oldIndex, int newIndex) {
     _customTags.insert(newIndex, _customTags.removeAt(oldIndex));
     setState(() {});
   }
 
   Widget get _buildBody {
     return ReorderableListView.builder(
-      onReorder: onReorder,
+      onReorderItem: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.only(

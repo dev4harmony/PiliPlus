@@ -73,7 +73,7 @@ jobs:
 
       - name: Setup flutter-ohos
         run: |
-          git clone -b oh-3.41.9-dev https://gitcode.com/CPF-Flutter/flutter_flutter.git $GITHUB_WORKSPACE/flutter
+          git clone -b oh-3.44.9-dev https://gitcode.com/CPF-Flutter/flutter_flutter.git $GITHUB_WORKSPACE/flutter
           echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
         shell: bash
 

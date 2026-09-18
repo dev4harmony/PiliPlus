@@ -2,8 +2,8 @@ import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart'
     show routeObserver;
-import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
+import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/common/widgets/selection_text.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/main.dart' show webViewEnvironment;
@@ -215,8 +215,7 @@ class _WebviewPageState extends State<WebviewPage> with RouteAware {
                   clearCache: true,
                   javaScriptEnabled: true,
                   forceDark: ForceDark.AUTO,
-                  // 鸿蒙 inappwebview fork 会读取该值（FlutterWebView.ets），保持 false，勿跟上游改 true
-                  useHybridComposition: false,
+                  useHybridComposition: true,
                   algorithmicDarkeningAllowed: true,
                   useShouldOverrideUrlLoading: true,
                   userAgent: userAgent,

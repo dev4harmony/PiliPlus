@@ -1,13 +1,13 @@
 import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/fav/fav_folder/list.dart';
 import 'package:PiliPlus/pages/fav/video/controller.dart';
 import 'package:PiliPlus/pages/fav/video/widgets/item.dart';
-import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class FavFolderSortPage extends StatefulWidget {
   const FavFolderSortPage({super.key, required this.favController});
@@ -56,9 +56,7 @@ class _FavFolderSortPageState extends State<FavFolderSortPage>
     );
   }
 
-  void onReorder(int oldIndex, int newIndex) {
-    // Flutter 3.41 的 onReorder 回调需自行修正 newIndex
-    if (newIndex > oldIndex) newIndex -= 1;
+  void onReorderItem(int oldIndex, int newIndex) {
     if (oldIndex == 0 || newIndex == 0) {
       SmartDialog.showToast('默认收藏夹不支持排序');
       return;
@@ -71,7 +69,7 @@ class _FavFolderSortPageState extends State<FavFolderSortPage>
 
   Widget get _buildBody {
     return ReorderableListView.builder(
-      onReorder: onReorder,
+      onReorderItem: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: sortList.length,

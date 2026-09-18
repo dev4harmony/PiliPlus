@@ -1,11 +1,11 @@
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/models/common/enum_with_label.dart';
 import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BarSetPage extends StatefulWidget {
   const BarSetPage({super.key});
@@ -61,9 +61,7 @@ class _BarSetPageState extends State<BarSetPage> with ReorderMixin {
     SmartDialog.showToast('重置成功，下次启动时生效');
   }
 
-  void onReorder(int oldIndex, int newIndex) {
-    // Flutter 3.41 的 onReorder 回调需自行修正 newIndex
-    if (newIndex > oldIndex) newIndex -= 1;
+  void onReorderItem(int oldIndex, int newIndex) {
     list.insert(newIndex, list.removeAt(oldIndex));
     setState(() {});
   }
@@ -80,7 +78,7 @@ class _BarSetPageState extends State<BarSetPage> with ReorderMixin {
         ],
       ),
       body: ReorderableListView(
-        onReorder: onReorder,
+        onReorderItem: onReorderItem,
         proxyDecorator: proxyDecorator,
         footer: Padding(
           padding: padding,

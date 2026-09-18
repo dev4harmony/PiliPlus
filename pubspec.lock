@@ -653,8 +653,8 @@ packages:
     dependency: "direct main"
     description:
       path: flutter_inappwebview
-      ref: "br_v6.1.5_ohos_dev"
-      resolved-ref: "0e399ed534241ef67d9514585afa49546c746bf6"
+      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      resolved-ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
     source: git
     version: "6.1.5"
@@ -662,8 +662,8 @@ packages:
     dependency: transitive
     description:
       path: flutter_inappwebview_android
-      ref: "0e399ed534241ef67d9514585afa49546c746bf6"
-      resolved-ref: "0e399ed534241ef67d9514585afa49546c746bf6"
+      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      resolved-ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
     source: git
     version: "1.1.3"
@@ -680,8 +680,8 @@ packages:
     dependency: transitive
     description:
       path: flutter_inappwebview_ios
-      ref: "0e399ed534241ef67d9514585afa49546c746bf6"
-      resolved-ref: "0e399ed534241ef67d9514585afa49546c746bf6"
+      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      resolved-ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
     source: git
     version: "1.1.2"
@@ -689,8 +689,8 @@ packages:
     dependency: transitive
     description:
       path: flutter_inappwebview_macos
-      ref: "0e399ed534241ef67d9514585afa49546c746bf6"
-      resolved-ref: "0e399ed534241ef67d9514585afa49546c746bf6"
+      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      resolved-ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
     source: git
     version: "1.1.2"
@@ -698,8 +698,8 @@ packages:
     dependency: transitive
     description:
       path: flutter_inappwebview_ohos
-      ref: "0e399ed534241ef67d9514585afa49546c746bf6"
-      resolved-ref: "0e399ed534241ef67d9514585afa49546c746bf6"
+      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      resolved-ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
     source: git
     version: "1.1.3"
@@ -716,8 +716,8 @@ packages:
     dependency: transitive
     description:
       path: flutter_inappwebview_web
-      ref: "0e399ed534241ef67d9514585afa49546c746bf6"
-      resolved-ref: "0e399ed534241ef67d9514585afa49546c746bf6"
+      ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
+      resolved-ref: b596ae059e388cbc8f710a6c26c5370a0527a03a
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
     source: git
     version: "1.1.2"
@@ -813,17 +813,18 @@ packages:
   font_awesome_flutter:
     dependency: "direct main"
     description:
-      name: font_awesome_flutter
-      sha256: f50ce90dbe26d977415b9540400d6778bef00894aced6358ae578abd92b14b10
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "."
+      ref: "v10.9.0"
+      resolved-ref: cf4a19ece5cb296d73d90f0d73106f779c85fa26
+      url: "https://github.com/bggRGjQaUbCoE/font_awesome_flutter.git"
+    source: git
     version: "10.9.0"
   get:
     dependency: "direct main"
     description:
       path: "."
       ref: dev
-      resolved-ref: "12c9d4d1517186390e92f86063369f4a26d01fdb"
+      resolved-ref: "3e65da893d9736135b2631a39e46c8f5388c2536"
       url: "https://github.com/bggRGjQaUbCoE/getx.git"
     source: git
     version: "4.7.2"
@@ -1933,10 +1934,10 @@ packages:
     dependency: transitive
     description:
       name: test_api
-      sha256: "8161c84903fd860b26bfdefb7963b3f0b68fee7adea0f59ef805ecca346f0c7a"
+      sha256: "949a932224383300f01be9221c39180316445ecb8e7547f70a41a35bf421fb9e"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.7.10"
+    version: "0.7.11"
   tray_manager:
     dependency: "direct main"
     description:

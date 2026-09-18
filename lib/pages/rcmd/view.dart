@@ -8,9 +8,9 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:os_type/os_type.dart';
 
 class RcmdPage extends StatefulWidget {
@@ -82,7 +82,6 @@ class _RcmdPageState extends State<RcmdPage>
         child: CustomScrollView(
           controller: controller.scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
-          cacheExtent: 800,
           slivers: [
             // 原生顶栏启用时顶部的可滚动留白（内容可滑入顶栏下方重合）
             const NativeTopSpacer(),

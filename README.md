@@ -20,7 +20,7 @@
 > [!TIP]
 > 当前项目编译API已经提升到了26.0.0，请在华为官网下载最新的配套IDE和SDK使用，防止编译异常
 
-- 1、配置鸿蒙flutter3.41.9环境，参考[鸿蒙flutter3.41.9](https://gitcode.com/CPF-Flutter/flutter_flutter/tree/oh-3.41.9-dev)
+- 1、配置鸿蒙flutter3.44.9环境，参考[鸿蒙flutter3.44.9](https://gitcode.com/CPF-Flutter/flutter_flutter/tree/oh-3.44.9-dev)
 
 - 2、通过vscode运行启动配置或是build_hap任务以确保应用内所需环境变量正确写入
 

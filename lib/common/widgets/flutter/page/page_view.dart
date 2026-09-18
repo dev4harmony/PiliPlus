@@ -396,7 +396,6 @@ class _PageViewState<T extends HorizontalDragGestureRecognizer>
             // independent of implicit scrolling:
             // https://github.com/flutter/flutter/issues/45632
             cacheExtent: widget.allowImplicitScrolling ? 1.0 : 0.0,
-            cacheExtentStyle: CacheExtentStyle.viewport,
             axisDirection: axisDirection,
             offset: position,
             clipBehavior: widget.clipBehavior,

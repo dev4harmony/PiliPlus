@@ -14,10 +14,6 @@ import 'package:flutter/rendering.dart'
 import 'package:flutter/widgets.dart';
 
 class LiveListView extends ListView {
-  // 上游用 `required super.itemBuilder` 这类 super 形参直接转发给
-  // ListView.separated；3.41 的 ListView.separated 把它们收成普通具名形参
-  // （不是字段），super 形参用不了，只能显式列出再转发。3.41 也还没有
-  // `scrollCacheExtent`，一并去掉。
   LiveListView.separated({
     super.key,
     super.scrollDirection,
@@ -25,29 +21,23 @@ class LiveListView extends ListView {
     super.primary,
     super.physics,
     super.padding,
-    required NullableIndexedWidgetBuilder itemBuilder,
-    ChildIndexGetter? findItemIndexCallback,
-    required IndexedWidgetBuilder separatorBuilder,
-    required int itemCount,
-    bool addAutomaticKeepAlives = true,
-    bool addRepaintBoundaries = true,
-    bool addSemanticIndexes = true,
-    super.cacheExtent,
+    required super.itemBuilder,
+    // ignore: deprecated_member_use
+    super.findChildIndexCallback,
+    super.findItemIndexCallback,
+    required super.separatorBuilder,
+    required super.itemCount,
+    super.addAutomaticKeepAlives,
+    super.addRepaintBoundaries,
+    super.addSemanticIndexes,
+    super.scrollCacheExtent,
     super.dragStartBehavior,
     super.keyboardDismissBehavior,
     super.restorationId,
     super.clipBehavior,
     super.hitTestBehavior,
     this.initialIndex = 0,
-  }) : super.separated(
-         itemBuilder: itemBuilder,
-         findItemIndexCallback: findItemIndexCallback,
-         separatorBuilder: separatorBuilder,
-         itemCount: itemCount,
-         addAutomaticKeepAlives: addAutomaticKeepAlives,
-         addRepaintBoundaries: addRepaintBoundaries,
-         addSemanticIndexes: addSemanticIndexes,
-       );
+  }) : super.separated();
 
   final int initialIndex;
 

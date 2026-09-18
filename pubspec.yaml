@@ -21,7 +21,7 @@ version: 2.1.4+6062
 
 environment:
   sdk: ">=3.11.1"
-  flutter: ">=3.41.9" # match installed OHOS SDK
+  flutter: ">=3.44.9" # match installed OHOS SDK
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -105,7 +105,10 @@ dependencies:
   # 下拉刷新
   # pull_to_refresh_notification: ^3.1.0
   # 图标
-  font_awesome_flutter: 10.9.0
+  font_awesome_flutter:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/font_awesome_flutter.git
+      ref: v10.9.0
   # material_design_icons_flutter: ^7.0.7296
   material_design_icons_flutter:
     git:
@@ -305,7 +308,7 @@ dependency_overrides:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
       path: "flutter_inappwebview"
-      ref: "br_v6.1.5_ohos_dev"
+      ref: "b596ae059e388cbc8f710a6c26c5370a0527a03a"
   flutter_inappwebview_platform_interface:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
@@ -383,7 +386,6 @@ dependency_overrides:
       url: https://github.com/My-Responsitories/media-kit.git
       path: libs/windows/media_kit_libs_windows_video
       ref: version_1.2.5
-  font_awesome_flutter: 10.9.0
   image_picker:
     git:
       url: https://gitcode.com/CPF-Flutter/flutter_packages.git

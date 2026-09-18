@@ -518,7 +518,7 @@ class RefreshIndicatorState extends State<RefreshIndicator>
             left: 0.0,
             right: 0.0,
             child: SizeTransition(
-              axisAlignment: 1.0,
+              alignment: AlignmentDirectional.topCenter,
               sizeFactor: _positionFactor, // This is what brings it down.
               child: Padding(
                 padding: EdgeInsets.only(top: displacement),
