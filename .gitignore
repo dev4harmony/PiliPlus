@@ -155,3 +155,5 @@ test*
 skills-lock.json
 
 ohos/.codegenie
+.codex/skills/deveco-cli/SKILL.md
+.claude/skills/deveco-cli/SKILL.md

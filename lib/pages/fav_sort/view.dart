@@ -1,14 +1,14 @@
 import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/fav/fav_detail/media.dart';
 import 'package:PiliPlus/pages/fav_detail/controller.dart';
 import 'package:PiliPlus/pages/fav_detail/widget/fav_video_card.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
-import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class FavSortPage extends StatefulWidget {
   const FavSortPage({super.key, required this.favDetailController});
@@ -81,9 +81,7 @@ class _FavSortPageState extends State<FavSortPage> with ReorderMixin {
     );
   }
 
-  void onReorder(int oldIndex, int newIndex) {
-    // Flutter 3.41 的 onReorder 回调需自行修正 newIndex
-    if (newIndex > oldIndex) newIndex -= 1;
+  void onReorderItem(int oldIndex, int newIndex) {
     final oldItem = sortList[oldIndex];
     final newItem = sortList.getOrNull(
       oldIndex > newIndex ? newIndex - 1 : newIndex, // might be Negative
@@ -99,7 +97,7 @@ class _FavSortPageState extends State<FavSortPage> with ReorderMixin {
 
   Widget get _buildBody {
     final child = ReorderableListView.builder(
-      onReorder: onReorder,
+      onReorderItem: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       padding:

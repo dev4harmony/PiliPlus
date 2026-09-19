@@ -1,9 +1,7 @@
 import 'package:PiliPlus/pages/setting/models/model.dart';
-import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:get/get.dart';
 
 List<SettingsModel> experimentalSettings = [
   SwitchModel(

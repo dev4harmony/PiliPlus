@@ -3,6 +3,10 @@
     {
       "name": "enable_impeller",
       "value": "true"
+    },
+    {
+      "name": "enable_ohos_hybrid_composition",
+      "value": "true"
     }
   ]
 }
