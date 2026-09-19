@@ -1311,7 +1311,7 @@ packages:
     description:
       path: "."
       ref: "br_2.1.0_ohos"
-      resolved-ref: "358570b3893e0e124ccadebca6c8cc10779edc68"
+      resolved-ref: c6ecc1c419409834f97b7274171ed63343b29c10
       url: "https://gitcode.com/hellozeronick/fluttertpc_native_device_orientation.git"
     source: git
     version: "2.1.0"
