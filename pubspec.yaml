@@ -203,7 +203,7 @@ dependencies:
   # nil: ^1.1.1
   catcher_2:
     git:
-      url: https://github.com/My-Responsitories/catcher_2.git
+      url: https://github.com/HelloZeroNick/catcher_2.git
       ref: dev
   logger: ^2.7.0
   #瀑布流

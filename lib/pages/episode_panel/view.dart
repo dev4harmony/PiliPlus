@@ -32,10 +32,10 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart' hide TabBarView;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:material_ui/material_ui.dart' hide TabBarView;
 
 class EpisodePanel extends CommonSlidePage {
   const EpisodePanel({
@@ -287,7 +287,7 @@ class EpisodePanelState extends State<EpisodePanel>
 
   double _calcItemHeight(ugc.BaseEpisodeItem episode) {
     if (episode is ugc.EpisodeItem && episode.pages!.length > 1) {
-      return 157; // 110 + 2 + 10 + 35
+      return 167; // 110 + 2 + 10 + 45
     }
     return 112;
   }
@@ -349,7 +349,7 @@ class EpisodePanelState extends State<EpisodePanel>
                                 vertical: 5,
                               ), // 10
                               child: PagesPanel(
-                                // 35
+                                // 45
                                 list: isCurrTab && isCurrItem
                                     ? null
                                     : episode.pages,

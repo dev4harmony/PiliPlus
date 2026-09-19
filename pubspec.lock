@@ -251,8 +251,8 @@ packages:
     description:
       path: "."
       ref: dev
-      resolved-ref: "9138d8d2aeefc564efd2f35fde3f54ad1b7e89a7"
-      url: "https://github.com/My-Responsitories/catcher_2.git"
+      resolved-ref: "99454cf0cd9aa427e6c7fd839392d8ff95f78d6f"
+      url: "https://github.com/HelloZeroNick/catcher_2.git"
     source: git
     version: "2.1.9"
   characters:
@@ -1312,7 +1312,7 @@ packages:
     description:
       path: "."
       ref: "br_2.1.0_ohos"
-      resolved-ref: "358570b3893e0e124ccadebca6c8cc10779edc68"
+      resolved-ref: c6ecc1c419409834f97b7274171ed63343b29c10
       url: "https://gitcode.com/hellozeronick/fluttertpc_native_device_orientation.git"
     source: git
     version: "2.1.0"

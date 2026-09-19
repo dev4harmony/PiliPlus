@@ -4,6 +4,7 @@
 
 import 'dart:async' show Completer;
 
+import 'package:PiliPlus/common/widgets/refresh_layout.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
     show BouncingScrollPhysicsExt;
@@ -13,6 +14,8 @@ import 'package:extended_nested_scroll_view/refresh.dart';
 import 'package:flutter/foundation.dart' show clampDouble;
 import 'package:flutter/material.dart' hide RefreshIndicator;
 import 'package:os_type/os_type.dart';
+
+const kIndicatorSize = 49.0;
 
 /// The distance from the child's top or bottom [edgeOffset] where
 /// the refresh indicator will settle. During the drag that exposes the refresh
@@ -516,41 +519,24 @@ class RefreshIndicatorState extends State<RefreshIndicator>
         _status == RefreshIndicatorStatus.refresh ||
         _status == RefreshIndicatorStatus.done;
 
-    child = Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        child,
-        if (_status != null)
-          Positioned(
-            top: widget.edgeOffset,
-            left: 0.0,
-            right: 0.0,
-            child: SizeTransition(
-              alignment: AlignmentDirectional.topCenter,
-              sizeFactor: _positionFactor, // This is what brings it down.
-              child: Padding(
-                padding: EdgeInsets.only(top: displacement),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ScaleTransition(
-                    scale: _scaleFactor,
-                    child: AnimatedBuilder(
-                      animation: _positionController,
-                      builder: (context, child) => RefreshProgressIndicator(
-                        value: showIndeterminateIndicator ? null : _value.value,
-                        valueColor: _valueColor,
-                        backgroundColor: widget.backgroundColor,
-                        strokeWidth: widget.strokeWidth,
-                        elevation: widget.elevation,
-                      ),
-                    ),
-                  ),
-                ),
+    child = RefreshLayout(
+      body: child,
+      scale: _scaleFactor,
+      position: _positionFactor,
+      indicator: _status == null
+          ? null
+          : AnimatedBuilder(
+              animation: _positionController,
+              builder: (context, child) => RefreshProgressIndicator(
+                value: showIndeterminateIndicator ? null : _value.value,
+                valueColor: _valueColor,
+                backgroundColor: widget.backgroundColor,
+                strokeWidth: widget.strokeWidth,
+                elevation: widget.elevation,
               ),
             ),
-          ),
-      ],
     );
+
     // 鸿蒙与iOS保持一致的下拉动画
     if (PlatformUtils.isDarwin || OS.isHarmony) {
       if (widget.isClampingScrollPhysics) {

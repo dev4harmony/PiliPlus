@@ -660,7 +660,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       _orientationListener = NativeDeviceOrientationCommunicator()
           .onOrientationChanged(
             checkIsAutoRotate: checkIsAutoRotate,
-            angleDegrees: Pref.angleDegrees.toDouble(),
+            angleDegrees: Pref.angleDegrees,
           )
           .listen(_onOrientationChanged);
     }
