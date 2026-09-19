@@ -1970,7 +1970,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     bool? isHorizontal,
     bool needRelated = true,
     bool needCtr = true,
-    bool isNested = false,
   }) {
     if (videoDetailController.isFileSource) {
       return localIntroPanel(needCtr: needCtr);
@@ -2032,12 +2031,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           ),
         ],
       );
-      if (isNested) {
-        child = ExtendedVisibilityDetector(
-          uniqueKey: const Key('intro-panel'),
-          child: child,
-        );
-      }
       return KeepAliveWrapper(child: child);
     }
 

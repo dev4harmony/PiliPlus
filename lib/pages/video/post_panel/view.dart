@@ -18,7 +18,6 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
-import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
@@ -297,13 +296,11 @@ class _PostPanelState extends State<PostPanel>
   }
 
   late Key _key;
-  late bool _isNested;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final controller = PrimaryScrollController.of(context);
-    _isNested = controller is ExtendedNestedScrollController;
     _key = ValueKey(controller.hashCode);
   }
 
@@ -313,25 +310,18 @@ class _PostPanelState extends State<PostPanel>
       return scrollableError;
     }
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
-    Widget child = ListView.builder(
-      key: _key,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.only(bottom: 88 + bottom),
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        return _buildItem(theme, index, list[index]);
-      },
-    );
-    if (_isNested) {
-      child = ExtendedVisibilityDetector(
-        uniqueKey: const ValueKey(PostPanel),
-        child: child,
-      );
-    }
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        child,
+        ListView.builder(
+          key: _key,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: 88 + bottom),
+          itemCount: list.length,
+          itemBuilder: (context, index) {
+            return _buildItem(theme, index, list[index]);
+          },
+        ),
         Positioned(
           right: kFloatingActionButtonMargin,
           bottom: kFloatingActionButtonMargin + bottom,

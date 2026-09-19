@@ -16,7 +16,6 @@ import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/pages/video/reply_reply/view.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:easy_debounce/easy_throttle.dart';
-import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
@@ -71,7 +70,7 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final child = fabAnimWrapper(
+    return fabAnimWrapper(
       child: refreshIndicator(
         onRefresh: _videoReplyController.onRefresh,
         isClampingScrollPhysics: widget.isNested,
@@ -145,13 +144,6 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
         ),
       ),
     );
-    if (widget.isNested) {
-      return ExtendedVisibilityDetector(
-        uniqueKey: const ValueKey(VideoReplyPanel),
-        child: child,
-      );
-    }
-    return child;
   }
 
   Widget _buildBody(LoadingState<List<ReplyInfo>?> loadingState) {

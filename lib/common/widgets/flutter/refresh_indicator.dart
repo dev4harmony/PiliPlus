@@ -5,10 +5,11 @@
 import 'dart:async' show Completer;
 
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart'
+    show BouncingScrollPhysicsExt;
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart'
-    show RefreshScrollPhysics;
+import 'package:extended_nested_scroll_view/refresh.dart';
 import 'package:flutter/foundation.dart' show clampDouble;
 import 'package:flutter/material.dart' hide RefreshIndicator;
 import 'package:os_type/os_type.dart';
@@ -218,6 +219,9 @@ class RefreshIndicatorState extends State<RefreshIndicator>
   RefreshIndicatorStatus? _status;
   late Future<void> _pendingRefreshFuture;
   double? _dragOffset;
+
+  // 鸿蒙保留kDragContainerExtentPercentage= Pref.refreshDragPercentage所需
+  double _containerExtent = 0.0;
   late Color _effectiveValueColor;
   // late Color _backgroundColor;
 
@@ -312,6 +316,10 @@ class RefreshIndicatorState extends State<RefreshIndicator>
   bool _handleScrollNotification(ScrollNotification notification) {
     if (!widget.notificationPredicate(notification)) {
       return false;
+    }
+    final viewportDimension = notification.metrics.viewportDimension;
+    if (viewportDimension > 0) {
+      _containerExtent = viewportDimension;
     }
     if (_shouldStart(notification)) {
       setState(() {
@@ -543,7 +551,19 @@ class RefreshIndicatorState extends State<RefreshIndicator>
           ),
       ],
     );
-    if (!widget.isClampingScrollPhysics && (PlatformUtils.isDarwin || OS.isHarmony)) {
+    // 鸿蒙与iOS保持一致的下拉动画
+    if (PlatformUtils.isDarwin || OS.isHarmony) {
+      if (widget.isClampingScrollPhysics) {
+        return ScrollConfiguration(
+          behavior: RefreshScrollBehavior(
+            scrollPhysics: RefreshScrollPhysicsIOS(
+              parent: const RangeMaintainingScrollPhysics(),
+              onDrag: _onDrag,
+            ),
+          ),
+          child: child,
+        );
+      }
       return child;
     }
     return ScrollConfiguration(
@@ -557,10 +577,12 @@ class RefreshIndicatorState extends State<RefreshIndicator>
     );
   }
 
-  bool _onDrag(double offset, double viewportDimension) {
+  bool _onDrag(double offset) {
     if (_positionController.value > 0.0 && _status == .drag) {
       _dragOffset = _dragOffset! + offset;
-      _checkDragOffset(viewportDimension);
+      if (_containerExtent > 0.0) {
+        _checkDragOffset(_containerExtent);
+      }
       return true;
     }
     return false;
@@ -614,10 +636,42 @@ class RefreshScrollBehavior extends CustomScrollBehavior {
     required this.scrollPhysics,
   });
 
-  final RefreshScrollPhysics scrollPhysics;
+  final RefreshScrollPhysicsMixin scrollPhysics;
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
     return scrollPhysics;
+  }
+}
+
+class RefreshScrollPhysics extends ClampingScrollPhysics
+    with RefreshScrollPhysicsMixin {
+  const RefreshScrollPhysics({
+    super.parent,
+    required this.onDrag,
+  });
+
+  @override
+  final OnDrag onDrag;
+
+  @override
+  RefreshScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return RefreshScrollPhysics(parent: buildParent(ancestor), onDrag: onDrag);
+  }
+}
+
+class RefreshScrollPhysicsIOS extends BouncingScrollPhysicsExt
+    with RefreshScrollPhysicsMixin {
+  const RefreshScrollPhysicsIOS({super.parent, required this.onDrag});
+
+  @override
+  final OnDrag onDrag;
+
+  @override
+  RefreshScrollPhysicsIOS applyTo(ScrollPhysics? ancestor) {
+    return RefreshScrollPhysicsIOS(
+      parent: buildParent(ancestor),
+      onDrag: onDrag,
+    );
   }
 }

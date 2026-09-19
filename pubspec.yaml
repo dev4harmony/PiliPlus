@@ -94,12 +94,10 @@ dependencies:
   # webview_flutter: ^4.10.0
   flutter_inappwebview: ^6.1.5
   flutter_inappwebview_windows: ^0.6.0
-  # 解决sliver滑动不同步
-  # extended_nested_scroll_view: ^6.2.1
   extended_nested_scroll_view:
     git:
       url: https://github.com/bggRGjQaUbCoE/extended_nested_scroll_view.git
-      ref: 161cd202c20bf0ba2394e3a86381d58864dc9e4e
+      ref: dev
   # 上拉加载
   # loading_more_list: ^7.1.0
   # 下拉刷新

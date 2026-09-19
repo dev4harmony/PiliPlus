@@ -12,6 +12,7 @@ import 'package:PiliPlus/models_new/space/space_archive/data.dart';
 import 'package:PiliPlus/models_new/space/space_archive/episodic_button.dart';
 import 'package:PiliPlus/models_new/space/space_archive/item.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/pages/member/controller.dart';
 import 'package:PiliPlus/utils/extension/dimension_ext.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
@@ -58,12 +59,14 @@ class MemberVideoCtr
     }
   }
 
-  // 上游 04fe7be29「定位视频时只滚动内层列表」依赖 extended_nested_scroll_view
-  // fork 的 dev 分支（d9136d5 起才有 `ExtendedNestedScrollViewState.onlyInnerScroll`）；
-  // 鸿蒙锁在 161cd202 不升（dev 已去掉鸿蒙仍在用的 ExtendedVisibilityDetector），
-  // 这里保留调用形态、实现为空操作，日后升 fork 时恢复为
-  // `scrollKey.currentState?.onlyInnerScroll = value`。
-  set onlyInnerScroll(bool value) {}
+  set onlyInnerScroll(bool value) {
+    final state = Get.find<MemberController>(
+      tag: heroTag,
+    ).scrollKey.currentState;
+    if (state != null && state.mounted) {
+      state.onlyInnerScroll = value;
+    }
+  }
 
   bool isLoadPrevious = false;
   bool? hasPrev;

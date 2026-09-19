@@ -13,7 +13,6 @@ import 'package:PiliPlus/pages/webview/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
-import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -99,19 +98,17 @@ class _NoteListPageState extends State<NoteListPage>
   }
 
   late Key _key;
-  late bool _isNested;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final controller = PrimaryScrollController.of(context);
-    _isNested = controller is ExtendedNestedScrollController;
     _key = ValueKey(controller.hashCode);
   }
 
   @override
   Widget buildList(ThemeData theme) {
-    Widget child = refreshIndicator(
+    final child = refreshIndicator(
       onRefresh: _controller.onRefresh,
       child: CustomScrollView(
         key: _key,
@@ -126,12 +123,6 @@ class _NoteListPageState extends State<NoteListPage>
         ],
       ),
     );
-    if (_isNested) {
-      child = ExtendedVisibilityDetector(
-        uniqueKey: const ValueKey(NoteListPage),
-        child: child,
-      );
-    }
     if (!Accounts.main.isLogin) {
       return child;
     }
