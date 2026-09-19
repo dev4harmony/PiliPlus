@@ -659,12 +659,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (PlatformUtils.isMobile) {
       _orientationListener = NativeDeviceOrientationCommunicator()
           .onOrientationChanged(
-            useSensor: Platform.isAndroid || OS.isHarmony,
-            // 鸿蒙传感器平放（近水平）时上报 Unknown；保持 unknown 而不是默认
-            // portraitUp，让 _onOrientationChanged 识别并忽略（deviceOrientation
-            // 为 null），避免平放触发横竖屏误切换。
-            defaultOrientation: NativeDeviceOrientation.unknown,
             checkIsAutoRotate: checkIsAutoRotate,
+            angleDegrees: Pref.angleDegrees.toDouble(),
           )
           .listen(_onOrientationChanged);
     }
