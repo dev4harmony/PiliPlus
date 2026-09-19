@@ -46,7 +46,7 @@ List<SettingsModel> get playSettings => [
     title: '倍速设置',
     subtitle: '设置视频播放速度',
   ),
-  if (Platform.isAndroid)
+  if (Platform.isAndroid || OS.isHarmony)
     NormalModel(
       onTap: _showAngleDegreesDialog,
       leading: const Icon(MdiIcons.angleAcute),
