@@ -3,16 +3,16 @@ import 'dart:convert' show utf8, jsonDecode;
 
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/storage_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:file_picker_ohos/file_picker_ohos.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart' show Clipboard;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
-import 'package:intl/intl.dart' show DateFormat;
+import 'package:material_ui/material_ui.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/base16/github.dart';
@@ -32,7 +32,7 @@ void exportToLocalFile({
   StorageUtils.saveBytes2File(
     name:
         'piliplus_${localFileName()}_'
-        '${DateFormat('yyyyMMddHHmmss').format(DateTime.now())}.json',
+        '${DateFormatUtils.only0_9.format(DateTime.now())}.json',
     bytes: res,
     allowedExtensions: const ['json'],
   );
@@ -117,13 +117,12 @@ Future<void> importFromClipBoard<T>(
 Future<void> importFromLocalFile<T>({
   required FutureOr<void> Function(T json) onImport,
 }) async {
-  // 鸿蒙适配 fork 仅提供 FilePicker.platform 实例方法
-  final result = await FilePicker.platform.pickFiles(
-    type: FileType.custom,
+  final result = await FilePicker.pickFile(
+    type: .custom,
     allowedExtensions: const ['json', 'txt'],
   );
-  if (result?.files.firstOrNull case final file?) {
-    final data = await file.xFile.readAsString();
+  if (result != null) {
+    final data = await result.xFile.readAsString();
     final T json;
     try {
       json = jsonDecode(data);

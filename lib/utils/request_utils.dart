@@ -298,6 +298,7 @@ abstract final class RequestUtils {
   static Future<void> insertCreatedDyn(dynamic id) async {
     if (id != null) {
       try {
+        // TODO(ohos): 上游用 Future.pause（Dart 3.13+），鸿蒙 Dart SDK(3.12) 暂不支持，先用 Future.delayed 等价替换
         await Future.delayed(const Duration(milliseconds: 450));
         final res = await DynamicsHttp.dynamicDetail(id: id);
         if (res case final Success<DynamicItemModel> e) {
@@ -324,6 +325,7 @@ abstract final class RequestUtils {
       try {
         if (id != null) {
           if (!isManual) {
+            // TODO(ohos): 上游用 Future.pause（Dart 3.13+），鸿蒙 Dart SDK(3.12) 暂不支持，先用 Future.delayed 等价替换
             await Future.delayed(const Duration(seconds: 5));
           }
           final res = await DynamicsHttp.dynamicDetail(

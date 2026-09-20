@@ -95,6 +95,7 @@ abstract final class ReplyUtils {
 
     // CommAntifraud
     if (!isManual) {
+      // TODO(ohos): 上游用 Future.pause（Dart 3.13+），鸿蒙 Dart SDK(3.12) 暂不支持，先用 Future.delayed 等价替换
       await Future.delayed(const Duration(seconds: 8));
     }
     void showReplyCheckResult(String message, {bool isBan = false}) {
