@@ -168,7 +168,10 @@ class _SuperChatCardState extends State<SuperChatCard> {
         ),
         PopupMenuItem(
           height: 38,
-          onTap: () => _screenShot(context, item),
+          onTap: () {
+            if (!mounted) return;
+            _screenShot(context, item);
+          },
           child: const Text(
             '保存为图片',
             style: TextStyle(fontSize: 13),
@@ -203,7 +206,6 @@ Widget _build({
 }) {
   final bottomColor = ColourUtils.parseColor(item.backgroundBottomColor);
   final border = BorderSide(color: bottomColor);
-  void showMenu_(TapUpDetails e) => showMenu?.call(e.globalPosition, item);
 
   Widget name = Text(
     item.userInfo.uname,
@@ -258,7 +260,7 @@ Widget _build({
     );
   }
 
-  Widget first = Container(
+  Widget top = Container(
     decoration: BoxDecoration(
       borderRadius: const .vertical(top: .circular(8)),
       color: ColourUtils.parseColor(item.backgroundColor),
@@ -289,13 +291,7 @@ Widget _build({
     ),
   );
 
-  if (showMenu != null) {
-    first = GestureDetector(
-      onTapUp: showMenu_,
-      onSecondaryTapUp: PlatformUtils.isDesktop ? showMenu_ : null,
-      child: first,
-    );
-  }
+  final Widget msg;
 
   final style = TextStyle(
     color: ColourUtils.parseColor(item.messageFontColor),
@@ -307,34 +303,44 @@ Widget _build({
     // decorationColor: Colors.white,
   );
 
+  if (showMenu != null) {
+    void showMenu_(TapUpDetails e) => showMenu(e.globalPosition, item);
+    top = GestureDetector(
+      onTapUp: showMenu_,
+      onSecondaryTapUp: PlatformUtils.isDesktop ? showMenu_ : null,
+      child: top,
+    );
+    msg = TextSelectionTheme(
+      data: TextSelectionThemeData(
+        selectionColor: Color.lerp(bottomColor, Colors.black, .26),
+        selectionHandleColor: Color.lerp(
+          bottomColor,
+          Colors.white,
+          .26,
+        ),
+      ),
+      child: SelectionText(
+        item.message,
+        contextMenuBuilder: scMenuBuilder,
+        style: style,
+      ),
+    );
+  } else {
+    msg = Text(item.message, style: style);
+  }
+
   return Column(
     mainAxisSize: .min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      first,
+      top,
       Container(
         decoration: BoxDecoration(
           borderRadius: const .vertical(bottom: .circular(8)),
           color: bottomColor,
         ),
         padding: const .all(8),
-        child: showMenu == null
-            ? Text(item.message, style: style)
-            : TextSelectionTheme(
-                data: TextSelectionThemeData(
-                  selectionColor: Color.lerp(bottomColor, Colors.black, .26),
-                  selectionHandleColor: Color.lerp(
-                    bottomColor,
-                    Colors.white,
-                    .26,
-                  ),
-                ),
-                child: SelectionText(
-                  item.message,
-                  contextMenuBuilder: scMenuBuilder,
-                  style: style,
-                ),
-              ),
+        child: msg,
       ),
     ],
   );
@@ -377,7 +383,7 @@ Future<void> _screenShot(BuildContext context, SuperChatItem item) async {
   final image = await Screenshot.screenshot(
     context,
     Material(
-      color: Colors.transparent,
+      type: .transparency,
       child: _build(item: item),
     ),
     constraints: const BoxConstraints(maxWidth: 400),
