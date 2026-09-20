@@ -173,7 +173,7 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     );
     if (Platform.isAndroid &&
         (AndroidHelper.isPipMode ||
-            PlPlayerController.instance!.isAutoEnterPip)) {
+            PlPlayerController.instance?.isAutoEnterPip == true)) {
       AndroidHelper.updatePipActions(
         PlatformDispatcher.instance.engineId!,
         isLive,
@@ -182,7 +182,7 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
-  void onStatusChange(PlayerStatus status, bool isBuffering, isLive) {
+  void onStatusChange(PlayerStatus status, bool isBuffering, bool isLive) {
     if (!enableBackgroundPlay) return;
 
     if (_item.isEmpty) return;
