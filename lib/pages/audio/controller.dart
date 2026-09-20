@@ -30,6 +30,7 @@ import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/triple_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
+import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/services/shutdown_timer_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
@@ -95,6 +96,14 @@ class AudioController extends GetxController
 
   late double speed = 1.0;
 
+  void setSpeed(double value) {
+    if (player case final player?) {
+      speed = value;
+      player.setRate(value);
+      _updatePlaybackState();
+    }
+  }
+
   late final Rx<PlayRepeat> playMode = Pref.audioPlayMode.obs;
   StreamSubscription<PlayRepeat>? _playModeSub;
   Future<void> Function(PlayRepeat)? _savedOnRepeatModeChanged;
@@ -129,6 +138,15 @@ class AudioController extends GetxController
   late final RxDouble desktopVolume = RxDouble(Pref.desktopVolume);
 
   Timer? _statusTimer;
+
+  void _startStatusTimer() {
+    _statusTimer?.cancel();
+    _statusTimer = Timer(
+      const Duration(milliseconds: 500),
+      _updatePlaybackState,
+    );
+  }
+
   void _stopStatusTimer() {
     _statusTimer?.cancel();
     _statusTimer = null;
@@ -248,6 +266,7 @@ class AudioController extends GetxController
   }
 
   Future<void>? onSeek(Duration duration) {
+    _updatePlaybackState(position: duration);
     return player?.seek(duration);
   }
 
@@ -430,6 +449,29 @@ class AudioController extends GetxController
     _start = null;
   }
 
+  PlayerStatus _playerStatus = .paused;
+  void _updatePlaybackState({Duration? position, String? debugLabel}) {
+    // 鸿蒙：自动续播/自然播完的抑制窗口内不上报暂停、完成等非播放态，
+    // 避免后台连续播放任务被系统冻结（详见 _suppressPauseUntil/_autoContinue）
+    if (_playerStatus != .playing) {
+      if (_suppressPauseReport) return;
+      if (_playerStatus == .paused &&
+          _autoContinue &&
+          duration.value > 2 &&
+          position.value >= duration.value - 2) {
+        return;
+      }
+    }
+    videoPlayerServiceHandler?.onUpdateState(
+      _playerStatus,
+      false,
+      false,
+      position: position ?? player!.state.position,
+      speed: speed,
+      debugLabel: debugLabel,
+    );
+  }
+
   Future<void> _initPlayerIfNeeded() async {
     if (_hasInit) return;
     _hasInit = true;
@@ -465,10 +507,12 @@ class AudioController extends GetxController
       stream.position.listen((position) {
         if (isDragging) return;
         final seconds = position.inSeconds;
+        if (seconds == 0 && _playerStatus.isPlaying) {
+          _updatePlaybackState(position: position);
+        }
         if (seconds != this.position.value) {
           this.position.value = seconds;
           _videoDetailController?.playedTime = position;
-          videoPlayerServiceHandler?.onPositionChange(position);
         }
       }),
       stream.duration.listen((duration) {
@@ -477,24 +521,13 @@ class AudioController extends GetxController
       stream.playing.listen((playing) {
         if (playing) {
           animController.forward();
+          _playerStatus = .playing;
           _stopStatusTimer();
-          videoPlayerServiceHandler?.onStatusChange(.playing, false, false);
+          _updatePlaybackState();
         } else {
           animController.reverse();
-          _statusTimer?.cancel();
-          _statusTimer = Timer(
-            const Duration(milliseconds: 500),
-            () {
-              // 自然播完且会自动续播时，不向播控中心上报暂停（保持播放态，
-              // 避免后台连续任务被停）；重播窗口内的事件同样跳过
-              final naturalEnd =
-                  _autoContinue &&
-                  duration.value > 2 &&
-                  position.value >= duration.value - 2;
-              if (naturalEnd || _suppressPauseReport) return;
-              videoPlayerServiceHandler?.onStatusChange(.paused, false, false);
-            },
-          );
+          _playerStatus = .paused;
+          _startStatusTimer();
         }
       }),
       stream.buffering.listen((buffering) {
@@ -503,19 +536,8 @@ class AudioController extends GetxController
       stream.completed.listen((completed) {
         _videoDetailController?.playedTime = player!.state.duration;
         if (completed) {
-          _statusTimer?.cancel();
-          _statusTimer = Timer(
-            const Duration(milliseconds: 500),
-            () {
-              // 自动续播：抑制窗口内不向播控中心上报完成
-              if (_suppressPauseReport) return;
-              videoPlayerServiceHandler?.onStatusChange(
-                .completed,
-                false,
-                false,
-              );
-            },
-          );
+          _playerStatus = .completed;
+          _startStatusTimer();
           if (_autoContinue) {
             // 自动续播：进入抑制窗口，不向播控中心上报完成/停止
             _suppressPauseUntil = DateTime.now().add(
@@ -836,13 +858,6 @@ class AudioController extends GetxController
         _updateCurrItem(audioItem);
       }
     });
-  }
-
-  void setSpeed(double speed) {
-    if (player case final player?) {
-      this.speed = speed;
-      player.setRate(speed);
-    }
   }
 
   @override
