@@ -58,6 +58,7 @@ export default class HarmonyChannel implements FlutterPlugin {
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
     this.channel?.setMethodCallHandler(null);
     this.stopCutoutListener();
+    this.stopDecorListener();
   }
 
   /**
@@ -249,6 +250,123 @@ export default class HarmonyChannel implements FlutterPlugin {
     }
   }
 
+  /**
+   * 自由窗口（FLOATING：手机/平板小窗、平板自由多窗）顶部系统悬浮控件的避让
+   * 高度上报，物理像素。
+   *
+   * 原先靠 embedding：setEnabledSystemUIOverlays(['navigation']) 时它隐藏装饰
+   * 栏并把 viewPadding.top 钉成 getTitleButtonRect 高度。embedding 自
+   * af6c8ca176a（2026-09-08，3.41/3.44 均含）起在该路径上多了几处
+   * setPaddingTop(0)：小窗没有三键（rect 高度 0 / 不支持装饰栏）→ 直接钉 0，
+   * 不再回落到系统避让区；运行中才打开系统「自由多窗」时窗口状态仍是
+   * FLOATING，Dart 侧不会重发 overlays，钉住的 0 也没人刷新。结果顶部内容
+   * 压到系统悬浮控件下面。
+   *
+   * 这里不再依赖 embedding：自己读三键区域与 TYPE_SYSTEM 顶部避让区取 max，
+   * 变化时推给 Dart，在根 MediaQuery 里与 padding.top 取 max（见 Dart 侧
+   * HarmonyChannel.decorTopInset）。三键高度只在自由窗口下读；系统顶部避让区
+   * 任何窗口形态都报——与 embedding 正常算出的 viewPadding.top 同源，取 max
+   * 无副作用，只在 embedding 给出 0 时兜底（状态栏被隐藏时系统避让区本身
+   * 归 0，不会多让）。
+   */
+  private decorListening: boolean = false;
+  private lastDecorTop: number = -1;
+  private decorChangeCallback = (): void => {
+    this.pushDecorTop(this.readDecorTop());
+  };
+
+  private readDecorTop(): number {
+    const win = this.lastWindow;
+    if (!win) {
+      return 0;
+    }
+    let floating = false;
+    try {
+      floating = win.getWindowStatus() === window.WindowStatusType.FLOATING;
+    } catch (err) {
+      floating = false;
+    }
+    let buttonTop = 0;
+    if (floating) {
+      try {
+        // 小窗/不支持装饰栏的设备上会抛异常，按 0 处理
+        const rect = win.getTitleButtonRect();
+        if (rect && rect.height > 0) {
+          buttonTop = vp2px(rect.height);
+        }
+      } catch (err) {
+        buttonTop = 0;
+      }
+    }
+    let systemTop = 0;
+    try {
+      const area = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+      if (area.topRect.height > 0) {
+        systemTop = area.topRect.top + area.topRect.height;
+      }
+    } catch (err) {
+      systemTop = 0;
+    }
+    const top = Math.max(buttonTop, systemTop);
+    // avoidAreaChange 对键盘等各类避让区都会触发，只在值变化时打日志
+    if (top !== this.lastDecorTop) {
+      console.info("HarmonyChannel", `decorTop: titleButton=${buttonTop} system=${systemTop}`);
+    }
+    return top;
+  }
+
+  private pushDecorTop(top: number): void {
+    if (this.lastDecorTop === top) {
+      return;
+    }
+    this.lastDecorTop = top;
+    const args: Record<string, number> = { 'top': top };
+    this.channel?.invokeMethod("onDecorTopInsetChange", args);
+  }
+
+  private async startDecorListener(): Promise<void> {
+    if (this.decorListening) {
+      return;
+    }
+    this.decorListening = true;
+    this.lastWindow ??= await window.getLastWindow(getContext());
+    const win = this.lastWindow;
+    // 逐个注册：windowTitleButtonRectChange 在不支持装饰栏的设备上会抛异常，
+    // 不能连累其余监听
+    try {
+      win.on('windowTitleButtonRectChange', this.decorChangeCallback);
+    } catch (err) {
+      console.warn("HarmonyChannel", `on windowTitleButtonRectChange skipped: ${err}`);
+    }
+    try {
+      win.on('windowStatusChange', this.decorChangeCallback);
+      win.on('avoidAreaChange', this.decorChangeCallback);
+      win.on('windowSizeChange', this.decorChangeCallback);
+    } catch (err) {
+      console.error("HarmonyChannel", `decor listener failed: ${err}`);
+    }
+  }
+
+  private stopDecorListener(): void {
+    if (!this.decorListening) {
+      return;
+    }
+    this.decorListening = false;
+    const win = this.lastWindow;
+    try {
+      win?.off('windowTitleButtonRectChange', this.decorChangeCallback);
+    } catch (err) {
+      // 注册时即未成功
+    }
+    try {
+      win?.off('windowStatusChange', this.decorChangeCallback);
+      win?.off('avoidAreaChange', this.decorChangeCallback);
+      win?.off('windowSizeChange', this.decorChangeCallback);
+    } catch (err) {
+      console.error("HarmonyChannel", `decor listener off failed: ${err}`);
+    }
+  }
+
   public getChannel(): MethodChannel | null {
     return this.channel;
   }
@@ -324,6 +442,15 @@ export default class HarmonyChannel implements FlutterPlugin {
         const cutout = this.readCutout();
         this.lastCutout = cutout;
         result.success(cutout);
+        break;
+      }
+      case "getDecorTopInset": {
+        // 启动时供 Dart 拉取自由窗口顶部避让初值，并从此开始监听变化推送
+        // onDecorTopInsetChange。见 [readDecorTop]。
+        await this.startDecorListener();
+        const top = this.readDecorTop();
+        this.lastDecorTop = top;
+        result.success(top);
         break;
       }
       case "getPendingContinuation": {

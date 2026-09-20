@@ -29,6 +29,9 @@ abstract class HarmonyChannel {
       case 'onCutoutAvoidAreaChange':
         _updateCutout(call.arguments);
         break;
+      case 'onDecorTopInsetChange':
+        _updateDecorTop(call.arguments['top']);
+        break;
       case 'onFontWeightScaleChange':
         final fontWeightScale = (call.arguments['fontWeightScale'] as num?)?.toDouble();
         _systemFontWeightScale = fontWeightScale;
@@ -384,6 +387,9 @@ abstract class HarmonyChannel {
     try {
       _updateCutout(await _channel.invokeMethod<Map>('getCutoutAvoidArea'));
     } catch (_) {}
+    try {
+      _updateDecorTop(await _channel.invokeMethod<num>('getDecorTopInset'));
+    } catch (_) {}
     _syncWindowDecor();
   }
 
@@ -417,15 +423,47 @@ abstract class HarmonyChannel {
     }
   }
 
-  /// 把 [cutoutInsets]（物理像素）换算为逻辑像素后与 [padding] 按边取 max。
+  /// 窗口顶部系统控件的避让高度，**物理像素**：系统顶部避让区（状态栏/小窗
+  /// 顶条）与自由多窗三键高度取 max。由原生 getDecorTopInset / onDecorTopInsetChange 维护。
+  ///
+  /// 原先完全依赖 embedding 把 viewPadding.top 钉成三键高度（见
+  /// [_syncWindowDecor]），但 embedding 新版在小窗、以及运行中才打开系统
+  /// 「自由多窗」时会把它钉成 0 且不再刷新，顶部内容压到系统控件下面。
+  /// 这里自己上报一份，在 [mergeCutout] 里与 top 取 max 兜底。
+  static final ValueNotifier<double> decorTopInset = ValueNotifier(0);
+
+  static void _updateDecorTop(dynamic top) {
+    if (top is! num) return;
+    decorTopInset.value = top.toDouble();
+  }
+
+  /// 根视图的顶部避让（逻辑像素，已按 uiScale 换算），等价于根 MediaQuery 的
+  /// viewPadding.top。
+  ///
+  /// 给 Scaffold body 内部用：Scaffold 有 appBar 时对 body 做 removePadding，
+  /// 会把 viewPadding.top 连同 padding.top 一起减掉，body 里读 MediaQuery
+  /// 顶部恒为 0，只能回到 View 取原始值，再合并原生上报的部分。
+  static double rootTopInset(BuildContext context) {
+    final view = View.of(context);
+    final dpr = view.devicePixelRatio;
+    final top = mergeCutout(
+      EdgeInsets.only(top: view.viewPadding.top / dpr),
+      dpr,
+    ).top;
+    return top / ScaledWidgetsFlutterBinding.instance.scaleFactor;
+  }
+
+  /// 把 [cutoutInsets]、[decorTopInset]（物理像素）换算为逻辑像素后与
+  /// [padding] 按边取 max。
   /// [devicePixelRatio] 须是引擎上报的原始 DPR（uiScale 缩放前）。
   static EdgeInsets mergeCutout(EdgeInsets padding, double devicePixelRatio) {
     final cutout = cutoutInsets.value;
-    if (cutout == EdgeInsets.zero) return padding;
+    final decorTop = decorTopInset.value;
+    if (cutout == EdgeInsets.zero && decorTop == 0) return padding;
     final c = cutout / devicePixelRatio;
     return EdgeInsets.fromLTRB(
       max(padding.left, c.left),
-      max(padding.top, c.top),
+      max(padding.top, max(c.top, decorTop / devicePixelRatio)),
       max(padding.right, c.right),
       max(padding.bottom, c.bottom),
     );

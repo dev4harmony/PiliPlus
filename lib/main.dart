@@ -346,6 +346,7 @@ class MyApp extends StatelessWidget {
       listenable: Listenable.merge([
         ScaledWidgetsFlutterBinding.instance.scaleFactorNotifier,
         if (OS.isHarmony) HarmonyChannel.cutoutInsets,
+        if (OS.isHarmony) HarmonyChannel.decorTopInset,
       ]),
       builder: (context, _) => _scaledBuilder(context, child),
     );
