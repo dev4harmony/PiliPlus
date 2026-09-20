@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
+import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:flutter/material.dart';
@@ -68,8 +69,7 @@ class NativeTopSpacer extends StatelessWidget {
     } else {
       topHeight = collapsed ? collapsedHeight : expandedHeight;
     }
-    final view = View.of(context);
-    final statusBarHeight = view.viewPadding.top / view.devicePixelRatio;
+    final statusBarHeight = HarmonyChannel.rootTopInset(context);
     // 需要加上状态栏高度
     return max(0.0, topHeight + statusBarHeight);
   }
@@ -82,8 +82,7 @@ class NativeTopSpacer extends StatelessWidget {
   static double refreshEdgeOffset(BuildContext context) {
     if (!_active) return 0;
     final barHeight = _collapsed ? barCollapsedHeight : barExpandedHeight;
-    final view = View.of(context);
-    final statusBarHeight = view.viewPadding.top / view.devicePixelRatio;
+    final statusBarHeight = HarmonyChannel.rootTopInset(context);
     // 需要加上状态栏高度
     return max(0.0, barHeight + statusBarHeight);
   }
