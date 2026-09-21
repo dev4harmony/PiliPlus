@@ -1110,9 +1110,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Future<void> _initializePlayer() async {
     if (_instance == null) return;
     // 设置倍速
-    if (_videoPlayerController != null &&
-        _videoPlayerController!.state.rate != _playbackSpeed.value) {
-      await setPlaybackSpeed(isLive ? 1.0 : _playbackSpeed.value);
+    if (_videoPlayerController != null) {
+      final speed = isLive ? 1.0 : playbackSpeed;
+      if (_videoPlayerController!.state.rate != speed) {
+        await setPlaybackSpeed(speed);
+      }
     }
     _initVideoFit();
 
