@@ -41,7 +41,6 @@ typedef _StatusConfig = (
   PlayerStatus status,
   bool isBuffering,
   bool isLive,
-  Duration position,
   double speed,
 );
 
@@ -76,14 +75,6 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> pause() {
-    final state = playbackState.value;
-    _updateState(
-      .ready,
-      false,
-      PlPlayerController.instance?.isLive ?? false,
-      position: state.position,
-      speed: state.speed,
-    );
     return onPause?.call() ??
         PlPlayerController.pauseIfExists() ??
         Future.syncValue(null);
@@ -117,6 +108,7 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     if (!mediaItem.isClosed) mediaItem.add(newMediaItem);
   }
 
+  Duration? _lastPos;
   _StatusConfig? _lastConfig;
   void onUpdateState(
     PlayerStatus status,
@@ -130,8 +122,17 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
       return;
     }
 
-    final newConfig = (status, isBuffering, isLive, position, speed);
-    if (_lastConfig == newConfig) return;
+    if (onPlay != null && debugLabel == 'onVideoPaused') return;
+
+    final newConfig = (status, isBuffering, isLive, speed);
+    if (_lastConfig == newConfig) {
+      if (_lastPos != null) {
+        final pos = position.inSeconds;
+        final lastPos = _lastPos!.inSeconds;
+        _lastPos = position;
+        if (pos == lastPos && pos != 0) return;
+      }
+    }
     _lastConfig = newConfig;
 
     final AudioProcessingState processingState;
@@ -391,6 +392,7 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     if (!enableBackgroundPlay) return;
     mediaItem.add(null);
     _item.clear();
+    _lastPos = null;
     _lastConfig = null;
     /**
      * if (playbackState.processingState == AudioProcessingState.idle &&

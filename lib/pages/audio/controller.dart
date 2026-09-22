@@ -507,10 +507,10 @@ class AudioController extends GetxController
       stream.position.listen((position) {
         if (isDragging) return;
         final seconds = position.inSeconds;
-        if (seconds == 0 && _playerStatus.isPlaying) {
-          _updatePlaybackState(position: position);
-        }
         if (seconds != this.position.value) {
+          if (seconds == 0 && _playerStatus.isPlaying) {
+            _updatePlaybackState(position: position);
+          }
           this.position.value = seconds;
           _videoDetailController?.playedTime = position;
         }
@@ -530,8 +530,11 @@ class AudioController extends GetxController
           _startStatusTimer();
         }
       }),
-      stream.buffering.listen((buffering) {
-        if (buffering && !player!.state.completed) _stopStatusTimer();
+      stream.buffering.listen((bool buffering) {
+        if (!_playerStatus.isCompleted) {
+          _stopStatusTimer();
+          _updatePlaybackState();
+        }
       }),
       stream.completed.listen((completed) {
         _videoDetailController?.playedTime = player!.state.duration;
