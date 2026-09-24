@@ -59,6 +59,53 @@ export default class HarmonyChannel implements FlutterPlugin {
     this.channel?.setMethodCallHandler(null);
     this.stopCutoutListener();
     this.stopDecorListener();
+    this.stopFreeWindowModeListener();
+  }
+
+  /**
+   * 窗口是否处于「自由窗口模式」：2in1/PC、平板开启自由多窗、平板电脑模式
+   * 下为 true；手机/平板普通模式下的系统小窗（悬浮窗）为 false。
+   *
+   * 这几种形态下窗口状态都是 FLOATING，只能靠它区分「普通桌面窗口」与
+   * 「系统小窗」。不能用 deviceType 判断：平板（含带电脑模式的机型）上报的
+   * 都是 tablet，且自由多窗可在运行中开关。
+   */
+  private freeWindowModeListening: boolean = false;
+  private freeWindowModeCallback = (isFree: boolean): void => {
+    const args: Record<string, boolean> = { 'isFreeWindowMode': isFree };
+    this.channel?.invokeMethod("onFreeWindowModeChange", args);
+  };
+
+  private readFreeWindowMode(): boolean {
+    try {
+      return this.lastWindow?.isInFreeWindowMode() ?? false;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  private startFreeWindowModeListener(): void {
+    if (this.freeWindowModeListening || !this.lastWindow) {
+      return;
+    }
+    try {
+      this.lastWindow.on('freeWindowModeChange', this.freeWindowModeCallback);
+      this.freeWindowModeListening = true;
+    } catch (err) {
+      console.error("HarmonyChannel", `on freeWindowModeChange failed: ${err}`);
+    }
+  }
+
+  private stopFreeWindowModeListener(): void {
+    if (!this.freeWindowModeListening) {
+      return;
+    }
+    this.freeWindowModeListening = false;
+    try {
+      this.lastWindow?.off('freeWindowModeChange', this.freeWindowModeCallback);
+    } catch (err) {
+      // 窗口已销毁
+    }
   }
 
   /**
@@ -431,7 +478,9 @@ export default class HarmonyChannel implements FlutterPlugin {
         const state: Record<string, boolean> = {
           'isFloatingWindow': isFloating,
           'isWindowMode': isFloating || status == window.WindowStatusType.SPLIT_SCREEN,
+          'isFreeWindowMode': this.readFreeWindowMode(),
         };
+        this.startFreeWindowModeListener();
         result.success(state);
         break;
       }

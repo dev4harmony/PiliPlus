@@ -23,6 +23,11 @@ abstract class HarmonyChannel {
       case 'onFloatingWindowChange':
         onLandscapeOrMiniWindowChange(null, call.arguments['isFloatingWindow']);
         break;
+      case 'onFreeWindowModeChange':
+        _onFreeWindowModeChange(
+          call.arguments['isFreeWindowMode'] as bool? ?? false,
+        );
+        break;
       case 'onWindowModeChange':
         _windowMode = call.arguments['isWindowMode'] as bool? ?? false;
         break;
@@ -327,7 +332,22 @@ abstract class HarmonyChannel {
   /// 是否处于「横屏小窗」：系统小窗内把横屏视频切到了全屏，此时调用过原生
   /// enableLandscapeMultiWindow。实测仅此状态下进画中画会黑屏（小窗内不全屏
   /// 进画中画画面正常），故用它而不是 [isMiniWindow] 作为拦截条件。
-  static bool get isMiniWindowLandscape => _miniWindow && _landscape;
+  static bool get isMiniWindowLandscape =>
+      _miniWindow && _landscape && !_freeWindowMode;
+
+  /// 窗口是否处于系统「自由窗口模式」（2in1/PC、平板自由多窗、平板电脑
+  /// 模式）。此时窗口同样恒为 FLOATING、[_miniWindow] 为 true，但那是普通
+  /// 桌面窗口而非系统小窗：窗口内全屏不会变成「横屏小窗」，不能套用 0.75
+  /// 缩放与 enableLandscapeMultiWindow，否则每次进出全屏界面整体缩放一次，
+  /// 观感即 DPI 突变。由原生 isInFreeWindowMode / freeWindowModeChange 维护，
+  /// 不按 deviceType 判断（平板及带电脑模式的机型均上报 tablet）。
+  static bool _freeWindowMode = false;
+
+  static void _onFreeWindowModeChange(bool freeWindowMode) {
+    if (_freeWindowMode == freeWindowMode) return;
+    _freeWindowMode = freeWindowMode;
+    _applyMiniWindowLandscape();
+  }
 
   static bool _windowMode = false;
 
@@ -349,7 +369,11 @@ abstract class HarmonyChannel {
     _landscape = landscape;
     _miniWindow = miniWindow;
     if (miniWindowChanged) _syncWindowDecor();
-    if (_miniWindow && _landscape) {
+    _applyMiniWindowLandscape();
+  }
+
+  static void _applyMiniWindowLandscape() {
+    if (isMiniWindowLandscape) {
       _setMiniWindowLandscape(true);
       ScaledWidgetsFlutterBinding.instance.scaleFactor =
           _miniWindowLandscapeScale;
@@ -378,6 +402,7 @@ abstract class HarmonyChannel {
       final state = await _channel.invokeMethod<Map>('getWindowState');
       if (state != null) {
         _windowMode = state['isWindowMode'] as bool? ?? _windowMode;
+        _freeWindowMode = state['isFreeWindowMode'] as bool? ?? false;
         await onLandscapeOrMiniWindowChange(
           null,
           state['isFloatingWindow'] as bool?,
