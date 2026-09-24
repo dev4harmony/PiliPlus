@@ -301,8 +301,8 @@ export default class HarmonyChannel implements FlutterPlugin {
     let systemTop = 0;
     try {
       const area = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
-      if (area.topRect.height > 0) {
-        systemTop = area.topRect.top + area.topRect.height;
+      if (area.topRect.top === 0 && area.topRect.height > 0) {
+        systemTop = area.topRect.height;
       }
     } catch (err) {
       systemTop = 0;
