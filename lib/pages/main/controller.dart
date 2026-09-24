@@ -192,6 +192,14 @@ class MainController extends GetxController
     useNativeTopBar.value = useHdsTopBar;
     _syncNativeTopBarActive();
     HarmonyChannel.setShellBars(useNativeTabs: useHdsBar);
+    if (useHdsTopBar) {
+      // 补发初始「非首页页签隐藏顶栏」：ever(selectedIndex) 只在切换时才触发，
+      // 默认启动页设为动态/我的时冷启动不会经过它，顶栏会叠在非首页上，
+      // 切走再切回才消失。须先于 setShellTopBar 下发，否则顶栏先出现再收回。
+      HarmonyChannel.setTopBarTabHidden(
+        navigationBars[selectedIndex.value] != NavigationBarType.home,
+      );
+    }
     HarmonyChannel.setShellTopBar(useNativeTopBar: useHdsTopBar);
     // 同步 Navbar 页签数量与顺序到原生 HDS 底栏（与设置内 Navbar 编辑一致）
     if (useHdsBar) {
