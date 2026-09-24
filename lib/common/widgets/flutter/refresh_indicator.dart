@@ -523,7 +523,6 @@ class RefreshIndicatorState extends State<RefreshIndicator>
       body: child,
       scale: _scaleFactor,
       position: _positionFactor,
-      edgeOffset: widget.edgeOffset,
       indicator: _status == null
           ? null
           : AnimatedBuilder(
