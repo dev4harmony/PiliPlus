@@ -24,12 +24,19 @@ const kIndicatorSize = 49.0;
 /// In most cases, [displacement] distance starts counting from the parent's
 /// edges. However, if [edgeOffset] is larger than zero then the [displacement]
 /// value is calculated from that offset instead of the parent's edge.
-double displacement = Pref.refreshDisplacement;
+double _displacement = Pref.refreshDisplacement;
+double get displacement => _displacement;
+set displacement(double value) {
+  if (_displacement == value) return;
+  _displacement = value;
+  _refreshDragExtent = (value + kIndicatorSize) * _kDragSizeFactorLimit;
+}
 
 // The over-scroll distance that moves the indicator to its maximum
 // displacement, as a percentage of the scrollable's container extent.
-double kDragContainerExtentPercentage = Pref.refreshDragPercentage;
-
+double _refreshDragExtent =
+    (_displacement + kIndicatorSize) * _kDragSizeFactorLimit;
+double get refreshDragExtent => _refreshDragExtent;
 // How much the scroll's drag gesture can overshoot the RefreshIndicator's
 // displacement; max displacement = _kDragSizeFactorLimit * displacement.
 const double _kDragSizeFactorLimit = 1.5;
@@ -222,9 +229,6 @@ class RefreshIndicatorState extends State<RefreshIndicator>
   RefreshIndicatorStatus? _status;
   late Future<void> _pendingRefreshFuture;
   double? _dragOffset;
-
-  // 鸿蒙保留kDragContainerExtentPercentage= Pref.refreshDragPercentage所需
-  double _containerExtent = 0.0;
   late Color _effectiveValueColor;
   // late Color _backgroundColor;
 
@@ -320,10 +324,6 @@ class RefreshIndicatorState extends State<RefreshIndicator>
     if (!widget.notificationPredicate(notification)) {
       return false;
     }
-    final viewportDimension = notification.metrics.viewportDimension;
-    if (viewportDimension > 0) {
-      _containerExtent = viewportDimension;
-    }
     if (_shouldStart(notification)) {
       setState(() {
         _status = RefreshIndicatorStatus.drag;
@@ -333,7 +333,7 @@ class RefreshIndicatorState extends State<RefreshIndicator>
     if (notification is ScrollUpdateNotification) {
       if (_status == RefreshIndicatorStatus.drag) {
         _dragOffset = _dragOffset! - notification.scrollDelta!;
-        _checkDragOffset(notification.metrics.viewportDimension);
+        _checkDragOffset();
 
         if (notification.dragDetails == null &&
             _valueColor.value!.a == _effectiveValueColor.a) {
@@ -346,7 +346,7 @@ class RefreshIndicatorState extends State<RefreshIndicator>
     } else if (notification is OverscrollNotification) {
       if (_status == RefreshIndicatorStatus.drag) {
         _dragOffset = _dragOffset! - notification.overscroll;
-        _checkDragOffset(notification.metrics.viewportDimension);
+        _checkDragOffset();
       }
     } else if (notification is ScrollEndNotification) {
       switch (_status) {
@@ -390,12 +390,9 @@ class RefreshIndicatorState extends State<RefreshIndicator>
     return true;
   }
 
-  void _checkDragOffset(double containerExtent) {
-    assert(
-      _status == RefreshIndicatorStatus.drag,
-    );
-    double newValue =
-        _dragOffset! / (containerExtent * kDragContainerExtentPercentage);
+  void _checkDragOffset() {
+    assert(_status == RefreshIndicatorStatus.drag);
+    double newValue = _dragOffset! / _refreshDragExtent;
     _positionController.value = clampDouble(
       newValue,
       0.0,
@@ -567,9 +564,7 @@ class RefreshIndicatorState extends State<RefreshIndicator>
   bool _onDrag(double offset) {
     if (_positionController.value > 0.0 && _status == .drag) {
       _dragOffset = _dragOffset! + offset;
-      if (_containerExtent > 0.0) {
-        _checkDragOffset(_containerExtent);
-      }
+      _checkDragOffset();
       return true;
     }
     return false;

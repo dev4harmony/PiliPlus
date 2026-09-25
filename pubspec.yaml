@@ -48,7 +48,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.9
   # 动态取色
-  dynamic_color: ^1.8.1
+  dynamic_color: ^2.1.0	
 
   # get: ^4.7.2
   get:
