@@ -221,10 +221,8 @@ class MainController extends GetxController
       HarmonyChannel.setTopBarIsHome(
         navigationBars[selectedIndex.value] == NavigationBarType.home,
       );
-      HarmonyChannel.setHomeTopBarData(
-        tabs: homeController.tabs.map((e) => e.label).toList(),
+      HarmonyChannel.setHomeTopBarVisibility(
         hideTopBar: homeController.hideTopBar,
-        activeIndex: homeController.tabController.index,
       );
       // 初始头像（登录态）
       HarmonyChannel.setHomeFaceUrl(

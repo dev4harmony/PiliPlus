@@ -632,13 +632,11 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(true);
         break;
       }
-      case "setHomeTopBarData": {
-        const tabs: string[] = call.argument('tabs') ?? [];
+      case "setHomeTopBarVisibility": {
+        // 首页是否开启「滑动隐藏大搜索栏」。分类栏与页签数据已不再下发：
+        // 分类栏由 Flutter 绘制（见 lib/pages/home/widgets/home_top_bar.dart）。
         const hideTopBar: boolean = call.argument('hideTopBar') ?? false;
-        const activeIndex: number = call.argument('activeIndex') ?? 0;
-        AppStorage.setOrCreate('homeTabs', tabs);
         AppStorage.setOrCreate('homeHideTopBar', hideTopBar);
-        AppStorage.setOrCreate('homeActiveTabIndex', activeIndex);
         result.success(true);
         break;
       }
@@ -657,12 +655,6 @@ export default class HarmonyChannel implements FlutterPlugin {
       case "setHomeFaceUrl": {
         const url: string = call.argument('url') ?? '';
         AppStorage.setOrCreate('homeFaceUrl', url);
-        result.success(true);
-        break;
-      }
-      case "setHomeTabIndex": {
-        const index: number = call.argument('index') ?? 0;
-        AppStorage.setOrCreate('homeActiveTabIndex', index);
         result.success(true);
         break;
       }

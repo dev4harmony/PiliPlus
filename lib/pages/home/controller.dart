@@ -35,13 +35,12 @@ class HomeController extends GetxController
     vsync: this,
   );
 
-  /// ArkTS 发起的分类切换，跳过回发 ArkTS 以避免循环
-  bool _fromArkTS = false;
-
   RxBool? showTopBar;
   late final bool hideTopBar;
 
-  /// 原生顶栏是否已收起（由滚动信号同步），用于 Flutter 首页顶部安全边距
+  /// 原生顶栏（ArkTS 的搜索行 + Flutter 的分类栏）是否已因滑动隐藏。
+  /// 由 CommonPage 那条共用的滚动管线驱动（sync 模式看 barOffset，instant 模式
+  /// 看 showTopBar），见 _syncCollapsed。
   final RxBool topBarCollapsed = false.obs;
 
   bool enableSearchWord = Pref.enableSearchWord;
@@ -82,19 +81,6 @@ class HomeController extends GetxController
 
   /// 鸿蒙顶栏：订阅原生回调 + 状态同步
   void _initHarmonyTopBar() {
-    // ArkTS 分类切换 → Flutter 切换 TabController
-    HarmonyChannel.onHomeTabChange = (int index) {
-      // 同 index 时不置位：animateTo 对同 index 直接返回且不触发
-      // listener，若置位会导致 _fromArkTS 悬挂，吞掉后续手动切换。
-      if (index >= 0 && index < tabs.length && index != tabController.index) {
-        // 置位后由 _onTabIndexChanged 在动画结束（indexIsChanging == false）
-        // 时复位，而不是 animateTo 调用后立即复位：animateTo 是异步动画，
-        // listener 在动画期间多次触发，若立即复位会把动画中途的中间
-        // index 误发回 ArkTS 造成循环。
-        _fromArkTS = true;
-        tabController.animateTo(index);
-      }
-    };
     // ArkTS 搜索框点击 → 打开搜索页
     HarmonyChannel.onTopSearchTap = () => Get.toNamed(
       '/search',
@@ -119,19 +105,15 @@ class HomeController extends GetxController
         HarmonyChannel.setHomeSearchText(text);
       }
     });
-    // Flutter 切分类 → 同步高亮到 ArkTS Tabs
-    tabController.addListener(_onTabIndexChanged);
-    // 下滑收起 → 同步到 ArkTS（隐藏大搜索栏，显示小搜索按钮）
-    // 同时更新本地 topBarCollapsed，供 Flutter 首页顶部安全边距跟随
+    // 下滑收起 → 同步到 ArkTS（整行上移淡出）
+    // 与底栏隐藏、非原生顶栏共用同一条滚动管线：sync 模式看累计的 barOffset，
+    // instant 模式看 CommonPage 按滚动方向置位的 showTopBar，不另造一套判定。
     if (hideTopBar) {
       final mainCtr = Get.find<MainController>();
       if (mainCtr.barOffset case final barOffset?) {
         // 滚动偏移超过顶栏一半高度视为收起
         ever(barOffset, (offset) {
-          _syncCollapsed(
-            mainCtr,
-            collapsed: offset > Style.topBarHeight / 2,
-          );
+          _syncCollapsed(mainCtr, collapsed: offset > Style.topBarHeight / 2);
         });
       }
       if (showTopBar case final showTopBar?) {
@@ -143,26 +125,15 @@ class HomeController extends GetxController
     }
   }
 
-  /// 同步顶栏收起状态：本地 RxBool（Flutter 顶部安全边距跟随）
-  /// + 通知 ArkTS 原生顶栏收起（隐藏大搜索栏）。仅在原生顶栏启用时生效。
+  /// 同步顶栏收起状态：本地 RxBool（Flutter 侧悬浮层与列表留白跟随）
+  /// + 通知 ArkTS 原生顶栏收起 / 放下。仅在原生顶栏启用时生效。
+  ///
+  /// barOffset 是逐帧变化的，状态没变就不必再发通道消息。
   void _syncCollapsed(MainController mainCtr, {required bool collapsed}) {
     if (!mainCtr.useNativeTopBar.value) return;
+    if (topBarCollapsed.value == collapsed) return;
     topBarCollapsed.value = collapsed;
     HarmonyChannel.setTopBarCollapsed(collapsed);
-  }
-
-  void _onTabIndexChanged() {
-    // 动画播放期间跳过：index 中途值不参与回发。
-    // 动画结束时：ArkTS 发起的切换在此复位标志并跳过回发（高亮已在
-    // ArkTS 侧）；Flutter 手动切换则在此把最终 index 发回 ArkTS。
-    if (tabController.indexIsChanging) return;
-    if (_fromArkTS) {
-      _fromArkTS = false;
-      return;
-    }
-    if (Get.find<MainController>().useNativeTopBar.value) {
-      HarmonyChannel.setHomeTabIndex(tabController.index);
-    }
   }
 
   @override
@@ -175,11 +146,9 @@ class HomeController extends GetxController
   @override
   void dispose() {
     if (OS.isHarmony) {
-      HarmonyChannel.onHomeTabChange = null;
       HarmonyChannel.onTopSearchTap = null;
       HarmonyChannel.onTopMsgTap = null;
       HarmonyChannel.onTopMineTap = null;
-      tabController.removeListener(_onTabIndexChanged);
     }
     tabController.dispose();
     super.dispose();

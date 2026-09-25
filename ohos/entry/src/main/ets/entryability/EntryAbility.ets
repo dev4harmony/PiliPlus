@@ -33,7 +33,6 @@ const EVENT_TAB_SWITCH = 'EVENT_TAB_SWITCH';
 const EVENT_TOP_SEARCH = 'EVENT_TOP_SEARCH';
 const EVENT_TOP_MSG = 'EVENT_TOP_MSG';
 const EVENT_TOP_MINE = 'EVENT_TOP_MINE';
-const EVENT_HOME_TAB_CHANGE = 'EVENT_HOME_TAB_CHANGE';
 
 export default class EntryAbility extends FlutterAbility {
   harmonyChannel: HarmonyChannel = new HarmonyChannel();
@@ -68,10 +67,7 @@ export default class EntryAbility extends FlutterAbility {
     this.context.eventHub.on(EVENT_TOP_MINE, () => {
       this.flutterChannel?.invokeMethod('onTopMineTap', null);
     });
-    // 分类栏切换 → Flutter 切换首页 TabController
-    this.context.eventHub.on(EVENT_HOME_TAB_CHANGE, (index: number) => {
-      this.flutterChannel?.invokeMethod('onHomeTabChange', { index: index });
-    });
+    // 分类栏切换不再经此转发：分类栏已由 Flutter 绘制，TabController 就在那边
   }
 
   private initFontWeightListener(): void {

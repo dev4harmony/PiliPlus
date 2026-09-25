@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
+import 'package:PiliPlus/pages/home/widgets/home_top_bar.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
@@ -26,8 +27,16 @@ class _HomePageState extends CommonPageState<HomePage>
   final _mainController = Get.find<MainController>();
   Worker? _nativeTopBarWorker;
 
+  /// 是否需要对滚动做「顶栏位移补偿」（见 CommonPage.onNotificationType2）。
+  ///
+  /// 原生顶栏生效时必须关掉：那条补偿是用来抵消 Flutter 自绘顶栏（customAppBar）
+  /// 随 barOffset 收缩的位移的，原生顶栏下根本没有这层自绘顶栏，补偿出来的位移无
+  /// 处抵消，累计下来会把列表一直往顶栏方向推，表现为上滑时列表直接回顶。
+  /// 收起信号本身仍然走共用管线：barOffset 照常累计，只是不做这条补偿
+  /// （见 HomeController._syncCollapsed）。
   @override
-  bool get needsCorrection => _homeController.hideTopBar;
+  bool get needsCorrection =>
+      _homeController.hideTopBar && !_mainController.nativeTopBarActive.value;
 
   @override
   bool get wantKeepAlive => true;
@@ -54,10 +63,24 @@ class _HomePageState extends CommonPageState<HomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    // 鸿蒙原生顶栏生效时隐藏 Flutter 顶部控件。
-    // 横屏/侧栏布局下 ArkTS 顶栏是隐藏的，此处必须恢复 Flutter 分类栏，
-    // 否则分类栏消失且顶部留白（NativeTopSpacer）空出一大片。
+    // 鸿蒙原生顶栏生效时：ArkTS 只画搜索行/私信/头像，分类栏与渐变模糊在这里
+    // （见 HomeTopBar）。分类栏是**悬浮**在列表之上的，视频从状态栏区域开始
+    // 渲染、从分类栏下方透出；列表首屏不被遮住靠 NativeTopSpacer 的顶部留白。
     final useNativeTopBar = _mainController.nativeTopBarActive.value;
+    if (useNativeTopBar) {
+      return Stack(
+        children: [
+          Positioned.fill(child: onBuild(_buildTabBarView())),
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: HomeTopBar(),
+          ),
+        ],
+      );
+    }
+    // 横屏/侧栏布局下 ArkTS 顶栏是隐藏的，此处恢复 Flutter 自绘的顶栏与分类栏
     Widget tabBar;
     if (_homeController.tabs.length > 1) {
       tabBar = Padding(
@@ -94,22 +117,21 @@ class _HomePageState extends CommonPageState<HomePage>
     }
     return Column(
       children: [
-        if (!useNativeTopBar &&
-            !_mainController.useSideBar &&
+        if (!_mainController.useSideBar &&
             MediaQuery.sizeOf(context).isPortrait)
           customAppBar(theme)
-        else if (!useNativeTopBar)
+        else
           SizedBox(height: MediaQuery.of(context).padding.top),
-        if (!useNativeTopBar) tabBar,
-        Expanded(
-          child: onBuild(
-            tabBarView(
-              controller: _homeController.tabController,
-              children: _homeController.tabs.map((e) => e.page).toList(),
-            ),
-          ),
-        ),
+        tabBar,
+        Expanded(child: onBuild(_buildTabBarView())),
       ],
+    );
+  }
+
+  Widget _buildTabBarView() {
+    return tabBarView(
+      controller: _homeController.tabController,
+      children: _homeController.tabs.map((e) => e.page).toList(),
     );
   }
 

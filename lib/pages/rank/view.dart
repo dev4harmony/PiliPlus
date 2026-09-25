@@ -49,11 +49,10 @@ class _RankPageState extends State<RankPage>
   }
 
   Widget _buildTab(ThemeData theme) {
-    // 顶部留白需 Obx 包裹：顶栏是否生效（异步就绪 / 横竖屏切换）、
-    // topBarCollapsed 收起变化后自动重建。高度直接复用
-    // NativeTopSpacer.staticHeight（未启用时返回 0），与右侧 ZonePage 列表
-    // 顶部的 Sliver 留白语义对齐——两者都按「首页分类数 + 顶栏收起状态」
-    // 计算，避免硬编码 magic number 导致左右不对称。
+    // 顶部留白需 Obx 包裹：顶栏是否生效（异步就绪 / 横竖屏切换）、以及滑动
+    // 隐藏后自动重建。高度直接复用 NativeTopSpacer.staticHeight（未启用时返回
+    // 0），与右侧 ZonePage 列表顶部的 Sliver 留白同源，避免硬编码 magic number
+    // 导致左右不对称。
     return Obx(
       () => VerticalTabBar(
         dividerWidth: 0,

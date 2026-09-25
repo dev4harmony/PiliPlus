@@ -68,10 +68,6 @@ abstract class HarmonyChannel {
       case 'onTopMineTap':
         _onTopMineTap?.call();
         break;
-      // ArkTS 分类栏切换 → Flutter 切换首页 TabController
-      case 'onHomeTabChange':
-        _onHomeTabChange?.call(call.arguments['index'] as int? ?? 0);
-        break;
       default:
         break;
     }
@@ -90,11 +86,6 @@ abstract class HarmonyChannel {
   static void Function()? _onTopMineTap;
   static set onTopMineTap(void Function()? callback) =>
       _onTopMineTap = callback;
-
-  /// 分类切换回调：由 HomeController 注册
-  static void Function(int index)? _onHomeTabChange;
-  static set onHomeTabChange(void Function(int)? callback) =>
-      _onHomeTabChange = callback;
 
   /// Shell 页签切换回调：由 MainController 注册
   static void Function(int index)? _onShellTabSwitch;
@@ -158,16 +149,13 @@ abstract class HarmonyChannel {
   static Future<void> setShellTopBar({required bool useNativeTopBar}) =>
       _invoke('setShellTopBar', {'useNativeTopBar': useNativeTopBar});
 
-  /// 批量同步首页顶部数据到 ArkTS 原生顶栏
-  static Future<void> setHomeTopBarData({
-    required List<String> tabs,
-    required bool hideTopBar,
-    required int activeIndex,
-  }) => _invoke('setHomeTopBarData', {
-    'tabs': tabs,
-    'hideTopBar': hideTopBar,
-    'activeIndex': activeIndex,
-  });
+  /// 同步首页顶栏配置到 ArkTS 原生顶栏。
+  ///
+  /// 分类栏（页签文本、当前高亮）不再下发：它已由 Flutter 绘制，见
+  /// lib/pages/home/widgets/home_top_bar.dart。这里只剩「是否开启滑动隐藏」，
+  /// 原生侧据此在收到 [setTopBarCollapsed] 时决定整行收不收。
+  static Future<void> setHomeTopBarVisibility({required bool hideTopBar}) =>
+      _invoke('setHomeTopBarVisibility', {'hideTopBar': hideTopBar});
 
   /// 同步搜索默认词到 ArkTS Search 组件
   static Future<void> setHomeSearchText(String text) =>
@@ -181,11 +169,8 @@ abstract class HarmonyChannel {
   static Future<void> setHomeFaceUrl(String url) =>
       _invoke('setHomeFaceUrl', {'url': url});
 
-  /// Flutter 切分类时同步高亮到 ArkTS Tabs
-  static Future<void> setHomeTabIndex(int index) =>
-      _invoke('setHomeTabIndex', {'index': index});
-
-  /// 下滑收起/展开顶部大搜索栏
+  /// 滑动隐藏时收起/展开原生顶栏那一行（ArkTS 侧整行上移淡出）。
+  /// Flutter 侧的 [HomeTopBar] 收到同一个信号后同步播放同一段动画。
   static Future<void> setTopBarCollapsed(bool collapsed) =>
       _invoke('setTopBarCollapsed', {'collapsed': collapsed});
 

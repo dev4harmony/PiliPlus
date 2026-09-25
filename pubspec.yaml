@@ -93,6 +93,9 @@ dependencies:
   # 浏览器
   # webview_flutter: ^4.10.0
   flutter_inappwebview: ^6.1.5
+  # 首页顶栏（分类栏上方那条）的渐变模糊 + 背景色叠加。
+  # 用 backdrop blur（模糊身后的内容），叠加在列表之上、分类栏之下
+  inspire_blur: ^0.4.1
   flutter_inappwebview_windows: ^0.6.0
   extended_nested_scroll_view:
     git:

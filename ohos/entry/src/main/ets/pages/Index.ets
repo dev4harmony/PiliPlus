@@ -15,34 +15,41 @@ const EVENT_CHANGE_TAB = 'EVENT_CHANGE_TAB';
 const EVENT_TOP_SEARCH = 'EVENT_TOP_SEARCH';
 const EVENT_TOP_MSG = 'EVENT_TOP_MSG';
 const EVENT_TOP_MINE = 'EVENT_TOP_MINE';
-const EVENT_HOME_TAB_CHANGE = 'EVENT_HOME_TAB_CHANGE';
 
 const NAV_UNSELECTED = $r('sys.color.comp_focused_primary');
 const BOTTOM_NORMAL_AVOID_AREA_VALUE = 1;
 const BOTTOM_SPECIAL_AVOID_AREA_VALUE = 12;
-const TOP_BAR_BLUR_RADIUS = 15;
-const TOP_BAR_FRACTION_STOPS: [number, number][] = [[0, 0], [0.8, 0.2], [1, 0.4], [1, 1]];
-const TOP_BAR_COLLAPSED_HEIGHT = 80;
-const TOP_BAR_EXPANDED_HEIGHT = 144;
-/// 顶栏收缩曲线：重减速的三次贝塞尔，起步轻、尾段长距离滑停，
-/// 比对称的 EaseInOut 柔和。裁剪容器/内容容器/搜索行三处高度共用同一条
-/// 曲线与时长，避免各自为政导致的错位；数值需与 Flutter 侧
-/// NativeTopSpacer 的留白动画保持一致。
+/// 顶栏内容行高度（vp）：搜索栏 / 私信按钮 / 头像
+const TOP_BAR_ROW_HEIGHT = 44;
+/// 顶栏内容行的上下外边距（vp）
+const TOP_BAR_ROW_MARGIN = 2;
+/// 顶栏内容行左右边距（vp）
+const TOP_BAR_SIDE_PADDING = 14;
+/// 顶栏内容行内元素间距（vp）
+const TOP_BAR_ROW_SPACE = 8;
+/// 顶栏内容行自身高度（vp，不含状态栏）。
+/// 搜索栏 / 私信 / 头像这一行由原生绘制，分类栏与渐变模糊背景由 Flutter 绘制
+/// （见 lib/pages/home/widgets/home_top_bar.dart），那边按这个值给分类栏留顶空，
+/// 改这里必须同时改那边。
+const TOP_BAR_CONTENT_HEIGHT = TOP_BAR_ROW_HEIGHT + TOP_BAR_ROW_MARGIN * 2 + 8;
+/// API 26+ 顶栏承载盒的高度上限（vp）。沉浸式系统材质只在 Navigation 标题栏
+/// （或 BarPosition.End 的底部 TabBar）内生效，这条路径必须挂进 Navigation
+/// 标题栏；而 Navigation 的属性链里不能出现状态变量，高度只能写常量。
+/// 实际占位由外层普通容器按「状态栏 + TOP_BAR_CONTENT_HEIGHT」裁剪，这里只要
+/// 够高即可（含状态栏也不会被切）。
+const TOP_BAR_NAV_HEIGHT = 120;
+/// 顶栏滑动隐藏 / 展开的时长与曲线。Flutter 侧 HomeTopBar 与 NativeTopSpacer
+/// 共用同一套参数：两端同时起步才不会各走各的节奏、收起过程中露出错位。
 const TOP_BAR_MOTION_DURATION = 300;
 const TOP_BAR_MOTION_CURVE: ICurve = curves.cubicBezierCurve(0.2, 0, 0, 1);
-/// 搜索行淡出/淡入：收起时抢在高度压扁之前淡出，展开时等高度让出空间后
-/// 再淡入，避免文字在被压扁的行内闪现（旧实现同时做，观感发硬）
-const TOP_BAR_FADE_DURATION = 120;
-const TOP_BAR_FADE_IN_DELAY = 48;
-/// API 23~25 顶栏：消息按钮（单页签 HdsTabs 悬浮栏）边长，与 API 26+ 的
-/// 44vp 圆形按钮一致
-const HDS_MSG_BUTTON_SIZE = 44;
-const CATEGORY_TABS_HEIGHT = 32;
 /// 转屏动画参数
 const ROTATION_MASK_FADE_DURATION = 130;
 const ROTATION_MASK_FADE_DELAY = 75;
 const ROTATION_MASK_MAX_LIFETIME = 2000;
 
+/// API 26+ 的沉浸光感材质。API 26 起 ArkUI 通用组件（Search / Stack / Image …）
+/// 才支持 systemMaterial；API 23~25 只有 HDS 组件内部能拿到材质，顶栏因此分两条
+/// 路径（见 homeTopBarHds / homeTopBarHost）。
 function topBarMaterial(interactive: boolean): uiMaterial.ImmersiveMaterial {
   return new uiMaterial.ImmersiveMaterial({
     style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
@@ -96,8 +103,6 @@ struct Index {
   @StorageLink('homeSearchText') homeSearchText: string = '';
   @StorageLink('homeUnreadCount') homeUnreadCount: string = '';
   @StorageLink('homeFaceUrl') homeFaceUrl: string = '';
-  @StorageLink('homeTabs') homeTabs: string[] = [];
-  @StorageLink('homeActiveTabIndex') @Watch('onHomeTabIndexChanged') homeActiveTabIndex: number = 0;
   /// 底部 Navbar 页签（NavigationBarType 索引，由 Flutter 按设置内
   /// Navbar 编辑同步；默认 首页/动态/我的）
   @StorageLink('navTabs') navTabs: number[] = [0, 1, 2];
@@ -108,13 +113,11 @@ struct Index {
   /// 当前选中的底部 Navbar 页签索引（自定义 tabBar 需自行区分选中态）
   @State currentNavIndex: number = 0;
   @State statusBarHeight: number = 0;
-  @State categoryCurrentIndex: number = 0;
   @State winWidth: number = 0;
   @State winHeight: number = 0;
   @State bottomAvoidAreaHeight: number = 0;
   @State bgColor: ResourceColor = $r("app.color.start_window_background")
 
-  private categoryController: TabsController = new TabsController();
   private controller: HdsTabsController = new HdsTabsController();
   private win: window.Window | null = null;
   private sizeCallback: ((size: window.Size) => void) | null = null;
@@ -127,13 +130,6 @@ struct Index {
   private rotatingCount: number = 0;
   private rotationMaskTimers: number[] = [];
   private currentOrientation: number = 0;
-
-  onHomeTabIndexChanged(): void {
-    if (this.homeActiveTabIndex >= 0 && this.homeActiveTabIndex < this.homeTabs.length) {
-      this.categoryCurrentIndex = this.homeActiveTabIndex;
-      this.categoryController.changeIndex(this.homeActiveTabIndex);
-    }
-  }
 
   private isTopBarCollapsed(): boolean {
     return this.homeHideTopBar && this.topBarCollapsed;
@@ -300,20 +296,6 @@ struct Index {
   }
 
   @Builder
-  categoryTabBuilder(index: number, name: string) {
-    Text(name)
-      .fontSize(15)
-      .fontWeight(this.categoryCurrentIndex === index ? FontWeight.Bolder : FontWeight.Medium)
-      .fontColor(this.categoryCurrentIndex === index ? this.navSelected : NAV_UNSELECTED)
-      .height(28)
-      .margin({
-        left: index === 0 ? 8 : 3,
-        right: index === this.homeTabs.length - 1 ? 8 : 3
-      })
-      .padding({ left: 15, right: 15 })
-  }
-
-  @Builder
   navTabBuilder(typeIndex: number, index: number) {
     Column({ space: 3 }) {
       if (typeIndex === 1 && this.dynBadgeCount > 0 && this.dynBadgeMode !== 0) {
@@ -375,6 +357,182 @@ struct Index {
   }
 
   @Builder
+  avatarButton() {
+    Stack() {
+      if (this.homeFaceUrl !== '') {
+        Image(this.homeFaceUrl)
+          .width(41)
+          .height(41)
+          .borderRadius(20.5)
+      } else {
+        SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
+          .fontSize(26)
+          .width(26)
+          .height(26)
+          .fontColor([this.navSelected])
+          .align(Alignment.Center)
+      }
+    }
+    .width(TOP_BAR_ROW_HEIGHT)
+    .height(TOP_BAR_ROW_HEIGHT)
+    .borderRadius(TOP_BAR_ROW_HEIGHT / 2)
+    .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+    .onClick(() => {
+      this.context.eventHub.emit(EVENT_TOP_MINE);
+    })
+  }
+
+  /// 搜索栏页签内容：放大镜 + 默认搜索词。
+  /// 由 HdsTabs 悬浮栏承载，因此整块（含文字）都绘制在沉浸光感材质之上。
+  @Builder
+  hdsSearchTabBuilder() {
+    // HdsTabs 悬浮栏给页签内容的盒子比悬浮栏本身略矮，写死满栏高度会让整行从
+    // 盒子上沿起排、整体偏下。这里只做居中、不给高度，让盒子按内容收缩，与
+    // 信息按钮（单个 SymbolGlyph + align(Center)）的居中方式保持一致。
+    Stack({ alignContent: Alignment.Center }) {
+      Row({ space: 6 }) {
+        SymbolGlyph($r('sys.symbol.magnifyingglass'))
+          .fontSize(16)
+          .width(16)
+          .height(16)
+          .fontColor([this.navSelected])
+        Text(this.homeSearchText !== '' ? this.homeSearchText : '搜索')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.placeholder_text'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16 })
+    }
+    .width('100%')
+  }
+
+  /// 顶栏搜索栏宽度（vp）：整行宽去掉左右边距、私信按钮、头像与两处间距。
+  /// HDS 悬浮栏只接受具体宽度，不吃 layoutWeight，只能自己算。
+  private searchBarWidth(): number {
+    const total = this.winWidth > 0 ? this.winWidth : 360;
+    return Math.max(
+      120,
+      total - TOP_BAR_SIDE_PADDING * 2 - TOP_BAR_ROW_HEIGHT * 2 - TOP_BAR_ROW_SPACE * 2
+    );
+  }
+
+  /// 沉浸光感搜索栏：由只含单个页签的 HdsTabs 悬浮栏承载。
+  ///
+  /// 为什么不直接用 ArkUI 的 systemMaterial：它要到 API 26 才有，而本项目顶栏
+  /// 与底栏都从 API 23 起就要支持。HdsTabs 悬浮栏的 systemMaterialEffect 从
+  /// API 23 起即可用，是同一套沉浸光感材质，而且栏宽/栏高/边距完全可指定
+  /// （不像 HdsNavigation 标题栏有最小宽度和自带遮罩）。
+  @Builder
+  hdsSearchBar() {
+    HdsTabs() {
+      TabContent() { // empty
+      }
+      .tabBar(this.hdsSearchTabBuilder())
+    }
+    .scrollable(false)
+    .barOverlap(true)
+    .barPosition(BarPosition.End)
+    .vertical(false)
+    .barMode(BarMode.Fixed)
+    .barHeight(TOP_BAR_ROW_HEIGHT)
+    .barFloatingStyle({
+      barWidth: {
+        smallWidth: this.searchBarWidth(),
+        mediumWidth: this.searchBarWidth(),
+        largeWidth: this.searchBarWidth()
+      },
+      barSideMargin: 0,
+      barBottomMargin: 0,
+      // 唯一的例外：保留自定义渐变遮罩。底栏不设它、吃默认值，而顶栏这颗悬浮栏
+      // 很短，默认遮罩（组件高 + 32vp）会露出直角块。
+      // 注意不能写 Color.Transparent / 0：二者都是 falsy，HDS 会当作未设置而回退
+      // 默认，主题切换后默认遮罩色未刷新就成了搜索框旁的灰块
+      gradientMask: { maskColor: '#00000000', maskHeight: 1 },
+      systemMaterialEffect: {
+        materialType: hdsMaterial.MaterialType.IMMERSIVE,
+        materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+      }
+    })
+    .onTabBarClick(() => {
+      this.context.eventHub.emit(EVENT_TOP_SEARCH);
+    })
+    .width(this.searchBarWidth())
+    .height(TOP_BAR_ROW_HEIGHT)
+    // 兜底：无论 HDS 在组件范围内画了什么底/遮罩，都裁成与悬浮栏同样的胶囊
+    .clipShape(new Rect({
+      width: this.searchBarWidth(),
+      height: TOP_BAR_ROW_HEIGHT,
+      radius: TOP_BAR_ROW_HEIGHT / 2
+    }))
+  }
+
+  /// API 23~25 原生顶栏：只保留沉浸光感搜索栏、沉浸光感私信按钮与头像。
+  ///
+  /// 分类栏与它背后的渐变模糊背景已交给 Flutter（见
+  /// lib/pages/home/widgets/home_top_bar.dart）：只有 Flutter 拿得到列表的滚动
+  /// 状态，分类栏才能与列表联动、并让视频从它下方透出。这里只负责列表滚不到、
+  /// 也不需要跟着内容动的那一行。
+  ///
+  /// 这一版靠 HdsTabs 悬浮栏拿材质（API 26 起改走 [homeTopBarHost] 的
+  /// systemMaterial），两条路径共用同一套几何与动画参数。
+  @Builder
+  homeTopBarHds() {
+    Row({ space: TOP_BAR_ROW_SPACE }) {
+      this.hdsSearchBar()
+      this.hdsMsgButton()
+      this.avatarButton()
+    }
+    .width('100%')
+    .padding({
+      left: TOP_BAR_SIDE_PADDING,
+      right: TOP_BAR_SIDE_PADDING,
+      top: this.statusBarHeight + TOP_BAR_ROW_MARGIN,
+      bottom: TOP_BAR_ROW_MARGIN,
+    })
+    // 滑动隐藏：整行一起上移淡出。由滚动方向一次性触发，不跟随滚动偏移逐帧
+    // 变化；Flutter 侧的分类栏同步播放同一段动画（见 HomeController）。
+    .translate({
+      y: this.isTopBarCollapsed() ? -(this.statusBarHeight + TOP_BAR_CONTENT_HEIGHT) : 0
+    })
+    .opacity(this.isTopBarCollapsed() ? 0 : 1)
+    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+    // 收起后虽然不可见，仍会吃到点击；命中测试一并关掉
+    .hitTestBehavior(this.isTopBarCollapsed() ? HitTestMode.None : HitTestMode.Default)
+    .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
+    .align(Alignment.Top)
+  }
+
+  /// API 26+ 搜索栏：ArkUI 通用组件的沉浸光感材质（systemMaterial），
+  /// 只能在 Navigation 标题栏内生效，见 [homeTopBarHost]。
+  @Builder
+  materialSearchBar() {
+    Search({ value: this.homeSearchText, placeholder: '搜索' })
+      .cancelButton({ style: CancelButtonStyle.INVISIBLE })
+      .focusable(false)
+      .enableKeyboardOnFocus(false)
+      .searchIcon(new SymbolGlyphModifier($r('sys.symbol.magnifyingglass'))
+        .fontColor([this.navSelected]).fontSize(16))
+      .placeholderColor($r('app.color.placeholder_text'))
+      .placeholderFont({ size: 16, weight: 600 })
+      .fontColor($r('app.color.placeholder_text'))
+      .textFont({ size: 16, weight: 600 })
+      .backgroundColor(Color.Transparent)
+      .borderRadius(TOP_BAR_ROW_HEIGHT / 2)
+      .layoutWeight(1)
+      .height(TOP_BAR_ROW_HEIGHT)
+      .systemMaterial(topBarMaterial(true))
+      .onClick(() => {
+        this.context.eventHub.emit(EVENT_TOP_SEARCH);
+      })
+      .hitTestBehavior(this.isTopBarCollapsed() ? HitTestMode.None : HitTestMode.Default)
+  }
+
+  /// API 26+ 的圆形材质按钮（私信 / 头像兜底）
+  @Builder
   circleIconButton(icon: Resource, size: number, iconSize: number, onClick: () => void) {
     Stack() {
       SymbolGlyph(icon)
@@ -389,12 +547,13 @@ struct Index {
     .borderRadius(size / 2)
     .systemMaterial(topBarMaterial(true))
     .onClick(onClick)
+    .hitTestBehavior(this.isTopBarCollapsed() ? HitTestMode.None : HitTestMode.Default)
   }
 
   @Builder
-  msgButton() {
+  materialMsgButton() {
     Stack() {
-      this.circleIconButton($r('sys.symbol.bell'), 44, 22, () => {
+      this.circleIconButton($r('sys.symbol.bell'), TOP_BAR_ROW_HEIGHT, 22, () => {
         this.context.eventHub.emit(EVENT_TOP_MSG);
       })
       if (this.homeUnreadCount !== '') {
@@ -412,12 +571,13 @@ struct Index {
           .offset({ x: 6, y: -8 })
       }
     }
-    .width(44)
-    .height(44)
+    .hitTestBehavior(this.isTopBarCollapsed() ? HitTestMode.None : HitTestMode.Default)
+    .width(TOP_BAR_ROW_HEIGHT)
+    .height(TOP_BAR_ROW_HEIGHT)
   }
 
   @Builder
-  avatarButton() {
+  materialAvatarButton() {
     if (this.homeFaceUrl !== '') {
       Image(this.homeFaceUrl)
         .width(41)
@@ -427,136 +587,41 @@ struct Index {
           this.context.eventHub.emit(EVENT_TOP_MINE);
         })
         .systemMaterial(topBarMaterial(true))
+        .hitTestBehavior(this.isTopBarCollapsed() ? HitTestMode.None : HitTestMode.Default)
     } else {
-      this.circleIconButton($r('sys.symbol.person_crop_circle_fill'), 44, 26, () => {
+      this.circleIconButton($r('sys.symbol.person_crop_circle_fill'), TOP_BAR_ROW_HEIGHT, 26, () => {
         this.context.eventHub.emit(EVENT_TOP_MINE);
       })
     }
   }
 
-  /// 首页分类栏（直播/推荐/热门/分区…），API 26+ 与 API 23~25 两条顶栏路径共用
+  /// API 26+ 顶栏内容：只保留搜索栏、私信按钮与头像（分类栏在 Flutter 侧）
   @Builder
-  categoryTabs() {
-    Tabs({ barPosition: BarPosition.Start, controller: this.categoryController }) {
-      ForEach(this.homeTabs, (tab: string, index: number) => {
-        TabContent() { // empty
-        }
-        .tabBar(this.categoryTabBuilder(index, tab))
-      }, (tab: string, index: number) => index + '_' + tab)
+  homeTopBarMaterial() {
+    Row({ space: TOP_BAR_ROW_SPACE }) {
+      this.materialSearchBar()
+      this.materialMsgButton()
+      this.materialAvatarButton()
     }
-    .barMode(BarMode.Scrollable)
-    .fadingEdge(false)
-    .scrollable(false)
     .width('100%')
-    .height(CATEGORY_TABS_HEIGHT)
-    .onTabBarClick((index: number) => {
-      this.context.eventHub.emit(EVENT_HOME_TAB_CHANGE, index);
-      this.categoryCurrentIndex = index;
+    .padding({
+      left: TOP_BAR_SIDE_PADDING,
+      right: TOP_BAR_SIDE_PADDING,
+      top: this.statusBarHeight + TOP_BAR_ROW_MARGIN - 2,
+      bottom: TOP_BAR_ROW_MARGIN,
     })
   }
 
-  @Builder
-  homeTopBar() {
-    RelativeContainer() {
-      //渐变模糊底层
-      Column() {
-      }
-      .constraintSize({ maxHeight: TOP_BAR_EXPANDED_HEIGHT })
-      .linearGradient({
-          direction: GradientDirection.Bottom, // 渐变方向
-          colors: [
-                [$r('app.color.top_bar_mask_start'), 0],
-                [$r('app.color.top_bar_mask_mid'), 0.8],
-                [$r('app.color.top_bar_mask_end'), 0.95],
-                [$r('app.color.top_bar_mask_end'), 1],
-              ],
-        })
-      .linearGradientBlur(TOP_BAR_BLUR_RADIUS, {
-        fractionStops: TOP_BAR_FRACTION_STOPS,
-        direction: GradientDirection.Top
-      })
-      .alignRules({
-        top: { anchor: 'topBarContent', align: VerticalAlign.Top },
-        bottom: { anchor: 'topBarContent', align: VerticalAlign.Bottom },
-        left: { anchor: 'topBarContent', align: HorizontalAlign.Start },
-        right: { anchor: 'topBarContent', align: HorizontalAlign.End }
-      })
-      .id('topBarBg')
-      .hitTestBehavior(HitTestMode.Transparent)
-      .align(Alignment.Top)
-
-      Column() {
-        Row({ space: 8 }) {
-          Search({ value: this.homeSearchText, placeholder: '搜索' })
-            .cancelButton({ style: CancelButtonStyle.INVISIBLE })
-            .focusable(false)
-            .enableKeyboardOnFocus(false)
-            .searchIcon(new SymbolGlyphModifier($r('sys.symbol.magnifyingglass'))
-              .fontColor([this.navSelected]).fontSize(16))
-            .placeholderColor($r('app.color.placeholder_text'))
-            .placeholderFont({ size: 16, weight: 600 })
-            .fontColor($r('app.color.placeholder_text'))
-            .textFont({ size: 16, weight: 600 })
-            .backgroundColor(Color.Transparent)
-            .borderRadius(22)
-            .layoutWeight(1)
-            .height(44)
-            .systemMaterial(topBarMaterial(true))
-            .onClick(() => {
-              this.context.eventHub.emit(EVENT_TOP_SEARCH);
-            })
-          this.msgButton()
-          this.avatarButton()
-        }
-        .width('100%')
-        .padding({
-          left: 14,
-          right: 14,
-        })
-        .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
-        // .animation() 只作用于它之前、上一个 .animation() 之后的属性，
-        // 故透明度与高度可以各走一套节奏
-        .animation({
-          duration: TOP_BAR_FADE_DURATION,
-          curve: Curve.Sharp,
-          delay: this.homeHideTopBar && this.topBarCollapsed ? 0 : TOP_BAR_FADE_IN_DELAY
-        })
-        .margin({
-          top: this.homeHideTopBar && this.topBarCollapsed ? 0 : 5,
-          bottom: this.homeHideTopBar && this.topBarCollapsed ? -5 : 5
-        })
-        .height(this.homeHideTopBar && this.topBarCollapsed ? 0 : 44)
-        .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
-
-        if (this.homeTabs.length > 1) {
-          this.categoryTabs()
-        }
-      }
-      .width('100%')
-      .padding({ top: this.statusBarHeight})
-      .id('topBarContent')
-      .hitTestBehavior(HitTestMode.Default)
-      .align(Alignment.Top)
-    }
-    .height(this.topBarHeight())
-    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
-    .width('100%')
-    .hitTestBehavior(HitTestMode.Default)
-    .align(Alignment.Top)
-  }
-
-  /// 沉浸式系统材质仅在 Navigation/NavDestination 标题栏或 BarPosition.End 的
-  /// 底部 TabBar 内生效（API 26 正式版起校验，超范围时日志打印
-  /// Material inactive: out of scope），故顶栏整体挂进一个只占顶栏高度的
-  /// Navigation 标题栏，内容区留空，不遮挡下方 FlutterPage。
+  /// API 26+ 顶栏宿主：沉浸式系统材质只在 Navigation/NavDestination 标题栏
+  /// 或 BarPosition.End 的底部 TabBar 内生效（超范围时系统打印
+  /// Material inactive: out of scope 并且不画材质），所以这一版必须挂进一个
+  /// 只占顶栏高度的 Navigation 标题栏，内容区留空、不遮挡下方 FlutterPage。
   ///
   /// 关键约束：Navigation 的属性链里不得出现任何状态变量。builder 作为组件
-  /// 参数会被编译成闭包在宿主的 update 函数里传下去（见 .tabBar 的产物形态），
-  /// 一旦 Navigation 的 update 函数因读到脏状态而重跑，.title() 就会以新闭包
-  /// 再调一次，自定义标题栏整棵子树被重建——新节点没有上一帧的值可插值，
-  /// 隐式 .animation() 与 animateTo 一律退化成跳变。
-  /// 因此收缩动画与显隐一律由外层裁剪容器承担，Navigation 保持常量属性，
-  /// 标题栏内部的节点才能回到原地更新，沿用既有的 .animation() 写法。
+  /// 参数会被编译成闭包在宿主的 update 函数里传下去，一旦 Navigation 的 update
+  /// 函数因读到脏状态而重跑，.title() 就会以新闭包再调一次，自定义标题栏整棵
+  /// 子树被重建——新节点没有上一帧的值可插值，隐式 .animation() 一律退化成跳变。
+  /// 因此高度写常量、显隐与收起动画一律由外层普通容器承担。
   @Builder
   homeTopBarHost() {
     Column() {
@@ -571,33 +636,32 @@ struct Index {
       .mode(NavigationMode.Stack)
       .hideBackButton(true)
       .hideToolBar(true)
-      // 显式给出标题栏高度，避免自定义标题被压回默认 56vp；
       // 不设 menus，paddingStart/paddingEnd 才能把标题栏默认左右边距清零
-      .title({ builder: this.homeTopBar, height: TOP_BAR_EXPANDED_HEIGHT }, {
+      .title({ builder: this.homeTopBarMaterial, height: TOP_BAR_NAV_HEIGHT }, {
         barStyle: BarStyle.STACK,
         paddingStart: LengthMetrics.vp(0),
         paddingEnd: LengthMetrics.vp(0)
       })
-      // 状态栏避让由顶栏内部的 statusBarHeight padding 负责，避免重复加一层
+      // 状态栏避让由标题栏内部的 statusBarHeight padding 负责，避免重复加一层
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .backgroundColor(Color.Transparent)
       .width('100%')
-      .height(TOP_BAR_EXPANDED_HEIGHT)
+      .height(TOP_BAR_NAV_HEIGHT)
     }
     .width('100%')
-    // 收缩在这里做：普通容器高度，隐式动画正常生效；clip 让收起后露出的
-    // 那段标题栏既不绘制也不参与触摸测试，触摸照常落到下方 FlutterPage
-    .height(this.topBarHeight())
-    .clip(true)
+    // 实际占位按内容行算，多出来的部分裁掉——不然会盖住下方 Flutter 的分类栏，
+    // 把它的点击一起吃掉
+    .height(this.statusBarHeight + TOP_BAR_CONTENT_HEIGHT)
+    .clip(false)
+    // 收起动画与 API 23~25 那条路径完全一致
+    .translate({
+      y: this.isTopBarCollapsed() ? -(this.statusBarHeight + TOP_BAR_CONTENT_HEIGHT) : 0
+    })
+    .opacity(this.isTopBarCollapsed() ? 0 : 1)
     .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+    .hitTestBehavior(HitTestMode.Transparent)
     .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
     .align(Alignment.Top)
-  }
-
-  private topBarHeight(): number {
-    return this.isTopBarCollapsed()
-      ? TOP_BAR_COLLAPSED_HEIGHT
-      : TOP_BAR_EXPANDED_HEIGHT;
   }
 
   @Builder
@@ -610,11 +674,11 @@ struct Index {
       .align(Alignment.Center)
   }
 
-  /// API 23~25：消息按钮由一个只含单个页签的 HdsTabs 悬浮栏承载——悬浮栏
-  /// 的 systemMaterialEffect 就是底栏在 6.1 上拿沉浸光感的同一套机制，
-  /// 而且栏宽/栏高/边距全部可指定，几何完全可控（不像 HdsNavigation
+  /// 沉浸光感私信按钮：与搜索栏一样是「只含单个页签的 HdsTabs 悬浮栏」——
+  /// 悬浮栏的 systemMaterialEffect 就是底栏拿沉浸光感的同一套机制，API 23 起
+  /// 即可用；栏宽/栏高/边距全部可指定，几何完全可控（不像 HdsNavigation
   /// 标题栏有最小宽度和自带遮罩）。44×44 + barOverlap 使悬浮栏铺满组件，
-  /// 圆角随栏高变成正圆。角标与 API 26+ 的 msgButton 同一画法。
+  /// 圆角随栏高变成正圆。
   @Builder
   hdsMsgButton() {
     Stack() {
@@ -628,33 +692,29 @@ struct Index {
       .barPosition(BarPosition.End)
       .vertical(false)
       .barMode(BarMode.Fixed)
-      .barHeight(HDS_MSG_BUTTON_SIZE)
+      .barHeight(TOP_BAR_ROW_HEIGHT)
       .barFloatingStyle({
         barWidth: {
-          smallWidth: HDS_MSG_BUTTON_SIZE,
-          mediumWidth: HDS_MSG_BUTTON_SIZE,
-          largeWidth: HDS_MSG_BUTTON_SIZE
+          smallWidth: TOP_BAR_ROW_HEIGHT,
+          mediumWidth: TOP_BAR_ROW_HEIGHT,
+          largeWidth: TOP_BAR_ROW_HEIGHT
         },
         barSideMargin: 0,
         barBottomMargin: 0,
-        // 不要悬浮栏底部默认的渐变遮罩（默认高度为组件高 + 32vp，会露出直角块）。
-        // 注意不能写 Color.Transparent / 0：二者都是 falsy，HDS 会当作未设置而回退默认，
-        // 主题切换后默认遮罩色未刷新就成了按钮旁的灰色方块
+        // 同搜索栏：只保留自定义渐变遮罩这一个例外
         gradientMask: { maskColor: '#00000000', maskHeight: 1 },
         systemMaterialEffect: {
           materialType: hdsMaterial.MaterialType.IMMERSIVE,
-          // 浅色模式下 ADAPTIVE 几乎看不出材质，按钮很小，直接用最高等级
-          materialLevel: hdsMaterial.MaterialLevel.EXQUISITE
+          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
         }
       })
-      .barBackgroundColor('#00000000')
       .onTabBarClick(() => {
         this.context.eventHub.emit(EVENT_TOP_MSG);
       })
-      .width(HDS_MSG_BUTTON_SIZE)
-      .height(HDS_MSG_BUTTON_SIZE)
+      .width(TOP_BAR_ROW_HEIGHT)
+      .height(TOP_BAR_ROW_HEIGHT)
       // 兜底：无论 HDS 在组件范围内画了什么底/遮罩，都裁成与悬浮栏同样的正圆
-      .clipShape(new Circle({ width: HDS_MSG_BUTTON_SIZE, height: HDS_MSG_BUTTON_SIZE }))
+      .clipShape(new Circle({ width: TOP_BAR_ROW_HEIGHT, height: TOP_BAR_ROW_HEIGHT }))
       if (this.homeUnreadCount !== '') {
         Text(this.homeUnreadCount)
           .fontSize(9)
@@ -670,140 +730,10 @@ struct Index {
           .offset({ x: 6, y: -8 })
       }
     }
-    .width(HDS_MSG_BUTTON_SIZE)
-    .height(HDS_MSG_BUTTON_SIZE)
+    .width(TOP_BAR_ROW_HEIGHT)
+    .height(TOP_BAR_ROW_HEIGHT)
     // 角标可能探出按钮右缘，压在后绘制的头像之上
     .zIndex(1)
-  }
-
-  /// API 23~25（鸿蒙 6.1）顶栏。ArkUI 通用组件的 systemMaterial / uiMaterial
-  /// 要到 API 26 才有，6.1 上沉浸光感只在 HDS 组件内可用：消息按钮走
-  /// hdsMsgButton（HdsTabs 悬浮栏）拿材质；搜索框用组件级模糊做半透明胶囊，头像是普通圆形
-  /// 图片按钮。布局、收起动画与 homeTopBar 逐项对应，仅材质相关属性不同。
-  @Builder
-  homeTopBarHds() {
-    RelativeContainer() {
-      //渐变模糊底层
-      Column() {
-      }
-      .constraintSize({ maxHeight: TOP_BAR_EXPANDED_HEIGHT })
-      .linearGradient({
-          direction: GradientDirection.Bottom, // 渐变方向
-          colors: [
-                [$r('app.color.top_bar_mask_start'), 0],
-                [$r('app.color.top_bar_mask_mid'), 0.8],
-                [$r('app.color.top_bar_mask_end'), 0.95],
-                [$r('app.color.top_bar_mask_end'), 1],
-              ],
-        })
-      .linearGradientBlur(TOP_BAR_BLUR_RADIUS, {
-        fractionStops: TOP_BAR_FRACTION_STOPS,
-        direction: GradientDirection.Top
-      })
-      .alignRules({
-        top: { anchor: 'topBarContent', align: VerticalAlign.Top },
-        bottom: { anchor: 'topBarContent', align: VerticalAlign.Bottom },
-        left: { anchor: 'topBarContent', align: HorizontalAlign.Start },
-        right: { anchor: 'topBarContent', align: HorizontalAlign.End }
-      })
-      .id('topBarBg')
-      .hitTestBehavior(HitTestMode.Transparent)
-      .align(Alignment.Top)
-
-      Column() {
-        Row({ space: 8 }) {
-          Search({ value: this.homeSearchText, placeholder: '搜索' })
-            .cancelButton({ style: CancelButtonStyle.INVISIBLE })
-            .focusable(false)
-            .enableKeyboardOnFocus(false)
-            .searchIcon(new SymbolGlyphModifier($r('sys.symbol.magnifyingglass'))
-              .fontColor([this.navSelected]).fontSize(16))
-            .placeholderColor($r('app.color.placeholder_text'))
-            .placeholderFont({ size: 16, weight: 600 })
-            .fontColor($r('app.color.placeholder_text'))
-            .textFont({ size: 16, weight: 600 })
-            .backgroundColor(Color.Transparent)
-            .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
-            .borderRadius(22)
-            .layoutWeight(1)
-            .height(44)
-            .onClick(() => {
-              this.context.eventHub.emit(EVENT_TOP_SEARCH);
-            })
-          this.hdsMsgButton()
-          if (this.homeFaceUrl !== '') {
-            Image(this.homeFaceUrl)
-              .width(41)
-              .height(41)
-              .borderRadius(20.5)
-              .onClick(() => {
-                this.context.eventHub.emit(EVENT_TOP_MINE);
-              })
-          } else {
-            Stack() {
-              SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-                .fontSize(26)
-                .width(26)
-                .height(26)
-                .fontColor([this.navSelected])
-                .align(Alignment.Center)
-            }
-            .width(44)
-            .height(44)
-            .borderRadius(22)
-            .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
-            .onClick(() => {
-              this.context.eventHub.emit(EVENT_TOP_MINE);
-            })
-          }
-        }
-        .width('100%')
-        .padding({
-          left: 14,
-          right: 14,
-        })
-        .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
-        .animation({
-          duration: TOP_BAR_FADE_DURATION,
-          curve: Curve.Sharp,
-          delay: this.homeHideTopBar && this.topBarCollapsed ? 0 : TOP_BAR_FADE_IN_DELAY
-        })
-        .margin({
-          top: this.homeHideTopBar && this.topBarCollapsed ? 0 : 5,
-          bottom: this.homeHideTopBar && this.topBarCollapsed ? -5 : 5
-        })
-        .height(this.homeHideTopBar && this.topBarCollapsed ? 0 : 44)
-        .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
-
-        if (this.homeTabs.length > 1) {
-          this.categoryTabs()
-        }
-      }
-      .width('100%')
-      .padding({ top: this.statusBarHeight})
-      .id('topBarContent')
-      .hitTestBehavior(HitTestMode.Default)
-      .align(Alignment.Top)
-    }
-    .height(this.topBarHeight())
-    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
-    .width('100%')
-    .hitTestBehavior(HitTestMode.Default)
-    .align(Alignment.Top)
-  }
-
-  /// API 23~25 顶栏宿主：与 API 26+ 宿主同样由外层裁剪容器承担收缩与显隐
-  @Builder
-  homeTopBarHdsHost() {
-    Column() {
-      this.homeTopBarHds()
-    }
-    .width('100%')
-    .height(this.topBarHeight())
-    .clip(true)
-    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
-    .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
-    .align(Alignment.Top)
   }
 
   @Builder
@@ -849,12 +779,18 @@ struct Index {
       if (this.useNativeTabs && deviceInfo.sdkApiVersion >= 23) {
         this.hdsMainTabs()
       }
-      // API 26+：Navigation 标题栏 + ArkUI systemMaterial（全部元素带材质）
-      // API 23~25：自绘顶栏，仅消息按钮（HdsTabs 悬浮栏）带 HDS 材质
-      if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 26) {
-        this.homeTopBarHost()
-      } else if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 23) {
-        this.homeTopBarHdsHost()
+      // 原生顶栏分两条路径：
+      // API 26+ 用 ArkUI 通用组件的沉浸光感材质（systemMaterial），需要
+      //   Navigation 标题栏承载 → homeTopBarHost；
+      // API 23~25 上通用组件还没有 systemMaterial，只有 HDS 组件内能拿到材质
+      //   → 搜索栏/私信按钮走 HdsTabs 悬浮栏（与底栏同一套能力）→ homeTopBarHds。
+      // 两条路径几何、动画参数共用，切换只影响材质实现。
+      if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 23) {
+        if (deviceInfo.sdkApiVersion >= 26) {
+          this.homeTopBarHost()
+        } else {
+          this.homeTopBarHds()
+        }
       }
       // 转屏遮罩
       if (this.rotationMask !== null) {
