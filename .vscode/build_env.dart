@@ -26,7 +26,7 @@ Future<void> _updatePubspecVersion(int versionCode) async {
 
 void main() async {
   // 手动指定 versionName
-  const versionName = '2.1.4-ohos';
+  const versionName = '2.1.4-ohos-2';
 
   // 通过 git 命令获取 hash 和 code
   final versionCode = await _getGitCommitCount();
