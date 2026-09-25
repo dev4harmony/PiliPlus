@@ -935,7 +935,8 @@ class AudioController extends GetxController
       ..onSeek = null
       ..onSkipToPrevious = _savedOnSkipToPrevious
       ..onSkipToNext = _savedOnSkipToNext
-      ..onRepeatModeChanged = _savedOnRepeatModeChanged;
+      ..onRepeatModeChanged = _savedOnRepeatModeChanged
+      ..clearIfNeeded();
     _playModeSub?.cancel();
     _playModeSub = null;
     _subscriptions?.forEach((e) => e.cancel());
