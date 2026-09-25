@@ -223,6 +223,7 @@ class RefreshIndicatorState extends State<RefreshIndicator>
   late AnimationController _scaleController;
   late Animation<double> _positionFactor;
   late Animation<double> _scaleFactor;
+  late Animation<double> _layoutScale;
   late Animation<double> _value;
   late Animation<Color?> _valueColor;
 
@@ -231,6 +232,8 @@ class RefreshIndicatorState extends State<RefreshIndicator>
   double? _dragOffset;
   late Color _effectiveValueColor;
   // late Color _backgroundColor;
+
+  static final Animatable<double> _oneTween = ConstantTween<double>(1.0);
 
   static final Animatable<double> _threeQuarterTween = Tween<double>(
     begin: 0.0,
@@ -259,6 +262,7 @@ class RefreshIndicatorState extends State<RefreshIndicator>
 
     _scaleController = AnimationController(vsync: this);
     _scaleFactor = _scaleController.drive(_oneToZeroTween);
+    _layoutScale = _scaleController.drive(_oneTween);
   }
 
   @protected
@@ -518,19 +522,25 @@ class RefreshIndicatorState extends State<RefreshIndicator>
 
     child = RefreshLayout(
       body: child,
-      scale: _scaleFactor,
+      // 布局尺寸固定，缩放交给绘制期的 ScaleTransition：RefreshLayout 收紧
+      // 布局约束时，SDK 内层的固定内边距会让弧先归零，出现圆形背景已消失
+      // 而弧仍在绘制的问题。
+      scale: _layoutScale,
       position: _positionFactor,
       edgeOffset: widget.edgeOffset,
       indicator: _status == null
           ? null
-          : AnimatedBuilder(
-              animation: _positionController,
-              builder: (context, child) => RefreshProgressIndicator(
-                value: showIndeterminateIndicator ? null : _value.value,
-                valueColor: _valueColor,
-                backgroundColor: widget.backgroundColor,
-                strokeWidth: widget.strokeWidth,
-                elevation: widget.elevation,
+          : ScaleTransition(
+              scale: _scaleFactor,
+              child: AnimatedBuilder(
+                animation: _positionController,
+                builder: (context, child) => RefreshProgressIndicator(
+                  value: showIndeterminateIndicator ? null : _value.value,
+                  valueColor: _valueColor,
+                  backgroundColor: widget.backgroundColor,
+                  strokeWidth: widget.strokeWidth,
+                  elevation: widget.elevation,
+                ),
               ),
             ),
     );
