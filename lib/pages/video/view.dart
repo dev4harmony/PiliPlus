@@ -243,84 +243,68 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   // heroTag 恒非空（兼任 GetX 控制器 tag，toVideoPage 有随机值兜底），只有
   // 真正被 Hero 包裹的卡片（首页视频卡/番剧卡）会生成带这两个前缀的稳定
-  // tag。其他入口（搜索等）没有源端 Hero，若也进入 _waitingHero 等待，
-  // 转场期间会滑入 300ms 空白页导致动画不连贯。
+  // tag。其他入口（搜索等）没有源端 Hero，不能包 Hero。
   late final _enableHero =
       Pref.enableHeroCoverAnimation &&
       heroTag is String &&
       ((heroTag as String).startsWith('video_hero_') ||
           (heroTag as String).startsWith('pgc_hero_'));
-  late bool _waitingHero = _enableHero && (heroTag as String).startsWith('video_hero_');
-  final _heroDuration = const Duration(milliseconds: 300);
+
   @override
   void initState() {
     super.initState();
-    // 方向/布局状态必须首帧同步可用：旋转与全屏状态机在 build 里依赖
-    // isPortrait、maxWidth/maxHeight，它们必须总是 build 前的当前值。
-    // 控制器构造本身轻量（onInit 只初始化字段，网络请求在
-    // videoSourceInit 中执行），同步创建即可让 didChangeDependencies
-    // 立即以正确状态生效。
+    PlPlayerController.setPlayCallBack(playCallBack);
     videoDetailController = Get.put(VideoDetailController(), tag: heroTag);
+
     if (videoDetailController.removeSafeArea) {
       hideSystemBar();
     }
 
-    // 其余初始化延迟到 Hero 过渡结束后：查询播放地址、初始化播放器、创建
-    // 分页控制器、注册生命周期观察者都是较重的工作，放首帧会卡 Hero 动画。
-    Future.delayed(
-      _waitingHero ? _heroDuration : Duration.zero,
-      () {
-        PlPlayerController.setPlayCallBack(playCallBack);
-        // 自由多窗的装饰栏按钮跟随顶栏实际底色：顶部是黑色播放器时切浅色
-        // 风格（否则浅色模式下深色按钮不可见），顶栏随滚动渐变成 surface
-        // 后再交回系统颜色模式。滚动与全屏都会改变顶栏底色，各挂一个监听。
-        _decorDarkActive = true;
-        _syncDecorDark();
-        _decorDarkWorker = ever(
-          videoDetailController.scrollRatio,
-          (_) => _syncDecorDark(),
-        );
-        _decorFullScreenWorker = ever(
-          videoDetailController.plPlayerController.isFullScreen,
-          (_) => _syncDecorDark(),
-        );
-        // 画中画状态翻转时强制重建：PiP 结束时若窗口尺寸恰好没变（如画中画
-        // 期间从智慧多窗应用栏以小窗打开 app），没有视口变化触发重建，页面
-        // 会滞留在画中画布局（黑边+播控被状态栏遮挡）。
-        _pipModeWorker = ever(
-          videoDetailController.plPlayerController.pipModeRx,
-          (_) {
-            if (mounted) setState(() {});
-          },
-        );
-
-        if (videoDetailController.showReply) {
-          _videoReplyController = Get.put(
-            VideoReplyController(
-              aid: videoDetailController.aid,
-              videoType: videoDetailController.videoType,
-              heroTag: heroTag,
-            ),
-            tag: heroTag,
-          );
-        }
-
-        if (videoDetailController.isFileSource) {
-          localIntroController = Get.put(LocalIntroController(), tag: heroTag);
-        } else if (videoDetailController.isUgc) {
-          ugcIntroController = Get.put(UgcIntroController(), tag: heroTag);
-        } else {
-          pgcIntroController = Get.put(PgcIntroController(), tag: heroTag);
-        }
-
-        videoSourceInit();
-
-        addObserverMobile(this);
-        setState(() {
-          _waitingHero = false;
-        });
+    // 自由多窗的装饰栏按钮跟随顶栏实际底色：顶部是黑色播放器时切浅色
+    // 风格（否则浅色模式下深色按钮不可见），顶栏随滚动渐变成 surface
+    // 后再交回系统颜色模式。滚动与全屏都会改变顶栏底色，各挂一个监听。
+    // 首次同步在 didChangeDependencies 里做（theme 此时才就绪）
+    _decorDarkActive = true;
+    _decorDarkWorker = ever(
+      videoDetailController.scrollRatio,
+      (_) => _syncDecorDark(),
+    );
+    _decorFullScreenWorker = ever(
+      videoDetailController.plPlayerController.isFullScreen,
+      (_) => _syncDecorDark(),
+    );
+    // 画中画状态翻转时强制重建：PiP 结束时若窗口尺寸恰好没变（如画中画
+    // 期间从智慧多窗应用栏以小窗打开 app），没有视口变化触发重建，页面
+    // 会滞留在画中画布局（黑边+播控被状态栏遮挡）。
+    _pipModeWorker = ever(
+      videoDetailController.plPlayerController.pipModeRx,
+      (_) {
+        if (mounted) setState(() {});
       },
     );
+
+    if (videoDetailController.showReply) {
+      _videoReplyController = Get.put(
+        VideoReplyController(
+          aid: videoDetailController.aid,
+          videoType: videoDetailController.videoType,
+          heroTag: heroTag,
+        ),
+        tag: heroTag,
+      );
+    }
+
+    if (videoDetailController.isFileSource) {
+      localIntroController = Get.put(LocalIntroController(), tag: heroTag);
+    } else if (videoDetailController.isUgc) {
+      ugcIntroController = Get.put(UgcIntroController(), tag: heroTag);
+    } else {
+      pgcIntroController = Get.put(PgcIntroController(), tag: heroTag);
+    }
+
+    videoSourceInit();
+
+    addObserverMobile(this);
   }
 
   // 获取视频资源，初始化播放器
@@ -655,8 +639,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     super.didChangeDependencies();
     // 布局/方向状态必须在这里同步计算：旋转（MediaQuery 变化）时本方法先于
     // build 执行，保证 build 读到的 isPortrait/maxWidth/maxHeight 永远是当前值。
-    // 若像 Hero 优化那样延迟到 Future.delayed 里再算，旋转后 build 会读到过期
-    // 的 isPortrait，childWhenDisabled 的自动进/退全屏逻辑就会在错误方向上触发。
     if (videoDetailController.removeSafeArea) {
       padding = .zero;
     } else {
@@ -1579,39 +1561,34 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   @override
   Widget build(BuildContext context) {
     Widget child;
-    Widget result;
-    if (_waitingHero) {
-      result = child = const SizedBox.shrink();
+    if (videoDetailController.plPlayerController.isPipMode) {
+      child = plPlayer(width: maxWidth, height: maxHeight, isPipMode: true);
+    } else if (_usesLandscapeLayout) {
+      child = childWhenDisabledLandscape;
+    } else if (_usesPortraitLayout) {
+      child = childWhenDisabled;
     } else {
-      if (videoDetailController.plPlayerController.isPipMode) {
-        child = plPlayer(width: maxWidth, height: maxHeight, isPipMode: true);
-      } else if (_usesLandscapeLayout) {
-        child = childWhenDisabledLandscape;
-      } else if (_usesPortraitLayout) {
-        child = childWhenDisabled;
-      } else {
-        child = childWhenDisabledAlmostSquare;
-      }
-      if (videoDetailController.plPlayerController.keyboardControl) {
-        child = PlayerFocus(
-          plPlayerController: videoDetailController.plPlayerController,
-          introController: introController,
-          onSendDanmaku: videoDetailController.showShootDanmakuSheet,
-          canPlay: () {
-            if (videoDetailController.autoPlay) {
-              return true;
-            }
-            handlePlay();
-            return false;
-          },
-          onSkipSegment: videoDetailController.onSkipSegment,
-          child: child,
-        );
-      }
-      result = videoDetailController.plPlayerController.darkVideoPage
-          ? Theme(data: theme, child: child)
-          : child;
+      child = childWhenDisabledAlmostSquare;
     }
+    if (videoDetailController.plPlayerController.keyboardControl) {
+      child = PlayerFocus(
+        plPlayerController: videoDetailController.plPlayerController,
+        introController: introController,
+        onSendDanmaku: videoDetailController.showShootDanmakuSheet,
+        canPlay: () {
+          if (videoDetailController.autoPlay) {
+            return true;
+          }
+          handlePlay();
+          return false;
+        },
+        onSkipSegment: videoDetailController.onSkipSegment,
+        child: child,
+      );
+    }
+    Widget result = videoDetailController.plPlayerController.darkVideoPage
+        ? Theme(data: theme, child: child)
+        : child;
     if (_enableHero) {
       result = Hero(
         tag: heroTag,
