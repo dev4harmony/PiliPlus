@@ -14,12 +14,18 @@ class RefreshLayout
     required this.position,
     required this.indicator,
     required this.body,
+    this.edgeOffset = 0.0,
   });
 
   final Animation<double> scale;
   final Animation<double> position;
   final Widget? indicator;
   final Widget body;
+
+  /// 指示器出现位置相对顶边的下移量，对应 RefreshIndicator.edgeOffset。
+  /// 上游 RefreshLayout 无此参数；鸿蒙沉浸顶栏下列表顶边在 ArkTS 顶栏
+  /// 后面，须把指示器下移到顶栏底边，否则整个被顶栏盖住。
+  final double edgeOffset;
 
   @override
   Iterable<RefreshType> get slots => RefreshType.values;
@@ -32,7 +38,19 @@ class RefreshLayout
 
   @override
   RenderRefreshLayout createRenderObject(BuildContext context) {
-    return RenderRefreshLayout(scale: scale, position: position);
+    return RenderRefreshLayout(
+      scale: scale,
+      position: position,
+      edgeOffset: edgeOffset,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    RenderRefreshLayout renderObject,
+  ) {
+    renderObject.edgeOffset = edgeOffset;
   }
 }
 
@@ -41,7 +59,8 @@ class RenderRefreshLayout extends RenderBox
   RenderRefreshLayout({
     required this.scale,
     required this.position,
-  }) {
+    double edgeOffset = 0.0,
+  }) : _edgeOffset = edgeOffset {
     scale.addListener(_scaleListener);
     position.addListener(_positionListener);
   }
@@ -49,6 +68,17 @@ class RenderRefreshLayout extends RenderBox
   final Animation<double> scale;
 
   final Animation<double> position;
+
+  double _edgeOffset;
+  double get edgeOffset => _edgeOffset;
+  set edgeOffset(double value) {
+    if (_edgeOffset == value) {
+      return;
+    }
+    _edgeOffset = value;
+    _layoutIndicator();
+    markNeedsPaint();
+  }
 
   double _heightFactor = 0;
   double get heightFactor => _heightFactor;
@@ -112,7 +142,8 @@ class RenderRefreshLayout extends RenderBox
       indicator,
       Offset(
         (constraints.maxWidth - scaleSize) / 2,
-        (kIndicatorSize + displacement) * heightFactor -
+        edgeOffset +
+            (kIndicatorSize + displacement) * heightFactor -
             kIndicatorSize +
             (kIndicatorSize - scaleSize) / 2,
       ),
@@ -129,14 +160,14 @@ class RenderRefreshLayout extends RenderBox
     final indicator = this.indicator;
     if (indicator != null && heightFactor > 0 && scaleFactor > 0) {
       final indicatorOffset = getOffset(indicator);
-      if (indicatorOffset.dy > 0) {
+      if (indicatorOffset.dy > edgeOffset) {
         context.paintChild(indicator, indicatorOffset + offset);
         layer = null;
       } else {
         layer = context.pushClipRect(
           needsCompositing,
           offset,
-          Offset.zero & size,
+          Rect.fromLTRB(0, edgeOffset, size.width, size.height),
           (context, offset) {
             context.paintChild(indicator, indicatorOffset + offset);
           },
