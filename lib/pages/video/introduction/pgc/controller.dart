@@ -373,8 +373,6 @@ class PgcIntroController extends CommonIntroController {
       if (nextIndex >= episodes.length) {
         if (playRepeat == PlayRepeat.listCycle) {
           nextIndex = 0;
-        } else if (playRepeat == PlayRepeat.autoPlayRelated) {
-          return false;
         } else {
           return false;
         }

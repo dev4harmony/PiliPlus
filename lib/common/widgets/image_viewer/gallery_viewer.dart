@@ -15,6 +15,7 @@
  * along with PiliPlus.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'dart:async';
 import 'dart:io' show File, Platform;
 
 import 'package:PiliPlus/common/widgets/colored_box_transition.dart';
@@ -155,7 +156,7 @@ class _GalleryViewerState extends State<GalleryViewer>
       ..onLongPress = _onLongPress
       ..gestureSettings = gestureSettings;
 
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Timer(const Duration(milliseconds: 300), () {
       if (mounted) {
         _tapGestureRecognizer.onTap = _onTap;
       }
@@ -297,7 +298,7 @@ class _GalleryViewerState extends State<GalleryViewer>
         }
       }
     }
-    Future.delayed(const Duration(milliseconds: 200), _currIndex.close);
+    Timer(const Duration(milliseconds: 200), _currIndex.close);
     super.dispose();
     if (_hideSystemBar) {
       showSystemBar();
@@ -566,8 +567,8 @@ class _GalleryViewerState extends State<GalleryViewer>
                 PageUtils.launchURL(item.url);
               },
               child: const Text('网页打开', style: TextStyle(fontSize: 14)),
-            )
-          else if (widget.sources.length > 1)
+            ),
+          if (widget.sources.length > 1)
             DialogOption(
               onPressed: () {
                 Get.back();
@@ -620,6 +621,14 @@ class _GalleryViewerState extends State<GalleryViewer>
           onTap: () => PageUtils.launchURL(item.url),
           child: const Text('网页打开', style: TextStyle(fontSize: 14)),
         ),
+        if (widget.sources.length > 1)
+          PopupMenuItem(
+            height: 42,
+            onTap: () => ImageUtils.downloadImg(
+              widget.sources.map((item) => item.url).toList(),
+            ),
+            child: const Text('保存全部图片', style: TextStyle(fontSize: 14)),
+          ),
         if (item.sourceType == SourceType.livePhoto)
           PopupMenuItem(
             height: 42,

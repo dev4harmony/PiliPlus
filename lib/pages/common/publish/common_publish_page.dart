@@ -100,7 +100,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   }
 
   void _requestFocus({Duration duration = const Duration(microseconds: 200)}) {
-    Future.delayed(duration, _safeRequestFocus);
+    Timer(duration, _safeRequestFocus);
   }
 
   @override
@@ -170,6 +170,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
 
   Future<void> hidePanel([_]) async {
     if (focusNode.hasFocus) {
+      // TODO(ohos): 上游用 Future.pause（Dart 3.13+），鸿蒙 Dart SDK(3.12) 暂不支持，先用 Future.delayed 等价替换
       await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
       focusNode.unfocus();

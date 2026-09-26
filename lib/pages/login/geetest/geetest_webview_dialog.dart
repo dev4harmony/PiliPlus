@@ -1,14 +1,10 @@
-import 'dart:convert' show jsonDecode, jsonEncode;
+import 'dart:convert' show jsonDecode;
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
-import 'package:PiliPlus/http/init.dart';
-import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/main.dart';
-import 'package:PiliPlus/utils/accounts/account.dart';
-import 'package:PiliPlus/utils/extension/string_ext.dart';
-import 'package:dio/dio.dart';
+import 'package:PiliPlus/plugin/linux_webview.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -33,77 +29,89 @@ class GeetestWebviewDialog extends StatefulWidget {
 class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
   static const _geetestJsUri =
       'https://static.geetest.com/static/js/fullpage.0.0.0.js';
+  static const _geetestConfigUri = 'https://api.geetest.com/gettype.php';
 
-  late final Future<LoadingState<String>> _future;
-
-  static String _showJs(String response) =>
-      't=Geetest($response).onSuccess(()=>R("success",t.getValidate())).onError(o=>R("error",o)).onClose(o=>R("close",o));t.onReady(()=>t.verify())';
   late final double _previousScaleFactor;
 
   @override
   void initState() {
     super.initState();
-    _previousScaleFactor =
-        ScaledWidgetsFlutterBinding.instance.scaleFactor;
+    // CPF适配的Flutter在鸿蒙环境下对于flutter应用内调整了缩放比例（非1.0）的情况下platformview的视图大小会出现异常，非hcpp模式下会导致触摸漂移
+    // 需要主动调整缩放比例规避问题
+    _previousScaleFactor = ScaledWidgetsFlutterBinding.instance.scaleFactor;
     if (_previousScaleFactor != 1.0) {
       ScaledWidgetsFlutterBinding.instance.scaleFactor = 1.0;
     }
-    _future = _getConfig(widget.gt, widget.challenge);
-  }
-
-  static Future<LoadingState<String>> _getConfig(
-    String gt,
-    String challenge,
-  ) async {
-    final res = await Request().get<String>(
-      'https://api.geetest.com/gettype.php',
-      queryParameters: {'gt': gt},
-      options: Options(
-        responseType: ResponseType.plain,
-        extra: {'account': const NoAccount()},
-      ),
-    );
-    if (res.data case final String data) {
-      if (data.startsWith('(') && data.endsWith(')')) {
-        final Map<String, dynamic> config;
-        try {
-          config = jsonDecode(data.substring1);
-        } catch (e) {
-          return Error(e.toString());
-        }
-        if (config['status'] == 'success') {
-          return Success(
-            jsonEncode(
-              config['data'] as Map<String, dynamic>..addAll({
-                "gt": gt,
-                "challenge": challenge,
-                "offline": false,
-                "new_captcha": true,
-                "product": "bind",
-                "width": "100%",
-                "https": true,
-                "protocol": "https://",
-              }),
-            ),
-          );
-        } else {
-          return Error(data);
-        }
-      }
-    }
-    return Error(res.data['message']);
   }
 
   @override
   void dispose() {
+    // CPF适配的Flutter在鸿蒙环境下对于flutter应用内调整了缩放比例（非1.0）的情况下platformview的视图大小会出现异常，非hcpp模式下会导致触摸漂移
+    // 需要主动调整缩放比例规避问题
     if (_previousScaleFactor != 1.0) {
       ScaledWidgetsFlutterBinding.instance.scaleFactor = _previousScaleFactor;
     }
     super.dispose();
   }
 
+  static String _buildHtml(String gt, String challenge) {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final js =
+        'var C,S,T,t;'
+        'T=()=>{if(C&&S&&!t){t=Geetest(C).onSuccess(()=>R("success",t.getValidate())).onError(o=>R("error",o)).onClose(o=>R("close",o));t.onReady(()=>t.verify())}};'
+        'geetest_$ts=(d)=>{'
+        'if(!d||d.status!="success"){R("error",JSON.stringify(d));return};'
+        'C=Object.assign({gt:"$gt",challenge:"$challenge",offline:false,new_captcha:true,product:"bind",width:"100%",https:true,protocol:"https://"},d.data);T()'
+        '};'
+        'G=()=>{S=1;T()};'
+        'E=()=>{document.getElementById("E").textContent="验证码加载失败";R("error","geetest script load failed")}';
+
+    return '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width"></head>'
+        '<style>#E{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:red}</style>'
+        '<body><div id="E"></div>'
+        '<script>'
+        '${Platform.isLinux ? "R=(n,o)=>window.webkit.messageHandlers.msgToNative.postMessage(n+':'+JSON.stringify(o))" : "R=(n,o)=>window.flutter_inappwebview?.callHandler(n,o)"};$js'
+        '</script>'
+        '<script src="$_geetestJsUri" onload="G()" onerror="E()"></script>'
+        '<script src="$_geetestConfigUri?gt=$gt&callback=geetest_$ts" onerror="E()"></script>'
+        '</body></html>';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final html = _buildHtml(widget.gt, widget.challenge);
+
+    if (Platform.isLinux) {
+      return AlertDialog(
+        title: const Text('验证码'),
+        content: SizedBox(
+          width: 300,
+          height: 400,
+          child: LinuxWebview(
+            initialHtml: html,
+            userAgent: BrowserUa.mob,
+            incognito: true,
+            onWebMessageReceived: (msg) {
+              final msgStr = msg.toString();
+              if (msgStr.startsWith("success:")) {
+                final dataStr = msgStr.substring("success:".length);
+                try {
+                  final data = jsonDecode(dataStr);
+                  Get.back(result: data);
+                } catch (e) {
+                  debugPrint('geetest decode error: $e');
+                }
+              } else if (msgStr.startsWith("error:")) {
+                debugPrint('geetest error: $msgStr');
+              } else if (msgStr.startsWith('close:')) {
+                Get.back();
+              }
+            },
+          ),
+        ),
+      );
+    }
+
     return Stack(
       children: [
         InAppWebView(
@@ -140,47 +148,7 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
 
             pageZoom: Platform.isIOS ? 3 : 1,
           ),
-          initialData: InAppWebViewInitialData(
-            data:
-                // 之前的html
-                // '<!DOCTYPE html><html><head></head><body><script src="$_geetestJsUri"></script><script>function R(n,o){flutter_inappwebview.callHandler(n,o)}</script></body></html>',
-                // 铺满InAppWebView防止看不清
-                '''<!DOCTYPE html>
-            <html>
-            <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-              <style>
-                body {
-                  margin: 0;
-                  padding: 10px;
-                  display: flex;
-                  justify-content: center;
-                  align-items: center;
-                  min-height: 100vh;
-                  background-color: white;
-                }
-                #geetest_holder {
-                  width: 80%;
-                  max-width: 280px;
-                  display: flex;
-                  justify-content: center;
-                }
-                .geetest_panel {
-                  width: 100% !important;
-                }
-              </style>
-            </head>
-            <body>
-              <div id="geetest_holder"></div>
-              <script src="$_geetestJsUri"></script>
-              <script>
-                function R(n,o){
-                  flutter_inappwebview.callHandler(n,o)
-                }
-              </script>
-            </body>
-            </html>''',
-          ),
+          initialData: InAppWebViewInitialData(data: html),
           onWebViewCreated: (ctr) {
             ctr
               ..addJavaScriptHandler(
@@ -205,16 +173,6 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
                 handlerName: 'close',
                 callback: (args) => Get.back(),
               );
-          },
-          onLoadStop: (ctr, _) async {
-            final config = await _future;
-            if (!mounted) return;
-            if (config case Success(:final response)) {
-              ctr.evaluateJavascript(source: _showJs(response));
-            } else {
-              config.toast();
-              Get.back();
-            }
           },
         ),
         Positioned(

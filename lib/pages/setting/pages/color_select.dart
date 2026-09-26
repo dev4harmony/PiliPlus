@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:PiliPlus/common/widgets/animated_height.dart';
 import 'package:PiliPlus/common/widgets/color_palette.dart';
 import 'package:PiliPlus/main.dart' show MyApp;
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -7,6 +8,7 @@ import 'package:PiliPlus/models/common/theme/theme_color_type.dart';
 import 'package:PiliPlus/models/common/theme/theme_type.dart';
 import 'package:PiliPlus/pages/home/view.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
+import 'package:PiliPlus/pages/setting/slide_color_picker.dart';
 import 'package:PiliPlus/pages/setting/widgets/popup_item.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
@@ -58,11 +60,18 @@ class _ColorSelectPageState extends State<ColorSelectPage> {
     Get.updateMyAppTheme();
   }
 
+  late ThemeData theme;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    theme = Theme.of(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    TextStyle titleStyle = theme.textTheme.titleMedium!;
-    TextStyle subTitleStyle = theme.textTheme.labelMedium!.copyWith(
+    final titleStyle = theme.textTheme.titleMedium!;
+    final subTitleStyle = theme.textTheme.labelMedium!.copyWith(
       color: theme.colorScheme.outline,
     );
     final size = MediaQuery.sizeOf(context);
@@ -138,58 +147,8 @@ class _ColorSelectPageState extends State<ColorSelectPage> {
               ),
             ),
           Padding(
-            padding: padding,
-            child: AnimatedSize(
-              curve: Curves.easeInOut,
-              alignment: Alignment.topCenter,
-              duration: const Duration(milliseconds: 200),
-              child: Obx(
-                () => ctr.dynamicColor.value
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 22,
-                          runSpacing: 18,
-                          children: colorThemeTypes.mapIndexed(
-                            (index, item) {
-                              return GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () {
-                                  ctr.currentColor.value = index;
-                                  GStorage.setting
-                                      .put(SettingBoxKey.customColor, index)
-                                      .whenComplete(Get.updateMyAppTheme);
-                                },
-                                child: Column(
-                                  spacing: 3,
-                                  children: [
-                                    ColorPalette(
-                                      colorScheme: item.color.asColorSchemeSeed(
-                                        _dynamicSchemeVariant,
-                                        theme.brightness,
-                                      ),
-                                      selected: ctr.currentColor.value == index,
-                                    ),
-                                    Text(
-                                      item.label,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: ctr.currentColor.value != index
-                                            ? theme.colorScheme.outline
-                                            : null,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ).toList(),
-                        ),
-                      ),
-              ),
-            ),
+            padding: padding + const .all(12),
+            child: Obx(_buildColorPanel),
           ),
           Padding(
             padding: padding,
@@ -217,6 +176,109 @@ class _ColorSelectPageState extends State<ColorSelectPage> {
                     .toList(),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorPanel() {
+    final currentColor = ctr.currentColor.value;
+    return AnimatedHeightWidgetExt(
+      expand: !ctr.dynamicColor.value,
+      duration: const Duration(milliseconds: 200),
+      child: Wrap(
+        spacing: 22,
+        runSpacing: 18,
+        alignment: .center,
+        children: [
+          Builder(
+            builder: (context) {
+              final isCurr = currentColor > colorThemeTypes.length;
+              final color = isCurr
+                  ? Color(currentColor)
+                  : colorThemeTypes[currentColor].color;
+              return GestureDetector(
+                behavior: .opaque,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      clipBehavior: .hardEdge,
+                      contentPadding: const .symmetric(vertical: 16),
+                      title: const Text('Color Picker'),
+                      content: SlideColorPicker(
+                        color: color,
+                        onChanged: (Color? color) {
+                          if (color != null) {
+                            final res = color.toARGB32();
+                            ctr.currentColor.value = res;
+                            GStorage.setting
+                                .put(SettingBoxKey.customColor, res)
+                                .whenComplete(Get.updateMyAppTheme);
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                },
+                child: Column(
+                  spacing: 3,
+                  children: [
+                    ColorPalette(
+                      colorScheme: color.asColorSchemeSeed(
+                        _dynamicSchemeVariant,
+                        theme.brightness,
+                      ),
+                      selected: isCurr,
+                    ),
+                    Text(
+                      '自定义',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurr
+                            ? null
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          ...colorThemeTypes.mapIndexed(
+            (i, e) {
+              final color = e.color;
+              final isCurr = currentColor == i;
+              return GestureDetector(
+                behavior: .opaque,
+                onTap: () {
+                  ctr.currentColor.value = i;
+                  GStorage.setting
+                      .put(SettingBoxKey.customColor, i)
+                      .whenComplete(Get.updateMyAppTheme);
+                },
+                child: Column(
+                  spacing: 3,
+                  children: [
+                    ColorPalette(
+                      colorScheme: color.asColorSchemeSeed(
+                        _dynamicSchemeVariant,
+                        theme.brightness,
+                      ),
+                      selected: isCurr,
+                    ),
+                    Text(
+                      e.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurr ? null : theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
