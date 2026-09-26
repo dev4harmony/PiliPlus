@@ -20,6 +20,7 @@ import 'package:PiliPlus/common/widgets/scroll_physics.dart'
 import 'package:PiliPlus/common/widgets/simple_app_bar.dart';
 import 'package:PiliPlus/common/widgets/sliver/video_header.dart';
 import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
+import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
@@ -240,15 +241,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   /// 当前应用生命周期状态
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
-
-  // heroTag 恒非空（兼任 GetX 控制器 tag，toVideoPage 有随机值兜底），只有
-  // 真正被 Hero 包裹的卡片（首页视频卡/番剧卡）会生成带这两个前缀的稳定
-  // tag。其他入口（搜索等）没有源端 Hero，不能包 Hero。
-  late final _enableHero =
-      Pref.enableHeroCoverAnimation &&
-      heroTag is String &&
-      ((heroTag as String).startsWith('video_hero_') ||
-          (heroTag as String).startsWith('pgc_hero_'));
 
   @override
   void initState() {
@@ -1586,31 +1578,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         child: child,
       );
     }
-    Widget result = videoDetailController.plPlayerController.darkVideoPage
+    Widget page = videoDetailController.plPlayerController.darkVideoPage
         ? Theme(data: theme, child: child)
         : child;
-    if (_enableHero) {
-      result = Hero(
-        tag: heroTag,
-        // Hero 动画期间，框架默认把 toHero 的 child 从树中移除（空
-        // SizedBox 占位），详情页整棵子树（含播放器 State）会被 dispose。
-        // 开启「提前加载播放器」时 queryVideoUrl 若在动画期间完成，
-        // _initPlayerIfNeeded 因 videoPlayerKey.currentState 已卸载而跳过
-        // 预初始化且不再重试，导致播放器初始化失败。用占位 Builder 保留
-        // 子树（Offstage 隐藏 + 禁用 Ticker，与框架默认行为一致），让
-        // 播放器 State 在动画期间保持挂载。
-        placeholderBuilder: (context, size, child) => SizedBox(
-          width: size.width,
-          height: size.height,
-          child: Offstage(
-            offstage: true,
-            child: TickerMode(enabled: false, child: child),
-          ),
-        ),
-        child: RepaintBoundary(child: result),
-      );
-    }
-    return result;
+    // 首页卡片触发的一镜到底转场：非卡片入口时内部直接返回 child
+    return VideoPageHeroTarget(tag: heroTag, child: page);
   }
 
   Widget buildTabBar({

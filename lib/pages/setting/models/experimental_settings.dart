@@ -38,7 +38,7 @@ List<SettingsModel> experimentalSettings = [
   ),
   SwitchModel(
     title: '视频封面一镜到底动画',
-    subtitle: '点击视频卡片时封面平滑展开，返回时飞回原位\n仅支持首页的部分视频卡片和番剧/影视卡片',
+    subtitle: '点击首页视频卡片时封面平滑展开，返回时飞回原位\n仅支持首页的视频卡片',
     leading: const Icon(Icons.motion_photos_on_outlined),
     setKey: SettingBoxKey.enableHeroCoverAnimation,
     defaultVal: false,

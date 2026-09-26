@@ -208,6 +208,16 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// [videoPlayerController] instance of Player
   Player? get videoPlayerController => _videoPlayerController;
 
+  /// 底层 Player 是否已不可用。
+  ///
+  /// media_kit 的 NativePlayer 一旦 dispose，任何 API（play/pause/seek/
+  /// setSubtitleTrack…）都会抛 `[Player] has been disposed`。页面退出、
+  /// 换源期间异步链路仍可能继续跑，调用前先用它兜底。
+  bool get playerDisposed {
+    final platform = _videoPlayerController?.platform;
+    return platform == null || (platform is NativePlayer && platform.disposed);
+  }
+
   /// [videoController] instance of Player
   VideoController? get videoController => _videoController;
 
@@ -841,7 +851,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
       if (_playerCount == 0) {
         _removeListeners();
-        await _videoPlayerController?.dispose();
+        await _disposePlayerSafely(_videoPlayerController);
         _videoPlayerController = null;
         _videoController = null;
         return;
@@ -989,7 +999,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       player = await _initPlayer();
       if (_playerCount == 0) {
         _removeListeners();
-        await player.dispose();
+        await _disposePlayerSafely(player);
         player = null;
         _videoController = null;
         return;
@@ -1391,7 +1401,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     Future<void> seek() async {
       if (isSeek) {
         /// 拖动进度条调节时，不等待第一帧，防止抖动
-        await _videoPlayerController?.stream.buffer.first;
+        try {
+          await _videoPlayerController?.stream.buffer.first;
+        } catch (_) {
+          // 播放器在等待期间被销毁/换源：流已关闭（Bad state: No element）
+        }
+        if (_playerCount == 0) return;
       }
       danmakuController?.clear();
       try {
@@ -1421,7 +1436,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       return;
     }
 
-    await _videoPlayerController?.setRate(speed);
+    await _setRate(speed);
     _playbackSpeed.value = speed;
     if (danmakuController != null) {
       try {
@@ -1441,8 +1456,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   // 还原默认速度
   double playSpeedDefault = Pref.playSpeedDefault;
   Future<void> setDefaultSpeed() async {
-    await _videoPlayerController?.setRate(playSpeedDefault);
+    await _setRate(playSpeedDefault);
     _playbackSpeed.value = playSpeedDefault;
+  }
+
+  Future<void> _setRate(double speed) async {
+    if (playerDisposed) return;
+    try {
+      await _videoPlayerController?.setRate(speed);
+    } catch (e) {
+      if (kDebugMode) debugPrint('setRate failed: $e');
+    }
   }
 
   /// 播放视频
@@ -1472,7 +1496,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       } catch (_) {}
     }
 
-    await _videoPlayerController?.play();
+    try {
+      await _videoPlayerController?.play();
+    } catch (e) {
+      // 播放器可能在 seek/音频重建的 await 期间被销毁
+      if (kDebugMode) debugPrint('play failed: $e');
+    }
 
     audioSessionHandler?.setActive(true);
 
@@ -1517,7 +1546,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   Future<void> pause({bool notify = true, bool isInterrupt = false}) async {
     _pauseRequestedByApp = true;
-    await _videoPlayerController?.pause();
+    // 播放器可能在异步链路中被销毁（media_kit 会抛 [Player] has been disposed）
+    try {
+      await _videoPlayerController?.pause();
+    } catch (e) {
+      if (kDebugMode) debugPrint('pause failed: $e');
+    }
     playerStatus.value = PlayerStatus.paused;
 
     // 主动暂停时让出音频焦点
@@ -2073,12 +2107,33 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (kDebugMode) {
       debugPrint('dispose player');
     }
-    await _videoPlayerController?.dispose();
+    // 正在创建数据源/VideoController 时先等它收尾
+    final pending = _setDataSourceQueue;
+    if (pending != null) {
+      try {
+        await pending.timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
+    await _disposePlayerSafely(_videoPlayerController);
     _videoPlayerController = null;
     _videoController = null;
     _instance = null;
     videoPlayerServiceHandler?.clear();
     HarmonyChannel.releaseContinuation(this);
+  }
+
+  /// 销毁底层 Player 前给 OhosVideoController 的在途回调留收尾时间。
+  ///
+  /// 该控制器的 videoParams 回调链会异步回到 Player（SetSurfaceSize 走一次
+  /// 平台通道，随后 setProperty），而它的退订挂在 `Player.platform.release` 上、
+  /// 由 `Player.dispose()` 内部才执行；销毁瞬间若有回调在途，就会命中
+  /// "[Player] has been disposed"（原生侧还可能出现悬空 handle）。
+  Future<void> _disposePlayerSafely(Player? player) async {
+    if (player == null) return;
+    if (_videoController != null) {
+      await Future.delayed(const Duration(milliseconds: 150));
+    }
+    await player.dispose();
   }
 
   static Future<void> updatePlayCount() async {

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:PiliPlus/common/widgets/fractionally_sized_box.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/gallery_viewer.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/hero_dialog_route.dart';
+import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart';
 import 'package:PiliPlus/grpc/im.dart';
 import 'package:PiliPlus/http/dynamics.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -551,8 +552,9 @@ abstract final class PageUtils {
     bool off = false,
     bool isVertical = false,
     Dimension? dimension,
-    String? heroTag,
+    Object? heroTag,
   }) {
+    final tag = heroTag ?? Utils.makeHeroTag(cid ?? bvid ?? aid);
     final arguments = {
       'aid': aid ?? IdUtils.bv2av(bvid!),
       'bvid': bvid ?? IdUtils.av2bv(aid!),
@@ -565,22 +567,32 @@ abstract final class PageUtils {
       'progress': ?progress,
       'videoType': videoType,
       'isVertical': dimension?.isVertical ?? isVertical,
-      'heroTag': heroTag ?? Utils.makeHeroTag(cid),
+      'heroTag': tag,
       ...?extraArguments,
     };
-    if (off) {
-      return Get.offNamed(
-        '/videoV',
-        arguments: arguments,
-        preventDuplicates: false,
-      );
-    } else {
-      return Get.toNamed(
-        '/videoV',
-        arguments: arguments,
-        preventDuplicates: false,
-      );
+    if (!hasPendingVideoCardTransition(tag)) {
+      if (off) {
+        return Get.offNamed(
+          '/videoV',
+          arguments: arguments,
+          preventDuplicates: false,
+        );
+      } else {
+        return Get.toNamed(
+          '/videoV',
+          arguments: arguments,
+          preventDuplicates: false,
+        );
+      }
     }
+    // 由首页卡片触发：走「一镜到底」自定义转场路由
+    final pushed = pushVideoPageTransition(arguments: arguments, off: off);
+    if (pushed != null) return pushed;
+    return Get.toNamed(
+      '/videoV',
+      arguments: arguments,
+      preventDuplicates: false,
+    );
   }
 
   static final _pgcRegex = RegExp(r'(ep|ss)(\d+)');
@@ -637,17 +649,11 @@ abstract final class PageUtils {
     dynamic epId,
     int? progress, // milliseconds
     bool off = false,
-    String? heroTag,
   }) async {
-    // hero动画启用时，隐藏加载Dialog
     try {
-      if (heroTag == null) {
-        SmartDialog.showLoading(msg: '资源获取中');
-      }
+      SmartDialog.showLoading(msg: '资源获取中');
       final res = await SearchHttp.pgcInfo(seasonId: seasonId, epId: epId);
-      if (heroTag == null) {
-        SmartDialog.dismiss();
-      }
+      SmartDialog.dismiss();
       if (res case Success(:final response)) {
         final episodes = response.episodes;
         final hasEpisode = episodes != null && episodes.isNotEmpty;
@@ -669,7 +675,6 @@ abstract final class PageUtils {
               'pgcItem': response,
             },
             off: off,
-            heroTag: heroTag,
           );
         }
 
@@ -719,7 +724,6 @@ abstract final class PageUtils {
               'pgcItem': response,
             },
             off: off,
-            heroTag: heroTag,
           );
           return;
         } else {
@@ -747,16 +751,11 @@ abstract final class PageUtils {
     int? aid,
     int? progress, // milliseconds
     bool off = false,
-    String? heroTag,
   }) async {
     try {
-      if (heroTag == null) {
-        SmartDialog.showLoading(msg: '资源获取中');
-      }
+      SmartDialog.showLoading(msg: '资源获取中');
       final res = await SearchHttp.pugvInfo(seasonId: seasonId, epId: epId);
-      if (heroTag == null) {
-        SmartDialog.dismiss();
-      }
+      SmartDialog.dismiss();
       if (res case Success(:final response)) {
         final episodes = response.episodes;
         if (episodes != null && episodes.isNotEmpty) {
@@ -781,7 +780,6 @@ abstract final class PageUtils {
               'pgcItem': response,
             },
             off: off,
-            heroTag: heroTag,
           );
         } else {
           SmartDialog.showToast('资源加载失败');

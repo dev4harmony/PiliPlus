@@ -168,6 +168,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     }
   }
 
+  /// 亮度事件通道在鸿蒙侧可能下发 null/整数，`.cast<double>()` 会把
+  /// 类型错误抛成全局未捕获异常，这里就地吞掉
+  void _onBrightnessError(Object e) => debugPrint('屏幕亮度事件异常: $e');
+
   void _getSystemBrightness() {
     ScreenBrightnessPlatform.instance.system.then((res) {
       if (mounted) {
@@ -295,13 +299,13 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             _brightnessListener = ScreenBrightnessPlatform
                 .instance
                 .onSystemScreenBrightnessChanged
-                .listen(_onBrightnessChanged);
+                .listen(_onBrightnessChanged, onError: _onBrightnessError);
           } else {
             _getAppBrightness();
             _brightnessListener = ScreenBrightnessPlatform
                 .instance
                 .onApplicationScreenBrightnessChanged
-                .listen(_onBrightnessChanged);
+                .listen(_onBrightnessChanged, onError: _onBrightnessError);
           }
         } catch (e) {
           debugPrint('监听屏幕亮度失败: $e');
@@ -311,11 +315,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                 pluginEventChannelApplicationBrightnessChanged
                     .receiveBroadcastStream()
                     .cast<num>();
-            _harmonyBrightnessChanged!.listen((num value) {
-              if (mounted) {
-                _brightnessValue.value = value.toDouble();
-              }
-            });
+            _harmonyBrightnessSub ??= _harmonyBrightnessChanged!.listen(
+              (num value) {
+                if (mounted) {
+                  _brightnessValue.value = value.toDouble();
+                }
+              },
+              onError: _onBrightnessError,
+            );
           }
         }
       });
@@ -354,6 +361,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   Stream<num>? _harmonyBrightnessChanged;
+  StreamSubscription<num>? _harmonyBrightnessSub;
 
   StreamSubscription<bool>? _harmonyBackPlayingSub;
 
@@ -430,6 +438,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     _doubleTapGestureRecognizer.dispose();
     _scaleGestureRecognizer.dispose();
     _brightnessListener?.cancel();
+    _harmonyBrightnessSub?.cancel();
+    _harmonyBrightnessSub = null;
     _controlsListener?.cancel();
     _animationController.dispose();
     _transformationController.dispose();

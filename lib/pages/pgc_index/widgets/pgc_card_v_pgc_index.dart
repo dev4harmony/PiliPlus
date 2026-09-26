@@ -6,7 +6,6 @@ import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
-import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:material_ui/material_ui.dart';
 
 // 视频卡片 - 垂直布局
@@ -24,14 +23,11 @@ class PgcCardVPgcIndex extends StatelessWidget {
       title: item.title,
       cover: item.cover,
     );
-    final heroTag = Pref.enableHeroCoverAnimation
-        ? 'pgc_hero_${item.seasonId ?? item.cover}'
-        : null;
-    Widget card = Card(
+    return Card(
       shape: const RoundedRectangleBorder(borderRadius: Style.mdRadius),
       child: InkWell(
         borderRadius: Style.mdRadius,
-        onTap: () => PageUtils.viewPgc(seasonId: item.seasonId, heroTag: heroTag),
+        onTap: () => PageUtils.viewPgc(seasonId: item.seasonId),
         onLongPress: onLongPress,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Column(
@@ -76,13 +72,6 @@ class PgcCardVPgcIndex extends StatelessWidget {
         ),
       ),
     );
-    if (heroTag != null) {
-      card = Hero(
-        tag: heroTag,
-        child: RepaintBoundary(child: card),
-      );
-    }
-    return card;
   }
 
   Widget content(BuildContext context) {

@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/stat/stat.dart';
+import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart';
 import 'package:PiliPlus/common/widgets/video_popup_menu.dart';
 import 'package:PiliPlus/http/search.dart';
 import 'package:PiliPlus/models/common/badge_type.dart';
@@ -18,25 +19,97 @@ import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:intl/intl.dart';
 
 // 视频卡片 - 垂直布局
-class VideoCardV extends StatelessWidget {
+class VideoCardV extends StatefulWidget {
   final BaseRcmdVideoItemModel videoItem;
   final VoidCallback? onRemove;
+
+  /// 是否作为「一镜到底」转场的源卡片（仅首页推荐位开启）
+  final bool enableHeroTransition;
 
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
+    this.enableHeroTransition = false,
   });
 
-  Future<void> onPushDetail(String? heroTag) async {
+  static final shortFormat = DateFormat('M-d');
+  static final longFormat = DateFormat('yy-M-d');
+
+  @override
+  State<VideoCardV> createState() => _VideoCardVState();
+}
+
+class _VideoCardVState extends State<VideoCardV> {
+  BaseRcmdVideoItemModel get videoItem => widget.videoItem;
+  VoidCallback? get onRemove => widget.onRemove;
+
+  /// 转场标识：[Utils.makeHeroTag] 带随机后缀，必须只算一次并全程复用，
+  /// 否则卡片与详情页的 tag 对不上，动画不会触发。
+  String? _heroTag;
+
+  /// 取详情页时的底色：只在依赖变化时算一次（原来每帧 build 都要走一遍祖先链）
+  Color? _surfaceColor;
+
+  /// `av` 分支要先异步取 cid，期间重复点击会 push 两个播放页
+  bool _pushing = false;
+
+  bool get _enableHero =>
+      widget.enableHeroTransition && Pref.enableHeroCoverAnimation;
+
+  String _makeHeroTag() =>
+      Utils.makeHeroTag(videoItem.cid ?? videoItem.bvid ?? videoItem.aid);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_enableHero) _heroTag = _makeHeroTag();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_heroTag != null) _surfaceColor = transitionBackgroundOf(context);
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoCardV oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.enableHeroTransition != oldWidget.enableHeroTransition ||
+        !identical(oldWidget.videoItem, videoItem)) {
+      _heroTag = _enableHero ? _makeHeroTag() : null;
+    }
+  }
+
+  Future<void> onPushDetail() async {
+    if (_pushing) return;
+    _pushing = true;
+    // 同 tag 的播放页还在世（刚返回、动画未结束）时不再共用这个 tag：
+    // 否则两个页面共享同一个 GetX 控制器，旧页销毁会把新页的控制器一起删掉
+    final tag = _heroTag;
+    final useHero = tag != null && !isVideoPageTransitionActive(tag);
+    // 记下本卡片的矩形供转场使用（替代卡片上的 onPointerDown Listener）
+    if (useHero) prepareVideoCardTransition(tag, context);
+    try {
+      await _pushDetail(useHero: useHero);
+    } finally {
+      // 转场期间页面矩形之外仍可能漏进触摸，等动画结束再解锁
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _pushing = false;
+      });
+    }
+  }
+
+  Future<void> _pushDetail({required bool useHero}) async {
     switch (videoItem.goto) {
       case 'bangumi':
-        PageUtils.viewPgc(epId: videoItem.param!, heroTag: heroTag);
+        PageUtils.viewPgc(epId: videoItem.param!);
         break;
       case 'av':
         var bvid = videoItem.bvid ?? IdUtils.av2bv(videoItem.aid!);
@@ -64,7 +137,8 @@ class VideoCardV extends StatelessWidget {
             title: videoItem.title,
             isVertical: isVertical,
             dimension: dimension,
-            heroTag: heroTag,
+            // 退化成普通进入时会由 toVideoPage 生成新的随机 tag
+            heroTag: useHero ? _heroTag : null,
           );
         }
         break;
@@ -90,15 +164,10 @@ class VideoCardV extends StatelessWidget {
       cover: videoItem.cover,
       bvid: videoItem.bvid,
     );
-    final heroTag = Pref.enableHeroCoverAnimation
-        ? videoItem.goto == 'bangumi'
-              ? 'pgc_hero_${videoItem.param}'
-              : 'video_hero_${videoItem.cid ?? videoItem.aid ?? videoItem.param}'
-        : null;
     Widget card = Card(
       clipBehavior: Clip.hardEdge,
       child: InkWell(
-        onTap: () => onPushDetail(heroTag),
+        onTap: onPushDetail,
         onLongPress: onLongPress,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Column(
@@ -113,22 +182,11 @@ class VideoCardV extends StatelessWidget {
         ),
       ),
     );
-    if (heroTag != null) {
-      card = Hero(
+    if (_heroTag case final heroTag?) {
+      card = VideoCardHero(
         tag: heroTag,
-        flightShuttleBuilder: videoItem.goto == 'av'
-            ? (flightContext, animation, flightDirection, fromHeroContext,
-                toHeroContext) {
-                // 源卡片 Hero 占位区域宽度 = 卡片宽度 = 封面宽度
-                final size = (fromHeroContext.findRenderObject() as RenderBox?)
-                    ?.size;
-                return _VideoCardShuttle(
-                  videoItem: videoItem,
-                  coverWidth: size?.width,
-                );
-              }
-            : null,
-        child: RepaintBoundary(child: card),
+        surfaceColor: _surfaceColor ??= transitionBackgroundOf(context),
+        child: card,
       );
     }
     return Stack(
@@ -226,9 +284,6 @@ class VideoCardV extends StatelessWidget {
     );
   }
 
-  static final shortFormat = DateFormat('M-d');
-  static final longFormat = DateFormat('yy-M-d');
-
   Widget videoStat(BuildContext context, ThemeData theme) {
     return Row(
       children: [
@@ -248,8 +303,8 @@ class VideoCardV extends StatelessWidget {
           Text(
             DateFormatUtils.dateFormat(
               videoItem.pubdate,
-              short: shortFormat,
-              long: longFormat,
+              short: VideoCardV.shortFormat,
+              long: VideoCardV.longFormat,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -278,49 +333,6 @@ class VideoCardV extends StatelessWidget {
         //   const SizedBox(width: 2),
         // ]
       ],
-    );
-  }
-}
-
-/// Hero 飞行物：仅包含圆角卡片底层、封面。
-/// 飞行封面与卡片封面复用同一缓存
-class _VideoCardShuttle extends StatelessWidget {
-  const _VideoCardShuttle({
-    required this.videoItem,
-    this.coverWidth,
-  });
-
-  final BaseRcmdVideoItemModel videoItem;
-  final double? coverWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    final double width = coverWidth ?? 200;
-    final double height = width / Style.aspectRatio;
-    return Card(
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: Style.aspectRatio,
-            child: FittedBox(
-              fit: BoxFit.cover,
-              clipBehavior: Clip.hardEdge,
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: NetworkImgLayer(
-                  src: videoItem.cover,
-                  width: width,
-                  height: height,
-                  borderRadius: BorderRadius.zero,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -145,6 +145,7 @@ class _RcmdPageState extends State<RcmdPage>
                         '${item.goto}_${item.bvid ?? item.param ?? item.uri}',
                       ),
                       videoItem: item,
+                      enableHeroTransition: true,
                       onRemove: () {
                         if (controller.lastRefreshAt != null &&
                             actualIndex < controller.lastRefreshAt!) {
@@ -163,6 +164,7 @@ class _RcmdPageState extends State<RcmdPage>
                         '${item.goto}_${item.bvid ?? item.param ?? item.uri}',
                       ),
                       videoItem: item,
+                      enableHeroTransition: true,
                       onRemove: () => controller.loadingState
                         ..value.data!.remove(item)
                         ..refresh(),

@@ -7,6 +7,8 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/common/widgets/progress_bar/segment_progress_bar.dart';
 import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
+import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart'
+    show waitForVideoPageEntry;
 import 'package:PiliPlus/grpc/bilibili/app/listener/v1.pbenum.dart'
     show PlaylistSource;
 import 'package:PiliPlus/grpc/dm.dart';
@@ -939,11 +941,16 @@ class VideoDetailController extends GetxController
     bool fromReset = false,
     bool autoFullScreenFlag = false,
   }) async {
+    if (isClosed || isQuerying || _awaitingPageEntry) return;
+    // 首页卡片一镜到底：等页面入场动画接近完成再取流/初始化播放器。
+    // 等待期间要占住闸门，否则并发调用会各跑一遍 _queryVideoUrl。
+    _awaitingPageEntry = true;
+    final entered = await waitForVideoPageEntry(heroTag);
+    _awaitingPageEntry = false;
+    // 等待期间页面可能已关闭，或入场被打断（正在返回）
+    if (isClosed || !entered || isQuerying) return;
     if (isFileSource) {
       return _initPlayerIfNeeded(autoFullScreenFlag);
-    }
-    if (isQuerying) {
-      return;
     }
     isQuerying = true;
     try {
@@ -956,6 +963,8 @@ class VideoDetailController extends GetxController
       }
     }
   }
+
+  bool _awaitingPageEntry = false;
 
   @pragma('vm:prefer-inline')
   Future<void> _queryVideoUrl(bool fromReset, bool autoFullScreenFlag) async {
@@ -1159,8 +1168,10 @@ class VideoDetailController extends GetxController
 
   // 设定字幕轨道
   Future<void> setSubtitle(int index) async {
+    // 换集/退出期间本方法里有多处 await，播放器随时可能已被销毁
+    if (isClosed || plPlayerController.playerDisposed) return;
     if (index <= 0) {
-      await plPlayerController.videoPlayerController?.setSubtitleTrack(.no());
+      await _setSubtitleTrack(.no());
       vttSubtitlesIndex.value = index;
       return;
     }
@@ -1176,7 +1187,7 @@ class VideoDetailController extends GetxController
         if (!file.existsSync()) {
           await file.writeAsString(subtitle.id);
           try {
-            plPlayerController.videoPlayerController!.platform?.release.add(
+            plPlayerController.videoPlayerController?.platform?.release.add(
               file.tryDel,
             );
           } catch (_) {
@@ -1185,7 +1196,7 @@ class VideoDetailController extends GetxController
           }
         }
       }
-      await plPlayerController.videoPlayerController?.setSubtitleTrack(
+      await _setSubtitleTrack(
         SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
       );
       vttSubtitlesIndex.value = index;
@@ -1203,6 +1214,16 @@ class VideoDetailController extends GetxController
         vttSubtitles[index - 1] = subtitle;
         await setSub(subtitle);
       }
+    }
+  }
+
+  /// 设置字幕轨道；播放器可能在 await 之后已被销毁
+  Future<void> _setSubtitleTrack(SubtitleTrack track) async {
+    if (plPlayerController.playerDisposed) return;
+    try {
+      await plPlayerController.videoPlayerController?.setSubtitleTrack(track);
+    } catch (e) {
+      if (kDebugMode) debugPrint('setSubtitleTrack failed: $e');
     }
   }
 
