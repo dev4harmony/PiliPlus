@@ -11,7 +11,6 @@ import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:os_type/os_type.dart';
 
 class RcmdPage extends StatefulWidget {
   const RcmdPage({super.key});
@@ -74,7 +73,7 @@ class _RcmdPageState extends State<RcmdPage>
     super.build(context);
     final colorScheme = ColorScheme.of(context);
     return Container(
-      clipBehavior: OS.isHarmony ? Clip.none : Clip.hardEdge,
+      clipBehavior: Clip.hardEdge,
       margin: const EdgeInsets.symmetric(horizontal: Style.safeSpace),
       decoration: const BoxDecoration(borderRadius: Style.mdRadius),
       child: NativeTopRefreshIndicator(
