@@ -20,7 +20,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 2.1.5+6098
 
 environment:
-  sdk: ">=3.11.1"
+  sdk: ">=3.12.2"
   flutter: ">=3.44.9" # match installed OHOS SDK
 
 # Dependencies specify other packages that your package needs in order to work.

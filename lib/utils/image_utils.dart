@@ -179,7 +179,8 @@ abstract final class ImageUtils {
         }
         await SaverGallery.saveFiles(saveList, skipIfExists: false);
       } else {
-        final dst = await FilePicker.getDirectoryPath();
+        // 鸿蒙适配 fork 仅提供 FilePicker.platform 实例方法
+        final dst = await FilePicker.platform.getDirectoryPath();
         if (dst == null) {
           SmartDialog.showToast('取消保存');
           return false;

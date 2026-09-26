@@ -7,7 +7,7 @@ import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/storage_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker_ohos/file_picker_ohos.dart';
 import 'package:flutter/services.dart' show Clipboard;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get_core/src/get_main.dart';
@@ -117,12 +117,13 @@ Future<void> importFromClipBoard<T>(
 Future<void> importFromLocalFile<T>({
   required FutureOr<void> Function(T json) onImport,
 }) async {
-  final result = await FilePicker.pickFile(
-    type: .custom,
+  // 鸿蒙适配 fork 仅提供 FilePicker.platform 实例方法
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
     allowedExtensions: const ['json', 'txt'],
   );
-  if (result != null) {
-    final data = await result.xFile.readAsString();
+  if (result?.files.firstOrNull case final file?) {
+    final data = await file.xFile.readAsString();
     final T json;
     try {
       json = jsonDecode(data);

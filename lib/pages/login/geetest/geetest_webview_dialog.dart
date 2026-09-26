@@ -1,6 +1,7 @@
 import 'dart:convert' show jsonDecode;
 import 'dart:io' show Platform;
 
+import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/main.dart';
 import 'package:PiliPlus/plugin/linux_webview.dart';
@@ -29,6 +30,29 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
   static const _geetestJsUri =
       'https://static.geetest.com/static/js/fullpage.0.0.0.js';
   static const _geetestConfigUri = 'https://api.geetest.com/gettype.php';
+
+  late final double _previousScaleFactor;
+
+  @override
+  void initState() {
+    super.initState();
+    // CPF适配的Flutter在鸿蒙环境下对于flutter应用内调整了缩放比例（非1.0）的情况下platformview的视图大小会出现异常，非hcpp模式下会导致触摸漂移
+    // 需要主动调整缩放比例规避问题
+    _previousScaleFactor = ScaledWidgetsFlutterBinding.instance.scaleFactor;
+    if (_previousScaleFactor != 1.0) {
+      ScaledWidgetsFlutterBinding.instance.scaleFactor = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    // CPF适配的Flutter在鸿蒙环境下对于flutter应用内调整了缩放比例（非1.0）的情况下platformview的视图大小会出现异常，非hcpp模式下会导致触摸漂移
+    // 需要主动调整缩放比例规避问题
+    if (_previousScaleFactor != 1.0) {
+      ScaledWidgetsFlutterBinding.instance.scaleFactor = _previousScaleFactor;
+    }
+    super.dispose();
+  }
 
   static String _buildHtml(String gt, String challenge) {
     final ts = DateTime.now().millisecondsSinceEpoch;

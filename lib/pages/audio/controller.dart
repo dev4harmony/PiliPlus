@@ -457,8 +457,8 @@ class AudioController extends GetxController
       if (_suppressPauseReport) return;
       if (_playerStatus == .paused &&
           _autoContinue &&
-          duration.value > 2 &&
-          position.value >= duration.value - 2) {
+          this.duration.value > 2 &&
+          this.position.value >= this.duration.value - 2) {
         return;
       }
     }
