@@ -281,7 +281,12 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     Widget player = Obx(
       key: playerKey,
       () {
-        if (_liveRoomController.isLoaded.value && plPlayerController.isLive) {
+        // videoController 必须一起判断：取流成功不等于播放器已就绪
+        // （setDataSource 内部失败/播放器已被释放时仍然会置 isLoaded），
+        // 此时挂载 PLVideoPlayer 会在内部空断言里崩掉整个直播页。
+        if (_liveRoomController.isLoaded.value &&
+            plPlayerController.isLive &&
+            plPlayerController.videoController != null) {
           final roomInfoH5 = _liveRoomController.roomInfoH5.value;
           return PLVideoPlayer(
             maxWidth: width,

@@ -140,7 +140,13 @@ class PLVideoPlayer extends StatefulWidget {
 class _PLVideoPlayerState extends State<PLVideoPlayer>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late AnimationController _animationController;
-  late VideoController videoController;
+
+  /// 底层播放器控制器。直接向 controller 取值并允许为空：播放器可能在本页挂
+  /// 载之后才就绪，也可能在换源/退后台清内存时先一步被释放。为空时 [build] 只
+  /// 渲染空占位，等 controller 变化（Rx 通知父级守卫重建）后再渲染视频层，
+  /// 而不是在 initState 里空断言打崩整个播放页。
+  VideoController? get videoController => plPlayerController.videoController;
+
   late final CommonIntroController introController = widget.introController!;
   late final VideoDetailController videoDetailController =
       widget.videoDetailController!;
@@ -280,7 +286,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    videoController = plPlayerController.videoController!;
 
     if (PlatformUtils.isMobile) {
       Future.microtask(() {
@@ -1412,6 +1417,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   @override
   Widget build(BuildContext context) {
+    final controller = videoController;
+    if (controller == null) {
+      // 播放器已被释放（换源、退后台清内存）或尚未就绪。父级守卫正常情况下
+      // 不会在此时挂载本页，但重建与挂载之间仍可能被释放，这里退化为空占位。
+      return const SizedBox.shrink();
+    }
     maxWidth = widget.maxWidth;
     maxHeight = widget.maxHeight;
     final isFullScreen = this.isFullScreen;
@@ -1477,7 +1488,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                       ),
                     ),
                     child: SubtitleView(
-                      controller: videoController,
+                      controller: controller,
                       configuration: SubtitleViewConfiguration(
                         // 去掉 SubtitleView 内部 padding，外部手动管理
                         padding: EdgeInsets.zero,
@@ -2179,7 +2190,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                           const SubtitleViewConfiguration(
                             visible: false,
                           ),
-                      controller: plPlayerController.videoController!,
+                      controller: videoController!,
                       fill: widget.fill,
                       fit: videoFit.boxFit,
                       aspectRatio: videoFit.aspectRatio,

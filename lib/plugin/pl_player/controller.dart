@@ -72,7 +72,13 @@ typedef PlayCallback = Future<void>? Function();
 
 class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Player? _videoPlayerController;
-  VideoController? _videoController;
+
+  /// 播放器控制器。用 Rx 承载而不是普通字段：它的创建/释放都发生在异步链路
+  /// 里（换源、初始化失败、退后台清内存），与页面「可以开始播放」的时机并不同
+  /// 步。页面侧靠 `videoController == null` 决定是否挂载 PLVideoPlayer，普通字
+  /// 段的变化读不到，守卫就会在控制器为空时把播放器视图挂上去，命中
+  /// `_PLVideoPlayerState.initState` 里的空断言而整页报错。
+  final Rxn<VideoController> _videoControllerNotifier = Rxn<VideoController>();
 
   static PlPlayerController? _instance;
 
@@ -217,7 +223,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   /// [videoController] instance of Player
-  VideoController? get videoController => _videoController;
+  VideoController? get videoController => _videoControllerNotifier.value;
 
   bool isMuted = false;
 
@@ -855,7 +861,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         _removeListeners();
         await _disposePlayerSafely(_videoPlayerController);
         _videoPlayerController = null;
-        _videoController = null;
+        _videoControllerNotifier.value = null;
         return;
       }
 
@@ -961,9 +967,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       pp.setProperty(o.key, o.value);
     }
 
-    assert(_videoController == null);
+    assert(videoController == null);
 
-    _videoController = VideoController(
+    _videoControllerNotifier.value = VideoController(
       player,
       configuration: VideoControllerConfiguration(
         enableHardwareAcceleration: hwdec != null,
@@ -1002,7 +1008,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         _removeListeners();
         await _disposePlayerSafely(player);
         player = null;
-        _videoController = null;
+        _videoControllerNotifier.value = null;
         return;
       }
       _videoPlayerController = player;
@@ -2134,7 +2140,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     await _disposePlayerSafely(_videoPlayerController);
     _videoPlayerController = null;
-    _videoController = null;
+    _videoControllerNotifier.value = null;
     _instance = null;
     videoPlayerServiceHandler?.clear();
     HarmonyChannel.releaseContinuation(this);
@@ -2148,7 +2154,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// "[Player] has been disposed"（原生侧还可能出现悬空 handle）。
   Future<void> _disposePlayerSafely(Player? player) async {
     if (player == null) return;
-    if (_videoController != null) {
+    if (videoController != null) {
       await Future.delayed(const Duration(milliseconds: 150));
     }
     await player.dispose();
