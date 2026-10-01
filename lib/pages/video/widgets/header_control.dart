@@ -542,37 +542,45 @@ class HeaderControlState extends State<HeaderControl>
                   child: Row(
                     spacing: 10,
                     children: [
-                      Obx(
-                        () {
-                          final flipX = plPlayerController.flipX.value;
-                          return ActionRowLineItem(
-                            iconData: Icons.flip,
-                            onTap: () =>
-                                plPlayerController.flipX.value = !flipX,
-                            text: " 左右翻转 ",
-                            selectStatus: flipX,
-                          );
-                        },
-                      ),
-                      Obx(
-                        () {
-                          final flipY = plPlayerController.flipY.value;
-                          return ActionRowLineItem(
-                            icon: Icon(
-                              CustomIcons.flip_rotate_90,
-                              size: 13,
-                              color: flipY
-                                  ? theme.colorScheme.onSecondaryContainer
-                                  : theme.colorScheme.outline,
-                            ),
-                            onTap: () {
-                              plPlayerController.flipY.value = !flipY;
-                            },
-                            text: " 上下翻转 ",
-                            selectStatus: flipY,
-                          );
-                        },
-                      ),
+                      // 翻转是 Flutter 侧的 Transform.flip（绘制期变换）。走平台
+                      // 视图（鸿蒙 HDR）时视频不由 Flutter 绘制，而是 RenderService
+                      // 合成在 Flutter 表面之下，这个变换对它无效——按钮会点了没反应。
+                      // 与其留一个静默失效的开关，不如在该模式下不显示。
+                      // 这里不放进 Obx：面板打开期间不会切换渲染路径
+                      //（进出全屏 / 画中画都会先收起面板），读一次即可。
+                      if (!plPlayerController.usePlatformViewRx.value) ...[
+                        Obx(
+                          () {
+                            final flipX = plPlayerController.flipX.value;
+                            return ActionRowLineItem(
+                              iconData: Icons.flip,
+                              onTap: () =>
+                                  plPlayerController.flipX.value = !flipX,
+                              text: " 左右翻转 ",
+                              selectStatus: flipX,
+                            );
+                          },
+                        ),
+                        Obx(
+                          () {
+                            final flipY = plPlayerController.flipY.value;
+                            return ActionRowLineItem(
+                              icon: Icon(
+                                CustomIcons.flip_rotate_90,
+                                size: 13,
+                                color: flipY
+                                    ? theme.colorScheme.onSecondaryContainer
+                                    : theme.colorScheme.outline,
+                              ),
+                              onTap: () {
+                                plPlayerController.flipY.value = !flipY;
+                              },
+                              text: " 上下翻转 ",
+                              selectStatus: flipY,
+                            );
+                          },
+                        ),
+                      ],
                       if ((isFileSource &&
                               !(plPlayerController.dataSource as FileSource)
                                   .isMp4) ||

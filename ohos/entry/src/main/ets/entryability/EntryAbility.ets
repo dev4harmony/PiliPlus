@@ -95,6 +95,9 @@ export default class EntryAbility extends FlutterAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam) {
     AppStorage.setOrCreate('shellBarsHidden', false);
     AppStorage.setOrCreate('__scrollHidden', false);
+    // AppStorage 跟随进程：Ability 重建时清掉上次残留的 HDR 平台视图状态，
+    // 否则根 Stack 会带着黑底启动。
+    AppStorage.setOrCreate('platformVideoActive', false);
 
     // 快捷方式拉起（冷启动）
     this.injectShortcutUri(want);

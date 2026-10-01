@@ -14,6 +14,7 @@ import 'package:PiliPlus/media_kit_adapt/media_kit_adapt.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/audio_normalization.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
+import 'package:PiliPlus/models/common/video/video_quality.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
@@ -26,10 +27,13 @@ import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/duration.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
+import 'package:PiliPlus/plugin/pl_player/models/ohos_hdr_output.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
+import 'package:PiliPlus/plugin/pl_player/utils/platform_video_backdrop.dart';
+import 'package:PiliPlus/plugin/pl_player/utils/player_rebuild_queue.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
@@ -79,6 +83,41 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 段的变化读不到，守卫就会在控制器为空时把播放器视图挂上去，命中
   /// `_PLVideoPlayerState.initState` 里的空断言而整页报错。
   final Rxn<VideoController> _videoControllerNotifier = Rxn<VideoController>();
+
+  /// 渲染路径（平台视图 / 纹理）切换时 VideoController 会被整体替换，而它是
+  /// 普通字段，替换不会触发任何 Obx 重建 —— 于是 UI 继续持有已 dispose 的旧
+  /// controller（画面全黑、按钮卡死）。用下面两个 Rx 把替换广播出去。
+  final RxInt playerGeneration = 0.obs;
+  final RxBool usePlatformViewRx = false.obs;
+
+  /// [usePlatformViewRx] 的唯一写入口，同时把平台视图状态同步给 ArkTS
+  /// （Index.ets 根 Stack 据此把黑边涂黑）。见 [PlatformVideoBackdrop]。
+  late final PlatformVideoBackdrop _platformVideoBackdrop =
+      PlatformVideoBackdrop(
+        rx: usePlatformViewRx,
+        enabled: _isOhos,
+        isAlive: () => _playerCount > 0,
+      );
+
+  /// setDataSource 与渲染路径重建共用的串行队列，见 [PlayerRebuildQueue]。
+  late final PlayerRebuildQueue _playerQueue = PlayerRebuildQueue(
+    hasPlayer: () => _videoPlayerController != null,
+    isStale: () =>
+        _usesPlatformView != usePlatformView || _appliedHdrMode != ohosHdrMode,
+    rebuild: _rebuildForRenderPath,
+    onError: _onRenderPathRebuildFailed,
+  );
+
+  /// 渲染路径重建**完成**后自增（新播放器已经 open 好）。
+  ///
+  /// 与 [playerGeneration] 的区别很重要：[playerGeneration] 在 VideoController
+  /// 刚被替换时就自增，供 UI 尽快改挂新 controller，那时 `player.open()` 还没
+  /// 调用；这时候去设字幕轨之类的东西会被随后的 loadfile 丢掉。页面级、需要
+  /// 播放器真正就绪的重挂逻辑要订阅这一个。
+  ///
+  /// 只在 [_rebuildForRenderPath] 里自增——正常的 setDataSource 流程有 onInit 收口，
+  /// 不需要也不应该重复触发。
+  final RxInt playerRebuilt = 0.obs;
 
   static PlPlayerController? _instance;
 
@@ -451,6 +490,81 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   bool enableHeart = true;
   late final String? hwdec = Pref.enableHA ? Pref.hardwareDecoding : null;
 
+  late final bool enableHDR = Pref.enableHDR;
+
+  /// 当前播放源的画质，用于判断是否为 HDR 片源。由 [setDataSource] 传入。
+  VideoQuality? _hdrQuality;
+
+  static final bool _isOhos = Platform.operatingSystem == 'ohos';
+
+  /// 面板**明确**不支持任何 HDR 格式时不进 HDR 路径：既不该发 HDR 信令，也不
+  /// 该按 [_displayPeakNits] 去标定一块 SDR 屏。能力未知（查询失败 / 老版本
+  /// 原生侧没有这个 method）时按支持处理，免得一次偶发失败就把 HDR 关掉。
+  bool get _isHDRPlayback =>
+      enableHDR &&
+      (_hdrQuality?.isHDR ?? false) &&
+      !HarmonyChannel.displayHasNoHdr;
+
+  /// 鸿蒙上 HDR 必须走平台视图（XComponent）渲染。
+  ///
+  /// Flutter 纹理会把视频重采样进 Flutter 自己的 SDR 合成层，libmpv 挂在
+  /// NativeWindow 上的色域与 HDR 元数据在这一步就丢了，系统因此不会进入 HDR
+  /// 模式（没有峰值亮度，PQ 画面被按 sRGB 显示所以颜色也不对）。
+  /// 仅在**全屏**下使用平台视图。
+  ///
+  /// 平台视图由 RenderService 合成在 Flutter 表面「之下」，因此视频区域上方的
+  /// 每一层 Flutter 都必须透明。全屏时整屏都是播放器，做得到；内嵌时视频只是
+  /// 页面的一小块，要露出它就得在页面各层上按视频矩形抠一个透明洞
+  /// （BlendMode.clear），会波及顶栏 / 简介 / 评论等共用布局。
+  /// 所以内嵌时回退到纹理路径（几何正确但没有 HDR），全屏时才走平台视图。
+  /// 没有开关：关掉平台视图等于关掉 HDR（元数据会在 Flutter 纹理那一步丢光），
+  /// 所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。
+  /// 画中画要排除：PiP 是另一块 XComponent（FloatingPlugin 会把 Flutter 引擎
+  /// 重新 attach 上去），平台视图不会跟过去，留在平台视图路径上的结果是 PiP
+  /// 窗口里一片空白。退回纹理路径至少画面还在，只是没有 HDR。
+  bool get usePlatformView =>
+      _isOhos && _isHDRPlayback && isFullScreen.value && !isPipMode;
+
+  /// 当前 VideoController 实际使用的渲染路径，用于判断是否需要重建播放器。
+  bool _usesPlatformView = false;
+
+  /// 当前播放器实际带着的 `--ohos-hdr-mode`。
+  ///
+  /// 这个属性只在创建 Player 时写一次，之后改不了。两档 HDR 之间切换（例如
+  /// 杜比视界 → HDR10）渲染路径并没有变，只看 [_usesPlatformView] 会以为无事
+  /// 发生，于是新片源顶着上一档的信令上屏，类型报错。
+  String? _appliedHdrMode;
+
+  /// 色调映射用的目标屏幕峰值亮度（nit），取自设置「HDR 峰值亮度」。
+  ///
+  /// 鸿蒙没有公开查询面板峰值亮度的接口（`display` 只给得出支持哪些 HDR
+  /// 格式），所以由用户按屏幕参数填写，默认 1600（按 SLM-W32 标定）。
+  /// 它随 VideoController 的配置一起下发，只在创建播放器时读取：改了设置从
+  /// 下一次重建播放器（重新打开视频，或 HDR 片源进出全屏）起生效。
+  ///
+  /// 只在平台视图输出 HDR 时才会用上，规则见 [OhosHdrOutput.targetPeak]。
+  static int get _displayPeakNits => Pref.hdrPeakNits;
+
+  /// 传给 mpv 的 `--ohos-hdr-mode`，规则见 [OhosHdrOutput.mode]。
+  String? get ohosHdrMode => _isOhos
+      ? OhosHdrOutput.mode(
+          quality: _hdrQuality,
+          hdrPlayback: _isHDRPlayback,
+          platformView: usePlatformView,
+          displayMaySupportVivid: HarmonyChannel.displayMaySupportHdrVivid,
+          displaySupportsVivid: HarmonyChannel.displaySupportsHdrVivid,
+        )
+      : null;
+
+  /// 传给 mpv 的 `--target-peak`，规则见 [OhosHdrOutput.targetPeak]。
+  double? get ohosHdrTargetPeak => _isOhos
+      ? OhosHdrOutput.targetPeak(
+          hdrPlayback: _isHDRPlayback,
+          platformView: usePlatformView,
+          peakNits: _displayPeakNits,
+        )
+      : null;
+
   late final progressType = Pref.btmProgressBehavior;
   late final enableQuickDouble = Pref.enableQuickDouble;
   late final fullScreenGestureReverse = Pref.fullScreenGestureReverse;
@@ -754,17 +868,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     VoidCallback? onInit,
     Volume? volume,
     bool autoFullScreenFlag = false,
+    // 当前片源画质，用于判断是否需要按 HDR 输出
+    VideoQuality? quality,
   }) {
-    final previous = _setDataSourceQueue;
-    final run = () async {
-      if (previous != null) {
-        try {
-          await previous;
-        } catch (_) {
-          // 前一个初始化失败不阻塞本次
-        }
-      }
-      await _setDataSource(
+    return _playerQueue.run(
+      () => _setDataSource(
         dataSource,
         isLive: isLive,
         autoplay: autoplay,
@@ -784,14 +892,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         onInit: onInit,
         volume: volume,
         autoFullScreenFlag: autoFullScreenFlag,
-      );
-    }();
-    _setDataSourceQueue = run;
-    return run;
+        quality: quality,
+      ),
+    );
   }
-
-  /// setDataSource 串行队列尾；同一时刻仅一个初始化流程在执行
-  Future<void>? _setDataSourceQueue;
 
   Future<void> _setDataSource(
     DataSource dataSource, {
@@ -817,6 +921,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     VoidCallback? onInit,
     Volume? volume,
     bool autoFullScreenFlag = false,
+    // 当前片源画质，用于判断是否需要按 HDR 输出
+    VideoQuality? quality,
   }) async {
     try {
       _processing = true;
@@ -836,6 +942,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       _epid = epid;
       _seasonId = seasonId;
       _pgcType = pgcType;
+      // 必须在创建 VideoController 之前赋值：输出方式（平台视图 / HDR 信令）
+      // 在播放器初始化时就要确定。
+      _hdrQuality = quality;
       if (!isLive && bvid != null && cid != null) {
         HarmonyChannel.holdContinuation(this);
       } else {
@@ -975,6 +1084,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         enableHardwareAcceleration: hwdec != null,
         androidAttachSurfaceAfterVideoParameters: false,
         hwdec: hwdec,
+        usePlatformView: usePlatformView,
+        ohosHdrMode: ohosHdrMode,
+        ohosHdrTargetPeak: ohosHdrTargetPeak,
       ),
     );
     // await player.setAudioTrack(.auto());
@@ -994,15 +1106,46 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Future<void> _createVideoController(
     DataSource dataSource,
     Duration? seekTo,
-    Volume? volume,
-  ) async {
+    Volume? volume, {
+    // 渲染路径重建是同一个片源接着播，屏上的弹幕和心跳进度都要留着
+    bool isRebuild = false,
+  }) async {
     isBuffering.value = false;
-    _heartDuration = 0;
-    danmakuController?.clear();
+    if (!isRebuild) {
+      _heartDuration = 0;
+      danmakuController?.clear();
+    }
 
     var player = _videoPlayerController;
 
+    // 渲染路径（平台视图 / 纹理）和 HDR 信令都在 VideoController 创建时就固定
+    // 了，改不了。所以两者任一发生变化都必须重建播放器：
+    //  - 渲染路径变了还不重建：切到 HDR 片源后仍停在纹理路径，HDR 不会触发；
+    //  - 只有信令变了（例如杜比视界 → HDR10，两者都走平台视图）还不重建：
+    //    新片源会顶着上一档的 --ohos-hdr-mode 上屏，类型报错。
+    if (player != null &&
+        (_usesPlatformView != usePlatformView ||
+            _appliedHdrMode != ohosHdrMode)) {
+      _removeListeners();
+      await _disposePlayerSafely(player);
+      player = null;
+      _videoPlayerController = null;
+      _videoControllerNotifier.value = null;
+    }
+
     if (player == null) {
+      _usesPlatformView = usePlatformView;
+      _appliedHdrMode = ohosHdrMode;
+      // 唯一写入口：顺带同步给 ArkTS，平台视图模式下根 Stack 才会是黑的。
+      // 不要改成 await，原因见 PlatformVideoBackdrop.update。
+      _platformVideoBackdrop.update(usePlatformView);
+      if (usePlatformView) {
+        // 平台视图下 Transform.flip 不起作用（视频不由 Flutter 绘制），翻转
+        // 开关也因此不显示。留着已置位的 flipX/flipY 会变成一个用户既看不到
+        // 效果、又没有入口关掉的状态，切进来时直接清掉。
+        flipX.value = false;
+        flipY.value = false;
+      }
       player = await _initPlayer();
       if (_playerCount == 0) {
         _removeListeners();
@@ -1012,6 +1155,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         return;
       }
       _videoPlayerController = player;
+      // videoController 由 _initPlayer() 赋值，此处两者均已就绪，可以广播。
+      // 注意不要放进上面 _playerCount == 0 的提前返回分支：那里播放器已被
+      // dispose，videoController 是 null。
+      playerGeneration.value++;
       if (isAnim && superResolutionType.value != .disable) {
         await setShader();
       }
@@ -1174,7 +1321,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       // isPipMode 是普通 bool，build 读它不产生依赖；PiP 结束时若窗口尺寸
       // 恰好没变（如画中画期间从应用栏以小窗打开 app），没有任何重建时机，
       // 页面会冻结在画中画布局。用回调驱动 pipModeRx，页面据此重建。
-      Floating().onPipModeChanged = (v) => pipModeRx.value = v;
+      Floating().onPipModeChanged = (v) {
+        pipModeRx.value = v;
+        // 画中画是另一块 XComponent，平台视图不会跟过去（PiP 窗口里一片空白），
+        // 回到应用时也要切回来。渲染路径在 VideoController 创建时固定，
+        // 只能重建播放器。
+        unawaited(_syncRenderPath());
+      };
       pipModeRx.value = Floating().isPipMode;
     }
     final stream = player.stream;
@@ -1934,7 +2087,59 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     } finally {
       _setFullScreen(status);
       _fsProcessing = false;
+      // 进出全屏会改变 usePlatformView，渲染路径在 VideoController 创建时就
+      // 固定了，因此必须重建播放器。放在 _fsProcessing 复位之后，避免重建
+      // 期间的状态回调被全屏流程吞掉。
+      unawaited(_syncRenderPath());
     }
+  }
+
+  /// 渲染路径（平台视图 / 纹理）或 HDR 信令变化时重建播放器。
+  ///
+  /// 与 setDataSource 排在同一条队列里，是否真要重建到了队头才判断，
+  /// 见 [PlayerRebuildQueue]。
+  Future<void> _syncRenderPath() async {
+    if (!_isOhos) return;
+    await _playerQueue.requestRebuild();
+  }
+
+  /// 按当前渲染路径重建播放器，保留进度、播放状态与倍速。
+  /// 只由 [_playerQueue] 调用，失败向上抛，由它记下待重试。
+  Future<void> _rebuildForRenderPath() async {
+    // 上一次重建失败后，重试可能落在页面已经销毁之后
+    if (_playerCount == 0) return;
+    final wasPlaying = playerStatus.isPlaying;
+    // 不能只信 state.position：open() 会把它清零，全屏切换恰好落在「新播放器
+    // 刚建好、mpv 还没上报 time-pos」的窗口里时读到的就是 0，一重建就从头播，
+    // 还会把 0 当成观看进度写回历史。position（秒）由监听器维护，可以兜底。
+    final live = positionInMilliseconds;
+    final pos = live > 0
+        ? Duration(milliseconds: live)
+        : Duration(seconds: position.value);
+    await _createVideoController(dataSource, pos, null, isRebuild: true);
+    if (_videoPlayerController == null) return;
+    // 重建出来的是一个全新的 Player，倍速回到了默认值 1.0，而 UI 上的
+    // _playbackSpeed 没变——不重新应用就会「显示 2.0x，实际 1.0x」。
+    // 注意不要直接调 _initializePlayer()：它带 _autoPlay 分支，会把用户
+    // 手动暂停的视频重新播起来。
+    if (!isLive && _videoPlayerController!.state.rate != _playbackSpeed.value) {
+      await setPlaybackSpeed(_playbackSpeed.value);
+    }
+    if (wasPlaying) {
+      await play();
+    }
+    // 到这里新播放器已经 open 完毕，页面才能安全地重挂字幕轨、
+    // SponsorBlock 这些绑在 Player 上的东西。见 [playerRebuilt]。
+    playerRebuilt.value++;
+  }
+
+  void _onRenderPathRebuildFailed(Object error, StackTrace stackTrace) {
+    if (kDebugMode) {
+      debugPrint(stackTrace.toString());
+      debugPrint('_rebuildForRenderPath failed: $error');
+    }
+    // 旧播放器多半已经 dispose，画面是黑的；下一次进出全屏会重试。
+    SmartDialog.showToast('切换播放画面失败，进出全屏可重试');
   }
 
   /// 等待平台视口旋转为横屏（宽>高），带超时兜底。
@@ -2087,6 +2292,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     _playerCount = 0;
+    // 必须紧跟 _playerCount 清零、在第一个 await 之前：此后迟到的
+    // 渲染路径重建因 _playerCount == 0 不会再发 true，这里的 false 就是最终值。
+    _platformVideoBackdrop.reset();
     if (removeSafeArea) {
       showSystemBar();
     }
@@ -2128,8 +2336,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (kDebugMode) {
       debugPrint('dispose player');
     }
-    // 正在创建数据源/VideoController 时先等它收尾
-    final pending = _setDataSourceQueue;
+    // 正在创建数据源/VideoController 或重建渲染路径时先等它收尾
+    final pending = _playerQueue.tail;
     if (pending != null) {
       try {
         await pending.timeout(const Duration(seconds: 3));
