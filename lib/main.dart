@@ -242,6 +242,8 @@ void main() async {
       HarmonyChannel.checkPendingContinuation();
       // 获取系统初始字重值
       HarmonyChannel.initSystemFontWeight();
+      // 查询面板支持的 HDR 类型，决定杜比视界 / HDR10+ 能否按 HDR Vivid 上报
+      HarmonyChannel.loadDisplayHdrFormats();
       // 将当前主题颜色模式同步给原生层（Rx 初始值相同不触发监听，需显式同步）
       ThemeUtils.syncColorModeToNative();
     });
