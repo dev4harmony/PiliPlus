@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
@@ -54,7 +56,7 @@ class _SetDisplayModeState extends State<SetDisplayMode> {
     preferred ??= DisplayMode.auto;
 
     FlutterDisplayMode.setPreferredMode(preferred!).whenComplete(() {
-      Future.delayed(const Duration(milliseconds: 100), fetchAll);
+      Timer(const Duration(milliseconds: 100), fetchAll);
     });
   }
 
@@ -80,10 +82,7 @@ class _SetDisplayModeState extends State<SetDisplayMode> {
                 FlutterDisplayMode.setPreferredMode(
                   newMode!,
                 ).whenComplete(
-                  () => Future.delayed(
-                    const Duration(milliseconds: 100),
-                    fetchAll,
-                  ),
+                  () => Timer(const Duration(milliseconds: 100), fetchAll),
                 );
               },
               groupValue: preferred,
