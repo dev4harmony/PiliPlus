@@ -60,39 +60,7 @@ abstract final class ThemeUtils {
 
     FontWeight? fontWeight;
     if (appFontWeight == -1) {
-      // 跟随系统设置
-      double systemScale;
-      if (OS.isHarmony && HarmonyChannel.systemFontWeightScale != null) {
-        final raw = HarmonyChannel.systemFontWeightScale!;
-        // 如果取到的值无效（NaN、Infinity），回退到默认值 1
-        if (raw.isNaN || raw.isInfinite) {
-          systemScale = 1.0;
-        } else {
-          systemScale = raw;
-        }
-      } else {
-        // 完全取不到值时，使用默认值 1
-        systemScale = 1.0;
-      }
-
-      // 按区间直接映射到 FontWeight，超出范围的值自动取下限(w100)或上限(w900)
-      if (systemScale <= 0.75) {
-        fontWeight = FontWeight.w100;
-      } else if (systemScale <= 0.8) {
-        fontWeight = FontWeight.w200;
-      } else if (systemScale <= 0.9) {
-        fontWeight = FontWeight.w300;
-      } else if (systemScale <= 1.1) {
-        fontWeight = FontWeight.w400;
-      } else if (systemScale <= 1.2) {
-        fontWeight = FontWeight.w500;
-      } else if (systemScale <= 1.3) {
-        fontWeight = FontWeight.w600;
-      } else if (systemScale <= 1.45) {
-        fontWeight = FontWeight.w700;
-      } else {
-        fontWeight = FontWeight.w800;
-      }
+      fontWeight = FontWeight.normal;
     } else {
       fontWeight = FontWeight.values[appFontWeight];
     }

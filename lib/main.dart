@@ -39,13 +39,13 @@ import 'package:collection/collection.dart';
 import 'package:dynamic_color/dynamic_color.dart' show DynamicColorPlugin;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show DeviceGestureSettings;
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:os_type/os_type.dart';
 import 'package:path/path.dart' as path;
@@ -240,8 +240,6 @@ void main() async {
     // 顺带注册 method channel handler，保证热启动接续推送可达
     WidgetsBinding.instance.addPostFrameCallback((_) {
       HarmonyChannel.checkPendingContinuation();
-      // 获取系统初始字重值
-      HarmonyChannel.initSystemFontWeight();
       // 将当前主题颜色模式同步给原生层（Rx 初始值相同不触发监听，需显式同步）
       ThemeUtils.syncColorModeToNative();
     });
@@ -367,6 +365,11 @@ class MyApp extends StatelessWidget {
     final uiScale = ScaledWidgetsFlutterBinding.instance.scaleFactor;
     var mediaQuery = MediaQuery.of(context);
     final textScaler = TextScaler.linear(Pref.defaultTextScale);
+    // 鸿蒙引擎会把系统的 fontWeightScale 以 MediaQueryData.boldText 下发，
+    // 需要手动关闭
+    if (Pref.appFontWeight != -1) {
+      mediaQuery = mediaQuery.copyWith(boldText: false);
+    }
     // 鸿蒙 embedding（FlutterPage/FlutterView）把 ArkUI PanGesture 默认的
     // 5(vp) 当 physicalTouchSlop 下发，框架除以 DPR 后竖向滚动的触发阈值
     // 只有 ~1.5 逻辑像素（Android 约为 8）。竖向手势几乎瞬间赢得竞技场，

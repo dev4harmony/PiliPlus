@@ -3,7 +3,6 @@ import 'dart:math' show max;
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
-import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -11,9 +10,6 @@ import 'package:get/get.dart';
 import 'package:os_type/os_type.dart';
 
 abstract class HarmonyChannel {
-  static double? _systemFontWeightScale;
-
-  static double? get systemFontWeightScale => _systemFontWeightScale;
 
   static final MethodChannel _channel = const MethodChannel('harmonyChannel')
     ..setMethodCallHandler(handler);
@@ -36,13 +32,6 @@ abstract class HarmonyChannel {
         break;
       case 'onDecorTopInsetChange':
         _updateDecorTop(call.arguments['top']);
-        break;
-      case 'onFontWeightScaleChange':
-        final fontWeightScale = (call.arguments['fontWeightScale'] as num?)?.toDouble();
-        _systemFontWeightScale = fontWeightScale;
-        if (Pref.appFontWeight == -1) {
-          Get.updateMyAppTheme();
-        }
         break;
       // 源端 onContinue 拉取当前播放状态
       case 'getContinuationState':
@@ -311,10 +300,6 @@ abstract class HarmonyChannel {
       'topPhoto': topPhoto,
     });
   }
-
-  /// 获取系统当前字重设置（仅 Harmony 平台）
-  static Future<void> initSystemFontWeight() =>
-      _invoke('getSystemFontWeightScale');
 
   /// 将应用内设定的主题颜色传递给原生层，用于原生层的深浅色模式感知
   static Future<void> setSystemColorMode(String colorMode) =>

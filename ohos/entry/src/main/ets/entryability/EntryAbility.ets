@@ -47,7 +47,6 @@ export default class EntryAbility extends FlutterAbility {
     GeneratedPluginRegistrant.registerWith(flutterEngine);
     flutterEngine.getPlugins()?.add(this.harmonyChannel);
     this.flutterChannel = this.harmonyChannel.getChannel();
-    this.initFontWeightListener();
     this.initShellEventListeners();
   }
 
@@ -72,24 +71,6 @@ export default class EntryAbility extends FlutterAbility {
     this.context.eventHub.on(EVENT_HOME_TAB_CHANGE, (index: number) => {
       this.flutterChannel?.invokeMethod('onHomeTabChange', { index: index });
     });
-  }
-
-  private initFontWeightListener(): void {
-    // 监听系统字重变化
-    this.envChangeListener = this.context.getApplicationContext().on('environment', {
-      onConfigurationUpdated: (config) => {
-        const fontWeightScale = config.fontWeightScale;
-        console.info(`EntryAbility: fontWeightScale changed to ${fontWeightScale}`);
-        this.flutterChannel?.invokeMethod("onFontWeightScaleChange", { fontWeightScale: fontWeightScale });
-      },
-      onMemoryLevel: () => {
-      }
-    });
-
-    // 获取初始系统字重值
-    const initialFontWeightScale = this.context.config.fontWeightScale;
-    console.info(`EntryAbility: initial fontWeightScale is ${initialFontWeightScale}`);
-    this.flutterChannel?.invokeMethod("onFontWeightScaleChange", { fontWeightScale: initialFontWeightScale });
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam) {

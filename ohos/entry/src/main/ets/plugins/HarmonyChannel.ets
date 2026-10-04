@@ -514,10 +514,6 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(true);
         break;
       }
-      case "getSystemFontWeightScale": {
-        result.success(true);
-        break;
-      }
       case "setShellBars": {
         if (deviceInfo.sdkApiVersion < 23) {
           result.success(true);
