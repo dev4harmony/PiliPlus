@@ -2,6 +2,7 @@ import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
+import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/services.dart';
@@ -138,6 +139,10 @@ abstract class HarmonyChannel {
       }
     }
   }
+
+  /// 同步沉浸光感底栏材质等级到 ArkTS HdsTabs（hdsMaterial.MaterialLevel）
+  static Future<void> setTabMaterialLevel(HdsMaterialLevel level) =>
+      _invoke('setTabMaterialLevel', {'level': level.value});
 
   /// 同步主题色到 ArkTS HdsTabs 底栏
   static Future<void> setTabSelectedColor(String hexColor) =>

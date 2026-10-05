@@ -6,6 +6,7 @@ abstract final class SettingBoxKey {
       showActualVolume = 'showActualVolume',
       enableHdsBar = 'enableHdsBar',
       enableHdsTopBar = 'enableHdsTopBar',
+      hdsTabMaterialLevel = 'hdsTabMaterialLevel',
       enableHeroCoverAnimation = 'enableHeroCoverAnimation';
 
   static const String btmProgressBehavior = 'btmProgressBehavior',

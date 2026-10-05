@@ -203,6 +203,7 @@ class MainController extends GetxController
     HarmonyChannel.setShellTopBar(useNativeTopBar: useHdsTopBar);
     // 同步 Navbar 页签数量与顺序到原生 HDS 底栏（与设置内 Navbar 编辑一致）
     if (useHdsBar) {
+      HarmonyChannel.setTabMaterialLevel(Pref.hdsTabMaterialLevel);
       HarmonyChannel.setNavBarConfig(navigationBars);
       HarmonyChannel.changeTabIndex(Pref.defaultHomePage.index);
       // 初始动态角标（数量与模式）同步到原生 HDS 底栏

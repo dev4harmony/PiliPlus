@@ -105,6 +105,8 @@ struct Index {
   @StorageLink('dynBadgeMode') dynBadgeMode: number = 0;
   /// 动态页签角标数量（由 Flutter 按未读动态数同步）
   @StorageLink('dynBadgeCount') dynBadgeCount: number = 0;
+  /// 沉浸光感底栏材质等级（Flutter 按设置下发；0=精美 1=轻柔 2=流畅 10=自适应）
+  @StorageLink('tabMaterialLevel') tabMaterialLevel: number = 10;
   /// 当前选中的底部 Navbar 页签索引（自定义 tabBar 需自行区分选中态）
   @State currentNavIndex: number = 0;
   @State statusBarHeight: number = 0;
@@ -806,6 +808,20 @@ struct Index {
     .align(Alignment.Top)
   }
 
+  /// 把 Flutter 下发的档位值映射为 hdsMaterial.MaterialLevel，非法值回退自适应
+  private resolveMaterialLevel(): hdsMaterial.MaterialLevel {
+    switch (this.tabMaterialLevel) {
+      case 0:
+        return hdsMaterial.MaterialLevel.EXQUISITE;
+      case 1:
+        return hdsMaterial.MaterialLevel.GENTLE;
+      case 2:
+        return hdsMaterial.MaterialLevel.SMOOTH;
+      default:
+        return hdsMaterial.MaterialLevel.ADAPTIVE;
+    }
+  }
+
   @Builder
   hdsMainTabs() {
     HdsTabs({ controller: this.controller }) {
@@ -829,7 +845,7 @@ struct Index {
       adaptToHandedness: true,
       systemMaterialEffect: {
         materialType: hdsMaterial.MaterialType.IMMERSIVE,
-        materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+        materialLevel: this.resolveMaterialLevel()
       }
     })
     .visibility(this.navTabs.length <= 1 || this.shellBarsHidden
