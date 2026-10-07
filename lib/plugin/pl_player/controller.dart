@@ -537,6 +537,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     return _instance?.playerStatus;
   }
 
+  static void cancelPendingPlayOnInterruption() {
+    _instance?._pauseRequestedByApp = true;
+    _instance?._pauseGeneration++;
+    _instance?._audioInterrupted = true;
+  }
+
   static Future<void>? pauseIfExists({
     bool notify = true,
     bool isInterrupt = false,
@@ -1074,6 +1080,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   Future<bool?> refreshPlayer() async {
+    final pauseGeneration = _pauseGeneration;
     if (dataSource is FileSource) {
       return null;
     }
@@ -1103,6 +1110,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         'audio-files',
         '',
       );
+    }
+    if (OS.isHarmony) {
+      if (await audioSessionHandler?.setActive(true) != true) return false;
+      if (_playerCount == 0 ||
+          playerDisposed ||
+          _pauseGeneration != pauseGeneration) {
+        return false;
+      }
     }
     await _videoPlayerController!.open(
       Media(
@@ -1507,6 +1522,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Future<void> play({bool repeat = false, bool hideControls = true}) async {
     if (_playerCount == 0) return;
     _pauseRequestedByApp = false;
+    final pauseGeneration = _pauseGeneration;
     // 播放时自动隐藏控制条
     controls = !hideControls;
     // repeat为true，将从头播放
@@ -1514,14 +1530,22 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       await seekTo(Duration.zero, isSeek: false);
     }
 
-    // 鸿蒙：被系统打断后 mpv 的音频渲染器已被暂停且 mpv 自身无感知，
-    // 单纯解除暂停不会恢复。先重新激活音频会话抢回焦点（暂停其他 app 的
-    // 音频），再用 ao-reload 重建音频输出，让新渲染器以新焦点启动。
+    // 鸿蒙的会话策略必须在 mpv 启动音频流之前生效，包含自动播放和直播。
+    // 音频会话初始化也是异步的；等待期间页面可能已退出。
+    if (OS.isHarmony) {
+      if (await audioSessionHandler?.setActive(true) != true) return;
+      if (_playerCount == 0 ||
+          playerDisposed ||
+          _pauseRequestedByApp ||
+          _pauseGeneration != pauseGeneration) {
+        return;
+      }
+    }
+
+    // 被系统强制打断后，mpv 的音频渲染器可能已暂停而自身无感知。
+    // 先激活会话，再用 ao-reload 重建输出；混音开关不绕过强制打断。
     if (_audioInterrupted) {
       _audioInterrupted = false;
-      try {
-        await audioSessionHandler?.setActive(true);
-      } catch (_) {}
       try {
         await _videoPlayerController?.platform?.maybeAsNativePlayer.command(
           const ['ao-reload'],
@@ -1529,6 +1553,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       } catch (_) {}
     }
 
+    if (OS.isHarmony &&
+        (_playerCount == 0 ||
+            playerDisposed ||
+            _pauseRequestedByApp ||
+            _pauseGeneration != pauseGeneration)) {
+      return;
+    }
     try {
       await _videoPlayerController?.play();
     } catch (e) {
@@ -1536,7 +1567,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       if (kDebugMode) debugPrint('play failed: $e');
     }
 
-    audioSessionHandler?.setActive(true);
+    if (!OS.isHarmony) audioSessionHandler?.setActive(true);
 
     playerStatus = .playing;
   }
@@ -1546,6 +1577,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 过程中直接把 mpv 置为暂停"（Dart 层无任何 pause 调用，需要自动恢复）
   /// 与用户/业务发起的正常暂停。
   bool _pauseRequestedByApp = false;
+  int _pauseGeneration = 0;
   int _pipAutoResumeCount = 0;
   DateTime? _pipAutoResumeWindowStart;
 
@@ -1578,6 +1610,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   Future<void> pause({bool notify = true, bool isInterrupt = false}) async {
     _pauseRequestedByApp = true;
+    _pauseGeneration++;
     // 播放器可能在异步链路中被销毁（media_kit 会抛 [Player] has been disposed）
     try {
       await _videoPlayerController?.pause();
@@ -1742,6 +1775,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   // 双击播放、暂停
   Future<void> onDoubleTapCenter() async {
+    if (OS.isHarmony) {
+      // Do not bypass session activation/deactivation when resuming via gesture.
+      if (!isLive && isCompleted) {
+        await play(repeat: true);
+      } else if (videoPlayerController?.state.playing ?? false) {
+        await pause();
+      } else {
+        await play();
+      }
+      return;
+    }
     if (!isLive && isCompleted) {
       await videoPlayerController!.seek(Duration.zero);
       videoPlayerController!.play();
@@ -2140,6 +2184,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       } catch (_) {}
     }
     await _disposePlayerSafely(_videoPlayerController);
+    if (OS.isHarmony) {
+      await audioSessionHandler?.setActive(false);
+    }
     _videoPlayerController = null;
     _videoControllerNotifier.value = null;
     _instance = null;

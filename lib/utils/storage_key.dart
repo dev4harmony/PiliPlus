@@ -4,6 +4,7 @@ abstract final class SettingBoxKey {
   static const String enableLGBar = 'enableLGBar',
       enableStatusBarTapToTop = 'enableStatusBarTapToTop',
       showActualVolume = 'showActualVolume',
+      allowConcurrentPlayback = 'allowConcurrentPlayback',
       enableHdsBar = 'enableHdsBar',
       enableHdsTopBar = 'enableHdsTopBar',
       hdsTabMaterialLevel = 'hdsTabMaterialLevel',

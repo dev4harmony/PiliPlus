@@ -781,6 +781,10 @@ abstract final class Pref {
   static bool get enableStatusBarTapToTop =>
       _setting.get(SettingBoxKey.enableStatusBarTapToTop, defaultValue: false);
 
+  /// 鸿蒙音频会话使用混音策略，默认保持原有的独占播放行为。
+  static bool get allowConcurrentPlayback =>
+      _setting.get(SettingBoxKey.allowConcurrentPlayback, defaultValue: false);
+
   static bool get showActualVolume =>
       _setting.get(SettingBoxKey.showActualVolume, defaultValue: false);
 

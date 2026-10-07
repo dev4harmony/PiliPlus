@@ -8,6 +8,7 @@ import window from "@ohos.window";
 import { FlutterAbility, FlutterEngine, MethodChannel } from "@ohos/flutter_ohos";
 import { GeneratedPluginRegistrant } from "../plugins/GeneratedPluginRegistrant";
 import HarmonyChannel from "../plugins/HarmonyChannel";
+import HarmonyAudioSession from "../plugins/HarmonyAudioSession";
 
 /// 跨设备接续数据在 want.parameters 中的键
 const CONTINUATION_KEY = "pili_continuation";
@@ -46,6 +47,7 @@ export default class EntryAbility extends FlutterAbility {
     super.configureFlutterEngine(flutterEngine);
     GeneratedPluginRegistrant.registerWith(flutterEngine);
     flutterEngine.getPlugins()?.add(this.harmonyChannel);
+    flutterEngine.getPlugins()?.add(new HarmonyAudioSession());
     this.flutterChannel = this.harmonyChannel.getChannel();
     this.initShellEventListeners();
   }

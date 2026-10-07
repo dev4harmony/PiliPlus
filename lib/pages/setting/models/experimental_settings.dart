@@ -9,6 +9,14 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:os_type/os_type.dart';
 
 List<SettingsModel> experimentalSettings = [
+  if (OS.isHarmony)
+    const SwitchModel(
+      title: '允许和其他应用同时播放',
+      subtitle: '语音输入等场景下尽量不中断视频和直播；重新播放后生效\n通话等系统强制中断不受此设置影响',
+      leading: Icon(Icons.multitrack_audio_outlined),
+      setKey: SettingBoxKey.allowConcurrentPlayback,
+      defaultVal: false,
+    ),
   SwitchModel(
     title: '鸿蒙沉浸光感导航栏',
     subtitle: '仅鸿蒙6.1及以上支持，侧边栏下不显示',
