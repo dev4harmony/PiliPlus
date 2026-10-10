@@ -138,6 +138,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   /// 全屏横屏视频时竖屏窗口是稳定状态而非瞬态，同样排除。
   bool get _layoutFullScreen {
     if (!isFullScreen) return false;
+
     /// 应用窗口是否处于受限窗口模式（分屏/自由多窗/悬浮窗等非全屏窗口）。
     /// 此模式下窗口宽高比不代表设备方向，且窗口无法旋转到全屏横屏
     /// 仍应按 isFullScreen 渲染全屏布局，
@@ -703,7 +704,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       // triggerFullScreen 内），否则状态栏不会被隐藏。上游通过设备方向监听器
       // 同样无条件自动进全屏（与播放器是否初始化无关），这里行为保持一致。
       final player = videoDetailController.plPlayerController;
-      final aspectIsOrientation = !OS.isHarmony ||
+      final aspectIsOrientation =
+          !OS.isHarmony ||
           (!HarmonyChannel.isMiniWindow && !HarmonyChannel.isWindowMode);
       if (!isPortrait &&
           !isFullScreen &&
@@ -747,6 +749,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       () {
         final isFullScreen = this.isFullScreen;
         return SimpleScaffold(
+          // 全屏 + 平台视图时，Scaffold 的 Material 底色也在视频之上，必须透明。
+          // 只限全屏：竖屏下 MiniScaffold 自己不画背景，全局透明会露出下层。
+          backgroundColor:
+              isFullScreen &&
+                  (plPlayerController?.usePlatformViewRx.value ?? false)
+              ? Colors.transparent
+              : null,
           appBar: removeAppBar(isFullScreen)
               ? null
               : Obx(
@@ -1018,6 +1027,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     () {
       final isFullScreen = this.isFullScreen;
       return SimpleScaffold(
+        // 全屏 + 平台视图时，Scaffold 的 Material 底色也在视频之上，必须透明。
+        // 只限全屏：竖屏下 MiniScaffold 自己不画背景，全局透明会露出下层。
+        backgroundColor:
+            isFullScreen &&
+                (plPlayerController?.usePlatformViewRx.value ?? false)
+            ? Colors.transparent
+            : null,
         appBar: removeAppBar(isFullScreen)
             ? null
             : AppBar(
@@ -1255,6 +1271,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   Widget get childWhenDisabledAlmostSquare => Obx(() {
     final isFullScreen = _layoutFullScreen;
     return SimpleScaffold(
+      // 全屏 + 平台视图时，Scaffold 的 Material 底色也在视频之上，必须透明。
+      // 只限全屏：竖屏下 MiniScaffold 自己不画背景，全局透明会露出下层。
+      backgroundColor:
+          isFullScreen && (plPlayerController?.usePlatformViewRx.value ?? false)
+          ? Colors.transparent
+          : null,
       appBar: removeAppBar(isFullScreen)
           ? null
           : AppBar(
@@ -1738,10 +1760,19 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        const Positioned.fill(
-          child: ColoredBox(
-            color: Colors.black,
-            isAntiAlias: false,
+        // 平台视图由系统合成在 Flutter 表面「之下」，这层黑底会把视频整个
+        // 盖住。Positioned.fill 必须留在 Obx 外面 —— Obx 不是 Positioned，
+        // 直接作 Stack 子节点会丢掉 fill 语义。
+        Positioned.fill(
+          child: Obx(
+            // 必须用 videoDetailController.plPlayerController（非空）读取。
+            // 用可空的 plPlayerController?. 时，controller 为 null 会短路，
+            // 这个 Obx 就一个 observable 都没读到，GetX 会抛
+            // "improper use of a GetX has been detected"。
+            () =>
+                videoDetailController.plPlayerController.usePlatformViewRx.value
+                ? const SizedBox.shrink()
+                : const ColoredBox(color: Colors.black, isAntiAlias: false),
           ),
         ),
 

@@ -1197,9 +1197,9 @@ packages:
     dependency: "direct main"
     description:
       path: media_kit
-      ref: feat-ohos
-      resolved-ref: "762fdc6368fb95ad61ab2d99a9cf70a59a00c2e3"
-      url: "https://github.com/cnoim/media-kit.git"
+      ref: feat-ohos-hdr
+      resolved-ref: "2276970b187b26f5ad88e2282574bc4d19d1b3d0"
+      url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "1.2.3"
   media_kit_libs_android_video:
@@ -1242,18 +1242,18 @@ packages:
     dependency: "direct overridden"
     description:
       path: "libs/ohos/media_kit_libs_ohos"
-      ref: feat-ohos
-      resolved-ref: "762fdc6368fb95ad61ab2d99a9cf70a59a00c2e3"
-      url: "https://github.com/cnoim/media-kit.git"
+      ref: feat-ohos-hdr
+      resolved-ref: "2276970b187b26f5ad88e2282574bc4d19d1b3d0"
+      url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "1.0.0"
   media_kit_libs_video:
     dependency: "direct main"
     description:
       path: "libs/universal/media_kit_libs_video"
-      ref: feat-ohos
-      resolved-ref: "762fdc6368fb95ad61ab2d99a9cf70a59a00c2e3"
-      url: "https://github.com/cnoim/media-kit.git"
+      ref: feat-ohos-hdr
+      resolved-ref: "2276970b187b26f5ad88e2282574bc4d19d1b3d0"
+      url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "1.0.7"
   media_kit_libs_windows_video:
@@ -1278,9 +1278,9 @@ packages:
     dependency: "direct main"
     description:
       path: media_kit_video
-      ref: feat-ohos
-      resolved-ref: "762fdc6368fb95ad61ab2d99a9cf70a59a00c2e3"
-      url: "https://github.com/cnoim/media-kit.git"
+      ref: feat-ohos-hdr
+      resolved-ref: "2276970b187b26f5ad88e2282574bc4d19d1b3d0"
+      url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "2.0.1"
   menu_base:

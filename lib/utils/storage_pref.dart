@@ -30,6 +30,7 @@ import 'package:PiliPlus/pages/setting/pages/fullscreen_sc_size.dart'
 import 'package:PiliPlus/plugin/pl_player/models/audio_output_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
+import 'package:PiliPlus/plugin/pl_player/models/hdr_peak_nits.dart';
 import 'package:PiliPlus/plugin/pl_player/models/hwdec_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
@@ -807,6 +808,14 @@ abstract final class Pref {
 
   static bool get enableHA =>
       _setting.get(SettingBoxKey.enableHA, defaultValue: true);
+
+  /// 播放 HDR 视频时覆盖播放器设置，启用 HDR 输出
+  static bool get enableHDR =>
+      _setting.get(SettingBoxKey.enableHDR, defaultValue: false);
+
+  /// HDR 色调映射用的面板峰值亮度（nit）。鸿蒙读不到面板峰值亮度，由用户填写
+  static int get hdrPeakNits =>
+      HdrPeakNits.sanitize(_setting.get(SettingBoxKey.hdrPeakNits));
 
   static Set<int> get danmakuBlockType => Set<int>.from(
     _setting.get(SettingBoxKey.danmakuBlockType, defaultValue: const <int>{}),

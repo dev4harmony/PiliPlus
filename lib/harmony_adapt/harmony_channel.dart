@@ -5,12 +5,73 @@ import 'package:PiliPlus/harmony_adapt/continuation.dart';
 import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:os_type/os_type.dart';
 
 abstract class HarmonyChannel {
+  /// @ohos.graphics.hdrCapability 的 HDRFormat 取值。
+  static const int hdrFormatHlg = 1;
+  static const int hdrFormatHdr10 = 2;
+  static const int hdrFormatVivid = 3;
+
+  /// 面板实际支持的 HDR 类型，启动时查一次。
+  ///
+  /// null 表示**还没查到**（没查过 / 查询失败），与「查到了，一个都不支持」
+  /// （空集）是两回事：前者不能拿来关掉 HDR，否则查询一旦失败，HDR 就会在一台
+  /// 完全正常的设备上被静默禁用；后者才是这块屏确实不支持。
+  static Set<int>? _displayHdrFormats;
+
+  static Set<int> get displayHdrFormats => _displayHdrFormats ?? const {};
+
+  /// 面板是否**明确**不支持任何 HDR 格式。只有问出过结果才敢下这个结论，
+  /// 见 [_displayHdrFormats] 对 null 的说明。
+  static bool get displayHasNoHdr => _displayHdrFormats?.isEmpty ?? false;
+
+  /// 面板**确证**支持 HDR Vivid（保守口径，未知按不支持）。
+  ///
+  /// 用于杜比视界：它只是借 Vivid 的标签让面板拉峰值亮度，自己没有 CUVA
+  /// 载荷，没确证就退回 hdr10 更稳。
+  static bool get displaySupportsHdrVivid =>
+      _displayHdrFormats?.contains(hdrFormatVivid) ?? false;
+
+  /// 面板**没有明确表示**不支持 HDR Vivid（乐观口径，未知按支持）。
+  ///
+  /// 用于原生 HDR Vivid 片源：片源自己带 CUVA，本来就该按 Vivid 上报。
+  /// 与 [displayHasNoHdr] 同一个口径——查询失败不该把它静默降级成 hdr10。
+  static bool get displayMaySupportHdrVivid =>
+      _displayHdrFormats?.contains(hdrFormatVivid) ?? true;
+
+  /// 查询面板的 HDR 能力。只在鸿蒙上有意义。
+  ///
+  /// 失败时**保持 null**（未知）而不是记成空集：原生侧查询异常与「这块屏真的
+  /// 不支持 HDR」必须区分开，否则一次偶发失败会把 HDR 永久关掉。
+  static Future<void> loadDisplayHdrFormats() async {
+    if (!OS.isHarmony) return;
+    try {
+      final list = await _channel.invokeMethod<List<Object?>>(
+        'getDisplayHdrFormats',
+      );
+      _displayHdrFormats = <int>{
+        for (final e in list ?? const <Object?>[])
+          if (e is int) e,
+      };
+      if (kDebugMode) {
+        debugPrint(
+          '[HDRCAP] display hdrFormats=$_displayHdrFormats '
+          'vivid=$displaySupportsHdrVivid',
+        );
+      }
+    } catch (e) {
+      // 含 MissingPluginException：原生侧没有这个 method 的旧版本。
+      // 不写 _displayHdrFormats，能力保持「未知」。
+      if (kDebugMode) {
+        debugPrint('[HDRCAP] query failed, capability stays unknown: $e');
+      }
+    }
+  }
 
   static final MethodChannel _channel = const MethodChannel('harmonyChannel')
     ..setMethodCallHandler(handler);
@@ -280,6 +341,19 @@ abstract class HarmonyChannel {
   /// 避免 setWindowLayoutFullScreen 改变 surface 尺寸导致画面跳动。
   static Future<void> setFullScreenBars(bool fullscreen) =>
       _invoke('setFullScreenBars', {'fullscreen': fullscreen});
+
+  /// HDR 平台视图模式开关：Flutter 播放器各层是否已画透明。
+  ///
+  /// 平台视图只有拟合后的视频矩形那么大，矩形以外的黑边会透到 `Index.ets` 的
+  /// 根 Stack，ArkTS 据此在该模式期间把根 Stack 涂黑（见 `PlatformVideoBackdrop`）。
+  /// 吞掉所有异常（含 MissingPluginException，`_invoke` 只吞 PlatformException）：
+  /// 这只是背景色信号，失败最多露白边，不能影响播放器创建。
+  static Future<void> setPlatformVideoActive(bool active) async {
+    if (!OS.isHarmony) return;
+    try {
+      await _channel.invokeMethod('setPlatformVideoActive', {'active': active});
+    } catch (_) {}
+  }
 
   /// 鸿蒙部分机型（Mate80）开启系统旋转锁定后无法强制窗口转回竖屏，这里走原生接口。
   static Future<void> setWindowOrientation(int orientation) async {

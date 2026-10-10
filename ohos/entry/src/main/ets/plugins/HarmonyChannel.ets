@@ -439,6 +439,24 @@ export default class HarmonyChannel implements FlutterPlugin {
 
   async onMethodCall(call: MethodCall, result: MethodResult): Promise<void> {
     switch (call.method) {
+      case "getDisplayHdrFormats": {
+        // 面板实际支持的 HDR 类型。取值见 @ohos.graphics.hdrCapability 的
+        // HDRFormat：0=NONE 1=VIDEO_HLG 2=VIDEO_HDR10 3=VIDEO_HDR_VIVID。
+        // 用来决定杜比视界 / HDR10+ 到底能不能按 HDR Vivid 上报，避免在不支持
+        // Vivid 的屏幕上盲目发 Vivid 信令。
+        try {
+          const d = display.getDefaultDisplaySync();
+          const formats: number[] = (d.hdrFormats ?? []) as number[];
+          console.info(`HarmonyChannel display hdrFormats: ${JSON.stringify(formats)}`);
+          result.success(formats);
+        } catch (err) {
+          // 必须报错而不是回空数组：Dart 侧要用「查不到」和「查到了，不支持」
+          // 区分开，空数组会被当成这块屏确实不支持 HDR，把功能整个关掉。
+          console.error(`HarmonyChannel getDisplayHdrFormats failed: ${err}`);
+          result.error("HDR_CAPABILITY_QUERY_FAILED", `${err}`, null);
+        }
+        break;
+      }
       case "setFullScreenBars": {
         const fullscreen: boolean = call.argument("fullscreen") ?? false;
         await this.setFullScreenBars(fullscreen);
@@ -683,6 +701,14 @@ export default class HarmonyChannel implements FlutterPlugin {
       case "setTopBarHidden": {
         const hidden: boolean = call.argument('hidden') ?? false;
         AppStorage.setOrCreate('topBarHidden', hidden);
+        result.success(true);
+        break;
+      }
+      case "setPlatformVideoActive": {
+        // HDR 平台视图模式：Flutter 播放器各层画透明，视频矩形以外的黑边会透到
+        // Index.ets 的根 Stack，由它据此涂黑。与沉浸光感无关，不做 API 版本限制。
+        const active: boolean = call.argument('active') ?? false;
+        AppStorage.setOrCreate('platformVideoActive', active);
         result.success(true);
         break;
       }

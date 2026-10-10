@@ -10,6 +10,7 @@ import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
+import 'package:PiliPlus/plugin/pl_player/models/hdr_peak_nits.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
@@ -17,6 +18,7 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -297,7 +299,80 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.tempPlayerConf,
     defaultVal: false,
   ),
+  if (Platform.operatingSystem == 'ohos') ...[
+    const SwitchModel(
+      title: '启用 HDR 视频',
+      subtitle: '播放 HDR / HDR Vivid / 杜比视界片源时按 HDR 输出，触发峰值亮度',
+      leading: Icon(Icons.settings_brightness_outlined),
+      setKey: SettingBoxKey.enableHDR,
+      defaultVal: false,
+    ),
+    NormalModel(
+      title: 'HDR 峰值亮度',
+      leading: const Icon(Icons.wb_sunny_outlined),
+      getSubtitle: () => '当前 ${Pref.hdrPeakNits} nit。系统读不到屏幕峰值亮度，需按屏幕参数填写',
+      onTap: _showHdrPeakNitsDialog,
+    ),
+  ],
 ];
+
+void _showHdrPeakNitsDialog(BuildContext context, VoidCallback setState) {
+  String input = Pref.hdrPeakNits.toString();
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('HDR 峰值亮度'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '鸿蒙无法读取屏幕的峰值亮度，HDR 色调映射需要这个值。'
+            '请填写屏幕参数里的峰值亮度：填高了高光细节会被屏幕截断，'
+            '填低了高光会偏暗。重新打开视频后生效。',
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            autofocus: true,
+            initialValue: input,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              suffixText: 'nit',
+              helperText:
+                  '${HdrPeakNits.min}–${HdrPeakNits.max}，默认 ${HdrPeakNits.defaultValue}',
+            ),
+            onChanged: (value) => input = value,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: Get.back,
+          child: Text(
+            '取消',
+            style: TextStyle(color: ColorScheme.of(context).outline),
+          ),
+        ),
+        TextButton(
+          onPressed: () async {
+            final value = HdrPeakNits.tryParse(input);
+            if (value == null) {
+              SmartDialog.showToast(
+                '请输入 ${HdrPeakNits.min}–${HdrPeakNits.max} 之间的整数',
+              );
+              return;
+            }
+            Get.back();
+            await GStorage.setting.put(SettingBoxKey.hdrPeakNits, value);
+            setState();
+          },
+          child: const Text('确定'),
+        ),
+      ],
+    ),
+  );
+}
 
 Future<void> _showSubtitleDialog(
   BuildContext context,

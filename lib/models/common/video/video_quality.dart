@@ -23,4 +23,19 @@ enum VideoQuality {
   static final _codeMap = {for (final i in values) i.code: i};
 
   static VideoQuality fromCode(int code) => _codeMap[code]!;
+
+  /// Whether this quality carries an HDR signal, and therefore needs the
+  /// player configured for HDR output.
+  bool get isHDR => this == hdr || this == hdrVivid || this == dolbyVision;
+
+  /// Whether this quality is Dolby Vision, which HarmonyOS cannot signal
+  /// natively and is mapped onto HDR Vivid instead.
+  bool get isDolbyVision => this == dolbyVision;
+
+  /// Whether this quality is natively HDR Vivid, which HarmonyOS signals
+  /// directly, so no remapping onto HDR10 is needed. The type is forced from
+  /// the quality rather than auto-detected: on the OHOS hardware decode path
+  /// the CUVA side data only exists once the ohdec.c prefix-SEI patch is in
+  /// the linked libmpv.
+  bool get isHDRVivid => this == hdrVivid;
 }
