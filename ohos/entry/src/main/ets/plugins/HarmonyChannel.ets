@@ -532,10 +532,6 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(true);
         break;
       }
-      case "getSystemFontWeightScale": {
-        result.success(true);
-        break;
-      }
       case "setShellBars": {
         if (deviceInfo.sdkApiVersion < 23) {
           result.success(true);
@@ -624,6 +620,18 @@ export default class HarmonyChannel implements FlutterPlugin {
         }
         const index: number = call.argument('index') ?? 0;
         this.changeTabIndex(index);
+        result.success(true);
+        break;
+      }
+      case "setTabMaterialLevel": {
+        if (deviceInfo.sdkApiVersion < 23) {
+          result.success(true);
+          break;
+        }
+        // 与 Dart HdsMaterialLevel.value 一致：
+        // 0=精美 EXQUISITE 1=轻柔 GENTLE 2=流畅 SMOOTH 10=系统自适应 ADAPTIVE
+        const level: number = call.argument('level') ?? 10;
+        AppStorage.setOrCreate('tabMaterialLevel', level);
         result.success(true);
         break;
       }

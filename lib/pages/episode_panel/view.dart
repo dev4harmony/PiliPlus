@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:PiliPlus/common/assets.dart';
@@ -152,7 +153,7 @@ class EpisodePanelState extends State<EpisodePanel>
         _initialTabIndex,
         duration: const Duration(milliseconds: 200),
       );
-      Future.delayed(const Duration(milliseconds: 300), jumpToCurrent);
+      Timer(const Duration(milliseconds: 300), jumpToCurrent);
     } else {
       jumpToCurrent();
     }

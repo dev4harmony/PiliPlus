@@ -7,6 +7,7 @@ import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
 import 'package:PiliPlus/models/common/follow_order_type.dart';
+import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -770,6 +771,13 @@ abstract final class Pref {
 
   static bool get enableHdsTopBar =>
       _setting.get(SettingBoxKey.enableHdsTopBar, defaultValue: false);
+
+  /// 鸿蒙沉浸光感底栏材质等级，仅原生底栏启用时生效
+  static HdsMaterialLevel get hdsTabMaterialLevel =>
+      HdsMaterialLevel.values[_setting.get(
+        SettingBoxKey.hdsTabMaterialLevel,
+        defaultValue: HdsMaterialLevel.adaptive.index,
+      )];
 
   static bool get enableStatusBarTapToTop =>
       _setting.get(SettingBoxKey.enableStatusBarTapToTop, defaultValue: false);
