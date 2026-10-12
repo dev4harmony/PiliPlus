@@ -32,6 +32,10 @@ abstract final class AndroidHelper {
 
   static int sdkInt() => 0;
 
+  static void back() {}
+
+  static void openLinkVerifySettings() {}
+
   static void updatePipActions(int engineId, bool isLive, bool playing) {}
 
   static void updateDocProvider(bool enabled) {}

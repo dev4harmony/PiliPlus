@@ -30,7 +30,7 @@ enum _BlockType implements EnumWithLabel {
   @override
   final String label;
 
-  _BlockType(this.label);
+  const _BlockType(this.label);
 }
 
 class BlackListPage extends StatefulWidget {
