@@ -616,12 +616,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 发生，于是新片源顶着上一档的信令上屏，类型报错。
   String? _appliedHdrMode;
 
-  /// 色调映射用的目标屏幕峰值亮度（nit），取自设置「HDR 峰值亮度」。
+  /// 当前播放器生效的 `--target-peak`。创建时还不知道片源峰值，先按
+  /// [ohosHdrTargetPeak] 下发；「匹配视频亮度」时等 mpv 报出 video-params 再由
+  /// [_syncTargetPeakToVideo] 改成片源峰值。
+  double? _appliedTargetPeak;
+
+  /// 色调映射用的目标峰值亮度（nit），取自设置「HDR 峰值亮度」。
   ///
   /// 鸿蒙没有公开查询面板峰值亮度的接口（`display` 只给得出支持哪些 HDR
-  /// 格式），所以由用户按屏幕参数填写，默认 1600（按 SLM-W32 标定）。
-  /// 它随 VideoController 的配置一起下发，只在创建播放器时读取：改了设置从
-  /// 下一次重建播放器（重新打开视频、切换清晰度）起生效。
+  /// 格式），所以由用户填写，默认 1000。开启「匹配视频亮度」时它只是片源没有
+  /// 亮度元数据时的参考亮度。改了设置从下一次重建播放器（重新打开视频、
+  /// 切换清晰度）起生效。
   ///
   /// 只在平台视图输出 HDR 时才会用上，规则见 [OhosHdrOutput.targetPeak]。
   static int get _displayPeakNits => Pref.hdrPeakNits;
@@ -638,6 +643,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       : null;
 
   /// 传给 mpv 的 `--target-peak`，规则见 [OhosHdrOutput.targetPeak]。
+  /// 创建播放器时还不知道片源峰值，所以这里总是参考值，见 [_appliedTargetPeak]。
   double? get ohosHdrTargetPeak => OS.isHarmony
       ? OhosHdrOutput.targetPeak(
           hdrPlayback: _isHDRPlayback,
@@ -645,6 +651,26 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           peakNits: _displayPeakNits,
         )
       : null;
+
+  /// 「匹配视频亮度」：mpv 解出片源的 video-params 后，把 `--target-peak`
+  /// 改成片源元数据里的峰值。按播放器实际走的渲染路径
+  /// （[_usesPlatformView]）判断，而不是当前的 [usePlatformView]。
+  void _syncTargetPeakToVideo(VideoParams params) {
+    final player = _videoPlayerController;
+    if (player == null) return;
+    final peak = OhosHdrOutput.targetPeak(
+      hdrPlayback: _isHDRPlayback,
+      platformView: _usesPlatformView,
+      peakNits: _displayPeakNits,
+      matchVideo: Pref.hdrMatchVideoPeak,
+      videoSigPeak: params.sigPeak,
+    );
+    if (peak == null || peak == _appliedTargetPeak) return;
+    _appliedTargetPeak = peak;
+    player.platform!.maybeAsNativePlayer
+        .setProperty('target-peak', peak.toStringAsFixed(0))
+        .catchError((Object e) => debugPrint('set target-peak failed: $e'));
+  }
 
   late final progressType = Pref.btmProgressBehavior;
   late final enableQuickDouble = Pref.enableQuickDouble;
@@ -1232,6 +1258,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (player == null) {
       _usesPlatformView = usePlatformView;
       _appliedHdrMode = ohosHdrMode;
+      _appliedTargetPeak = ohosHdrTargetPeak;
       player = await _initPlayer();
       if (_playerCount == 0) {
         _removeListeners();
@@ -1419,6 +1446,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     final stream = player.stream;
     _subscriptions = [
+      if (OS.isHarmony) stream.videoParams.listen(_syncTargetPeakToVideo),
+
       /// playing
       stream.playing.listen((bool playing) {
         if (playing) {

@@ -817,6 +817,10 @@ abstract final class Pref {
   static int get hdrPeakNits =>
       HdrPeakNits.sanitize(_setting.get(SettingBoxKey.hdrPeakNits));
 
+  /// HDR 峰值跟随片源亮度元数据；片源没有元数据时用 [hdrPeakNits] 作参考亮度
+  static bool get hdrMatchVideoPeak =>
+      _setting.get(SettingBoxKey.hdrMatchVideoPeak, defaultValue: true);
+
   static Set<int> get danmakuBlockType => Set<int>.from(
     _setting.get(SettingBoxKey.danmakuBlockType, defaultValue: const <int>{}),
   );

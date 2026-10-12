@@ -87,4 +87,55 @@ void main() {
       );
     });
   });
+
+  group('OhosHdrOutput.targetPeak matching the video', () {
+    // mpv 的 sig-peak 以 SDR 参考白 203 nit 为 1
+    double sigPeak(double nits) => nits / 203;
+
+    double? target({
+      double? videoSigPeak,
+      bool matchVideo = true,
+      bool platformView = true,
+    }) => OhosHdrOutput.targetPeak(
+      hdrPlayback: true,
+      platformView: platformView,
+      peakNits: 1000,
+      matchVideo: matchVideo,
+      videoSigPeak: videoSigPeak,
+    );
+
+    test('follows the peak in the stream metadata', () {
+      expect(target(videoSigPeak: sigPeak(4000)), 4000.0);
+      expect(target(videoSigPeak: sigPeak(1600)), 1600.0);
+    });
+
+    test('uses the reference when the stream carries no peak', () {
+      // 没有 HDR10 元数据时 mpv 把 PQ 片源记成名义峰值 10000 nit
+      expect(target(videoSigPeak: sigPeak(10000)), 1000.0);
+      expect(target(videoSigPeak: null), 1000.0);
+      expect(target(videoSigPeak: 0), 1000.0);
+    });
+
+    test('ignores a peak below what mpv accepts', () {
+      expect(target(videoSigPeak: sigPeak(5)), 1000.0);
+    });
+
+    test('keeps the setting when matching is off', () {
+      expect(target(videoSigPeak: sigPeak(4000), matchVideo: false), 1000.0);
+    });
+
+    test('still leaves the texture path to mpv', () {
+      expect(target(videoSigPeak: sigPeak(4000), platformView: false), isNull);
+    });
+  });
+
+  group('OhosHdrOutput.videoPeakNits', () {
+    test('converts sig-peak to whole nits', () {
+      expect(OhosHdrOutput.videoPeakNits(1000 / 203), 1000);
+    });
+
+    test('treats the PQ nominal peak as unknown', () {
+      expect(OhosHdrOutput.videoPeakNits(10000 / 203), isNull);
+    });
+  });
 }

@@ -6,6 +6,7 @@ import 'package:PiliPlus/models/common/video/subtitle_pref_type.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/pages/fullscreen_sc_size.dart';
+import 'package:PiliPlus/pages/setting/widgets/hdr_peak_nits_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
@@ -313,71 +314,38 @@ List<SettingsModel> get playSettings => [
       setKey: SettingBoxKey.enableHDR,
       defaultVal: true,
     ),
+    const SwitchModel(
+      title: '匹配视频亮度',
+      subtitle: 'HDR 峰值跟随片源的亮度元数据，交给系统按屏幕能力显示；片源没有元数据时使用下方的参考亮度',
+      leading: Icon(Icons.brightness_auto_outlined),
+      setKey: SettingBoxKey.hdrMatchVideoPeak,
+      defaultVal: true,
+    ),
     NormalModel(
       title: 'HDR 峰值亮度',
       leading: const Icon(Icons.wb_sunny_outlined),
-      getSubtitle: () => '当前 ${Pref.hdrPeakNits} nit。系统读不到屏幕峰值亮度，需按屏幕参数填写',
+      getSubtitle: () => Pref.hdrMatchVideoPeak
+          ? '当前 ${Pref.hdrPeakNits} nit，片源没有亮度元数据时作为参考亮度'
+          : '当前 ${Pref.hdrPeakNits} nit。系统读不到屏幕峰值亮度，需按屏幕参数填写',
       onTap: _showHdrPeakNitsDialog,
     ),
   ],
 ];
 
-void _showHdrPeakNitsDialog(BuildContext context, VoidCallback setState) {
-  String input = Pref.hdrPeakNits.toString();
-  showDialog(
+Future<void> _showHdrPeakNitsDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final value = await showDialog<int>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('HDR 峰值亮度'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '鸿蒙无法读取屏幕的峰值亮度，HDR 色调映射需要这个值。'
-            '请填写屏幕参数里的峰值亮度：填高了高光细节会被屏幕截断，'
-            '填低了高光会偏暗。重新打开视频后生效。',
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            autofocus: true,
-            initialValue: input,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              suffixText: 'nit',
-              helperText:
-                  '${HdrPeakNits.min}–${HdrPeakNits.max}，默认 ${HdrPeakNits.defaultValue}',
-            ),
-            onChanged: (value) => input = value,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: Get.back,
-          child: Text(
-            '取消',
-            style: TextStyle(color: ColorScheme.of(context).outline),
-          ),
-        ),
-        TextButton(
-          onPressed: () async {
-            final value = HdrPeakNits.tryParse(input);
-            if (value == null) {
-              SmartDialog.showToast(
-                '请输入 ${HdrPeakNits.min}–${HdrPeakNits.max} 之间的整数',
-              );
-              return;
-            }
-            Get.back();
-            await GStorage.setting.put(SettingBoxKey.hdrPeakNits, value);
-            setState();
-          },
-          child: const Text('确定'),
-        ),
-      ],
+    builder: (context) => HdrPeakNitsDialog(
+      value: Pref.hdrPeakNits,
+      matchVideo: Pref.hdrMatchVideoPeak,
     ),
   );
+  if (value == null) return;
+  await GStorage.setting.put(SettingBoxKey.hdrPeakNits, value);
+  setState();
 }
 
 Future<void> _showSubtitleDialog(

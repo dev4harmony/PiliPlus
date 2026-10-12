@@ -2,8 +2,25 @@ import 'package:PiliPlus/plugin/pl_player/models/hdr_peak_nits.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('default keeps the value calibrated before the setting existed', () {
-    expect(HdrPeakNits.defaultValue, 1600);
+  test('default is the 1000 nit HDR reference', () {
+    expect(HdrPeakNits.defaultValue, 1000);
+  });
+
+  group('HdrPeakNits.snap', () {
+    test('rounds slider positions to the step', () {
+      expect(HdrPeakNits.snap(1049), 1000);
+      expect(HdrPeakNits.snap(1050), 1100);
+      expect(HdrPeakNits.snap(1600), 1600);
+    });
+
+    test('stays inside the range', () {
+      expect(HdrPeakNits.snap(0), HdrPeakNits.min);
+      expect(HdrPeakNits.snap(20000), HdrPeakNits.max);
+    });
+
+    test('the slider range divides evenly into steps', () {
+      expect((HdrPeakNits.max - HdrPeakNits.min) % HdrPeakNits.step, 0);
+    });
   });
 
   group('HdrPeakNits.tryParse', () {

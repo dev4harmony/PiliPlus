@@ -45,14 +45,48 @@ abstract final class OhosHdrOutput {
     return 'hdr10';
   }
 
-  /// 传给 mpv 的 `--target-peak`（面板峰值亮度，nit）。
+  /// 传给 mpv 的 `--target-peak`（nit）。
   ///
   /// HDR 输出时必须给：`gpu-next` 一定会做色调映射，不给的话 libplacebo 按 PQ
   /// 的名义峰值 10000 nit 反推，高光被无谓地压暗。SDR 输出（纹理路径）时
   /// 反过来必须不给：SDR 目标配上上千 nit 的峰值，整幅画面都会被压暗。
+  ///
+  /// [matchVideo]（「匹配视频亮度」）时跟随片源元数据里的峰值，画面按片源
+  /// 亮度交给系统，不再压到 [peakNits]；片源没有亮度元数据时才用 [peakNits]
+  /// 作参考亮度。[videoSigPeak] 是 mpv 的 `video-params/sig-peak`。
   static double? targetPeak({
     required bool hdrPlayback,
     required bool platformView,
     required int peakNits,
-  }) => hdrPlayback && platformView ? peakNits.toDouble() : null;
+    bool matchVideo = false,
+    double? videoSigPeak,
+  }) {
+    if (!hdrPlayback || !platformView) {
+      return null;
+    }
+    final videoPeak = matchVideo ? videoPeakNits(videoSigPeak) : null;
+    return (videoPeak ?? peakNits).toDouble();
+  }
+
+  /// mpv `sig-peak` 的单位：SDR 参考白。
+  static const double _sdrWhiteNits = 203;
+
+  /// mpv `--target-peak` 接受的最小值。
+  static const int _minTargetPeak = 10;
+
+  /// PQ 的名义峰值。片源没有 HDR10 元数据时 mpv 就报这个值，等于「未知」。
+  static const int _pqNominalPeak = 10000;
+
+  /// 片源元数据里的峰值（nit）；sig-peak 缺失、不在 mpv 可用范围内，或只是
+  /// mpv 填的 PQ 名义峰值时返回 null。
+  static int? videoPeakNits(double? sigPeak) {
+    if (sigPeak == null || sigPeak <= 0) {
+      return null;
+    }
+    final nits = (sigPeak * _sdrWhiteNits).round();
+    if (nits < _minTargetPeak || nits >= _pqNominalPeak) {
+      return null;
+    }
+    return nits;
+  }
 }
