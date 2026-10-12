@@ -49,7 +49,9 @@
 <div align="center">
     <h1>PiliPlus</h1>
 <div align="center">
-    
+
+中文 | [English](README.en.md)
+
 ![GitHub repo size](https://img.shields.io/github/repo-size/bggRGjQaUbCoE/PiliPlus) 
 ![GitHub Repo stars](https://img.shields.io/github/stars/bggRGjQaUbCoE/PiliPlus) 
 ![GitHub all releases](https://img.shields.io/github/downloads/bggRGjQaUbCoE/PiliPlus/total) 

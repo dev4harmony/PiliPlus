@@ -15,10 +15,9 @@ import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/waterfall.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
-import 'package:waterfall_flow/waterfall_flow.dart'
-    hide SliverWaterfallFlowDelegateWithMaxCrossAxisExtent;
 
 class SettingsSearchPage extends StatefulWidget {
   const SettingsSearchPage({super.key});
@@ -152,13 +151,10 @@ class _SettingsSearchPageState
           ViewSliverSafeArea(
             sliver: Obx(() {
               if (_list.isNotEmpty) {
-                return SliverWaterfallFlow(
-                  gridDelegate:
-                      SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: Grid.smallCardWidth * 2,
-                      ),
+                return SliverMasonryGrid(
+                  gridDelegate: gridDelegate,
                   delegate: SliverChildBuilderDelegate(
-                    (_, index) => _list[index].widget,
+                    (context, index) => _list[index].widget,
                     childCount: _list.length,
                   ),
                 );
@@ -241,4 +237,8 @@ class _SettingsSearchPageState
       ),
     );
   }
+
+  late final gridDelegate = SliverSimpleGridDelegateWithMaxCrossAxisExtent_(
+    maxCrossAxisExtent: Grid.smallCardWidth * 2,
+  );
 }

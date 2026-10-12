@@ -218,7 +218,6 @@ class _WhisperDetailPageState
   void onReport(Msg item) {
     autoWrapReportDialog(
       context,
-      ban: false,
       ReportOptions.imMsgReport,
       (reasonType, reasonDesc, banUid) => _whisperDetailController.onReport(
         item,

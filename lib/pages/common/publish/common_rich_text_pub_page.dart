@@ -337,6 +337,7 @@ abstract class CommonRichTextPubPageState<T extends CommonRichTextPubPage>
   }
 
   late double _mentionOffset = 0;
+  MentionItem? get topMentionItem => null;
   Future<void>? onMention([bool fromClick = false]) async {
     // 鸿蒙适配：@面板期间冻结聊天面板，避免面板高度被重置
     controller.keepChatPanel();
@@ -344,6 +345,7 @@ abstract class CommonRichTextPubPageState<T extends CommonRichTextPubPage>
       context,
       offset: _mentionOffset,
       onCachePos: (offset) => _mentionOffset = offset,
+      top: topMentionItem,
     );
     if (res != null) {
       if (res is MentionItem) {

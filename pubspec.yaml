@@ -17,7 +17,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 # update when release
-version: 2.1.5+6174
+version: 2.1.6+6174
 
 environment:
   sdk: ">=3.12.2"
@@ -206,8 +206,8 @@ dependencies:
       url: https://github.com/HelloZeroNick/catcher_2.git
       ref: dev
   logger: ^2.7.0
-  #瀑布流
-  waterfall_flow: ^3.1.1
+  #瀑布流（上游 2.1.6 起由 waterfall_flow 换成 flutter_staggered_grid_view）
+  flutter_staggered_grid_view: ^0.7.0
   #跑马灯
   # marquee: ^2.3.0
   #富文本
@@ -252,6 +252,8 @@ dependencies:
       url: https://github.com/bggRGjQaUbCoE/window_manager.git
       path: packages/window_manager
       ref: main
+  # 上游 2.1.6 升级到 tray_manager ^0.8.0（要求 Dart ^3.13 / Flutter >=3.47），
+  # 鸿蒙 SDK 为 Dart 3.12.2 / Flutter 3.44.9，暂留 0.5.x 及旧 TrayListener 写法
   tray_manager: ^0.5.3
   # file_picker: ^10.3.3
   file_picker_ohos:
@@ -282,12 +284,13 @@ dependencies:
   characters: any
   # 上游自 66a191b01 (refa: cache manager #2266) 起改用自家 fork，
   # 该 fork 复用 HTTP client、精简了 flutter_cache_manager 依赖。
+  # 上游 2.1.6 起切到 bggRGjQaUbCoE fork（新增 gaplessPlayback 参数）。
   # 这里 pin 到具体 commit 而非上游的 ref: develop，保证可复现。
   cached_network_image_ce:
     git:
-      url: https://github.com/My-Responsitories/flutter_cached_network_image_ce.git
+      url: https://github.com/bggRGjQaUbCoE/flutter_cached_network_image_ce.git
       path: cached_network_image
-      ref: dacec4de669b4c52c59576509db069e3194408ac
+      ref: 733d4aae9cadaafa9e16f20a6f6a3682c935de01
   shared_preferences: ^2.2.1
   package_info_plus: ">=4.0.0 <11.0.0"
 

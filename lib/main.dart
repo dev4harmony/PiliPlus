@@ -20,10 +20,12 @@ import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/calc_window_position.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/core_palettes_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/font_utils.dart';
 import 'package:PiliPlus/utils/image_memory_cleaner.dart';
+import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/json_file_handler.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
@@ -107,7 +109,7 @@ void main() async {
   } catch (e) {
     await Utils.copyText(e.toString(), needToast: false);
     if (kDebugMode) debugPrint('GStorage init error: $e');
-    exit(0);
+    DeviceUtils.exitApp();
   }
   ScaledWidgetsFlutterBinding.instance.scaleFactor = Pref.uiScale;
   await Future.wait([
@@ -128,6 +130,7 @@ void main() async {
     await Future.wait([
       if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
       setupServiceLocator(),
+      if (Platform.isIOS) IOSPipHelper.init(),
     ]);
   } else if (OS.isHarmony) {
     // 鸿蒙 2in1 设备 isPCOS 为 true（isMobile 为 false），但同样需要媒体服务，
@@ -153,6 +156,8 @@ void main() async {
   RequestUtils.syncHistoryStatus();
 
   SmartDialog.config.toast = SmartConfigToast(displayType: .onlyRefresh);
+
+  FocusManager.instance.addEarlyKeyEventHandler(_onKeyEvent);
 
   if (PlatformUtils.isMobile) {
     if (OS.isHarmony) {
@@ -193,9 +198,7 @@ void main() async {
     final windowOptions = WindowOptions(
       minimumSize: const Size(400, 720),
       skipTaskbar: false,
-      titleBarStyle: Pref.showWindowTitleBar
-          ? TitleBarStyle.normal
-          : TitleBarStyle.hidden,
+      titleBarStyle: Pref.showWindowTitleBar ? .normal : .hidden,
       title: Constants.appName,
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -246,6 +249,14 @@ void main() async {
       ThemeUtils.syncColorModeToNative();
     });
   }
+}
+
+KeyEventResult _onKeyEvent(KeyEvent event) {
+  if (event is KeyDownEvent && event.logicalKey == .escape) {
+    MyApp._onBack();
+    return .handled;
+  }
+  return .ignored;
 }
 
 class MyApp extends StatelessWidget {

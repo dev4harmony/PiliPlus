@@ -9,6 +9,7 @@ import 'package:PiliPlus/common/widgets/sliver/sliver_pinned_header.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/dynamic/dyn_mention/group.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_mention/item.dart';
 import 'package:PiliPlus/pages/dynamics_mention/controller.dart';
 import 'package:PiliPlus/pages/dynamics_mention/widgets/item.dart';
 import 'package:PiliPlus/pages/search/controller.dart' show DebounceStreamState;
@@ -23,15 +24,18 @@ class DynMentionPanel extends StatefulWidget {
     super.key,
     this.scrollController,
     this.onCachePos,
+    this.top,
   });
 
   final ScrollController? scrollController;
   final ValueChanged<double>? onCachePos;
+  final MentionItem? top;
 
   static Future<Object? /* ListOr<MentionItem> */> onDynMention(
     BuildContext context, {
     double offset = 0,
     ValueChanged<double>? onCachePos,
+    MentionItem? top,
   }) async {
     final wasVisible = HarmonyChannel.hdsBarVisible;
     HarmonyChannel.setShellBarsHidden(true);
@@ -53,6 +57,7 @@ class DynMentionPanel extends StatefulWidget {
         builder: (context, scrollController) => DynMentionPanel(
           scrollController: scrollController,
           onCachePos: onCachePos,
+          top: top,
         ),
       ),
     ).then((_) {
@@ -240,37 +245,50 @@ class _DynMentionPanelState
       Success<List<MentionGroup>?>(:final response) =>
         response != null && response.isNotEmpty
             ? SliverMainAxisGroup(
-                slivers: response.map((group) {
-                  if (group.items.isNullOrEmpty) {
-                    return const SliverToBoxAdapter();
-                  }
-                  return SliverMainAxisGroup(
-                    slivers: [
-                      SliverPinnedHeader(
-                        backgroundColor: theme.colorScheme.surface,
+                slivers: [
+                  if (_controller.controller.text.isEmpty)
+                    if (widget.top case final top?)
+                      SliverToBoxAdapter(
                         child: Padding(
-                          padding: const .symmetric(
-                            horizontal: 16,
-                            vertical: 10,
+                          padding: const .only(top: 5),
+                          child: DynMentionItem(
+                            item: top,
+                            onTap: () => Get.back(result: top),
                           ),
-                          child: Text(group.groupName!),
                         ),
                       ),
-                      SliverList.builder(
-                        itemCount: group.items!.length,
-                        itemBuilder: (context, index) {
-                          final item = group.items![index];
-                          return DynMentionItem(
-                            item: item,
-                            onTap: () => Get.back(result: item),
-                            onCheck: (value) =>
-                                _controller.onCheck(value, item),
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                }).toList(),
+                  ...response.map((group) {
+                    if (group.items.isNullOrEmpty) {
+                      return const SliverToBoxAdapter();
+                    }
+                    return SliverMainAxisGroup(
+                      slivers: [
+                        SliverPinnedHeader(
+                          backgroundColor: theme.colorScheme.surface,
+                          child: Padding(
+                            padding: const .symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            child: Text(group.groupName!),
+                          ),
+                        ),
+                        SliverList.builder(
+                          itemCount: group.items!.length,
+                          itemBuilder: (context, index) {
+                            final item = group.items![index];
+                            return DynMentionItem(
+                              item: item,
+                              onTap: () => Get.back(result: item),
+                              onCheck: (value) =>
+                                  _controller.onCheck(value, item),
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  }),
+                ],
               )
             : HttpError(onReload: _controller.onReload),
       Error(:final errMsg) => HttpError(
