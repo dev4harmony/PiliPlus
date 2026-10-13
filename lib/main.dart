@@ -243,7 +243,8 @@ void main() async {
     // 顺带注册 method channel handler，保证热启动接续推送可达
     WidgetsBinding.instance.addPostFrameCallback((_) {
       HarmonyChannel.checkPendingContinuation();
-      // 查询面板支持的 HDR 类型，决定杜比视界 / HDR10+ 能否按 HDR Vivid 上报
+      // 查询面板支持的 HDR 类型：一个都不支持时 HDR 片源按 SDR 输出，
+      // 不支持 HDR Vivid 时只发 HDR10 静态元数据
       HarmonyChannel.loadDisplayHdrFormats();
       // 将当前主题颜色模式同步给原生层（Rx 初始值相同不触发监听，需显式同步）
       ThemeUtils.syncColorModeToNative();

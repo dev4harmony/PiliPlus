@@ -3,139 +3,186 @@ import 'package:PiliPlus/plugin/pl_player/models/ohos_hdr_output.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  String? mode(
+  const hdrTiers = [
+    VideoQuality.hdr,
+    VideoQuality.hdrVivid,
+    VideoQuality.dolbyVision,
+  ];
+
+  bool playback(
     VideoQuality? quality, {
-    bool hdrPlayback = true,
-    bool platformView = true,
-    bool maySupportVivid = true,
-    bool supportsVivid = true,
-  }) => OhosHdrOutput.mode(
+    bool enabled = true,
+    bool displayHasNoHdr = false,
+  }) => OhosHdrOutput.hdrPlayback(
+    enabled: enabled,
     quality: quality,
-    hdrPlayback: hdrPlayback,
-    platformView: platformView,
-    displayMaySupportVivid: maySupportVivid,
-    displaySupportsVivid: supportsVivid,
+    displayHasNoHdr: displayHasNoHdr,
   );
 
+  OhosOutput output({
+    bool hdrPlayback = true,
+    bool pipMode = false,
+    bool maySupportVivid = true,
+    int peakNits = 1000,
+    bool matchVideo = true,
+  }) => OhosHdrOutput.output(
+    hdrPlayback: hdrPlayback,
+    pipMode: pipMode,
+    displayMaySupportVivid: maySupportVivid,
+    peakNits: peakNits,
+    matchVideo: matchVideo,
+  );
+
+  const textureOutput = (platformView: false, hdrMode: 'no', targetPeak: null);
+
+  group('OhosHdrOutput.hdrPlayback', () {
+    test('treats every HDR tier as HDR', () {
+      for (final quality in hdrTiers) {
+        expect(playback(quality), isTrue, reason: quality.name);
+      }
+    });
+
+    test('keeps SDR tiers and an unknown quality in SDR', () {
+      expect(playback(VideoQuality.super4K), isFalse);
+      expect(playback(VideoQuality.high1080), isFalse);
+      expect(playback(null), isFalse);
+    });
+
+    test('stays in SDR when HDR playback is switched off', () {
+      expect(playback(VideoQuality.hdr, enabled: false), isFalse);
+    });
+
+    test('stays in SDR on a panel known to lack HDR', () {
+      expect(playback(VideoQuality.hdr, displayHasNoHdr: true), isFalse);
+    });
+  });
+
+  group('OhosHdrOutput.output', () {
+    test('gives every HDR tier the same output, so tier switches keep the '
+        'player', () {
+      // HDR 类型由 mpv 读码流决定，几档 HDR 之间切换不必重建播放器
+      final outputs = {
+        for (final quality in hdrTiers) output(hdrPlayback: playback(quality)),
+      };
+      expect(outputs, hasLength(1));
+      expect(
+        outputs.single,
+        (platformView: true, hdrMode: 'auto', targetPeak: null),
+      );
+    });
+
+    test('differs between SDR and HDR sources, so that switch rebuilds', () {
+      expect(output(hdrPlayback: false), textureOutput);
+      expect(output(hdrPlayback: false), isNot(output()));
+    });
+
+    test('falls back to the texture path in picture-in-picture', () {
+      // PiP 是另一块 XComponent，平台视图跟不过去
+      expect(output(pipMode: true), textureOutput);
+    });
+
+    test('sticks to static HDR10 signalling on panels without HDR Vivid', () {
+      expect(output(maySupportVivid: false).hdrMode, 'hdr10');
+    });
+
+    test('follows the peak setting once matching the video is off', () {
+      expect(
+        output(matchVideo: false),
+        (platformView: true, hdrMode: 'auto', targetPeak: 1000.0),
+      );
+      expect(output(matchVideo: false), isNot(output()));
+      expect(
+        output(matchVideo: false, peakNits: 1200),
+        isNot(output(matchVideo: false)),
+      );
+    });
+  });
+
   group('OhosHdrOutput.mode', () {
-    test('leaves SDR sources to mpv', () {
-      expect(mode(null), isNull);
-      expect(mode(VideoQuality.super4K), isNull);
-      expect(mode(VideoQuality.high1080, platformView: false), isNull);
+    String mode({
+      bool hdrPlayback = true,
+      bool platformView = true,
+      bool maySupportVivid = true,
+    }) => OhosHdrOutput.mode(
+      hdrPlayback: hdrPlayback,
+      platformView: platformView,
+      displayMaySupportVivid: maySupportVivid,
+    );
+
+    test('lets mpv signal HDR from the bitstream on the platform view', () {
+      // 杜比视界、HDR10+、HDR Vivid、HDR10 都由 mpv 按码流里的元数据决定
+      expect(mode(), 'auto');
+    });
+
+    test('sticks to static HDR10 signalling on panels without HDR Vivid', () {
+      expect(mode(maySupportVivid: false), 'hdr10');
     });
 
     test('turns HDR off explicitly when HDR playback is disabled', () {
-      expect(mode(VideoQuality.hdr, hdrPlayback: false), 'no');
-      expect(mode(VideoQuality.hdrVivid, hdrPlayback: false), 'no');
-      expect(mode(VideoQuality.dolbyVision, hdrPlayback: false), 'no');
+      expect(mode(hdrPlayback: false), 'no');
+      expect(mode(hdrPlayback: false, maySupportVivid: false), 'no');
     });
 
     test('keeps the texture path in SDR so Flutter never shows raw PQ', () {
-      // 内嵌 / 画中画：纹理会被 Flutter 当成 sRGB 采样，PQ 画面直接泛白
-      expect(mode(VideoQuality.hdr, platformView: false), 'no');
-      expect(mode(VideoQuality.hdrVivid, platformView: false), 'no');
-      expect(mode(VideoQuality.dolbyVision, platformView: false), 'no');
-    });
-
-    test('reports HDR10 as hdr10 on the platform view', () {
-      expect(mode(VideoQuality.hdr), 'hdr10');
-    });
-
-    test('reports native Vivid as vivid unless the panel rules it out', () {
-      expect(mode(VideoQuality.hdrVivid), 'vivid');
-      expect(mode(VideoQuality.hdrVivid, maySupportVivid: false), 'hdr10');
-    });
-
-    test('borrows the Vivid tag for Dolby Vision only when confirmed', () {
-      expect(mode(VideoQuality.dolbyVision), 'vivid');
-      expect(mode(VideoQuality.dolbyVision, supportsVivid: false), 'hdr10');
+      // SDR 片源、画中画：纹理会被 Flutter 当成 sRGB 采样，PQ 画面直接泛白
+      expect(mode(platformView: false), 'no');
+      expect(mode(platformView: false, maySupportVivid: false), 'no');
     });
   });
 
   group('OhosHdrOutput.targetPeak', () {
-    test('passes the panel peak on the platform view', () {
-      expect(
-        OhosHdrOutput.targetPeak(
-          hdrPlayback: true,
-          platformView: true,
-          peakNits: 1000,
-        ),
-        1000.0,
-      );
-    });
-
-    test('leaves the peak to mpv on the texture path', () {
-      // SDR 输出配上 1600 nit 的目标峰值，libplacebo 会把整幅画面压暗
-      expect(
-        OhosHdrOutput.targetPeak(
-          hdrPlayback: true,
-          platformView: false,
-          peakNits: 1000,
-        ),
-        isNull,
-      );
-    });
-
-    test('leaves the peak to mpv when HDR playback is disabled', () {
-      expect(
-        OhosHdrOutput.targetPeak(
-          hdrPlayback: false,
-          platformView: false,
-          peakNits: 1000,
-        ),
-        isNull,
-      );
-    });
-  });
-
-  group('OhosHdrOutput.targetPeak matching the video', () {
-    // mpv 的 sig-peak 以 SDR 参考白 203 nit 为 1
-    double sigPeak(double nits) => nits / 203;
-
     double? target({
-      double? videoSigPeak,
-      bool matchVideo = true,
+      bool hdrPlayback = true,
       bool platformView = true,
+      bool matchVideo = false,
     }) => OhosHdrOutput.targetPeak(
-      hdrPlayback: true,
+      hdrPlayback: hdrPlayback,
       platformView: platformView,
       peakNits: 1000,
       matchVideo: matchVideo,
-      videoSigPeak: videoSigPeak,
     );
 
-    test('follows the peak in the stream metadata', () {
-      expect(target(videoSigPeak: sigPeak(4000)), 4000.0);
-      expect(target(videoSigPeak: sigPeak(1600)), 1600.0);
+    test('passes the setting on the platform view', () {
+      expect(target(), 1000.0);
     });
 
-    test('uses the reference when the stream carries no peak', () {
-      // 没有 HDR10 元数据时 mpv 把 PQ 片源记成名义峰值 10000 nit
-      expect(target(videoSigPeak: sigPeak(10000)), 1000.0);
-      expect(target(videoSigPeak: null), 1000.0);
-      expect(target(videoSigPeak: 0), 1000.0);
+    test('passes no peak when matching the video', () {
+      // 不传时 mpv 以片源自身的峰值为目标，高光不会被压缩
+      expect(target(matchVideo: true), isNull);
     });
 
-    test('ignores a peak below what mpv accepts', () {
-      expect(target(videoSigPeak: sigPeak(5)), 1000.0);
+    test('leaves the peak to mpv on the texture path', () {
+      // SDR 输出配上上千 nit 的目标峰值，libplacebo 会把整幅画面压暗
+      expect(target(platformView: false), isNull);
+      expect(target(platformView: false, matchVideo: true), isNull);
     });
 
-    test('keeps the setting when matching is off', () {
-      expect(target(videoSigPeak: sigPeak(4000), matchVideo: false), 1000.0);
-    });
-
-    test('still leaves the texture path to mpv', () {
-      expect(target(videoSigPeak: sigPeak(4000), platformView: false), isNull);
+    test('leaves the peak to mpv when HDR playback is disabled', () {
+      expect(target(hdrPlayback: false), isNull);
+      expect(target(hdrPlayback: false, platformView: false), isNull);
     });
   });
 
-  group('OhosHdrOutput.videoPeakNits', () {
-    test('converts sig-peak to whole nits', () {
-      expect(OhosHdrOutput.videoPeakNits(1000 / 203), 1000);
+  group('OhosHdrOutput.measuresPeak', () {
+    test('measures the real peak when tone mapping to the setting', () {
+      // 有的 HDR10 片源标 1000 nit，画面却到 10000 nit：只信元数据的话，比它
+      // 亮的部分要么被压成一片，要么原样交给屏幕截断
+      expect(OhosHdrOutput.measuresPeak(output(matchVideo: false)), isTrue);
     });
 
-    test('treats the PQ nominal peak as unknown', () {
-      expect(OhosHdrOutput.videoPeakNits(10000 / 203), isNull);
+    test('leaves the peak alone when matching the video', () {
+      // 匹配视频亮度时目标就是片源自己标的峰值；测出更高的峰值反而会让 mpv
+      // 压缩画面，违背不做变换的约定
+      expect(OhosHdrOutput.measuresPeak(output()), isFalse);
+    });
+
+    test('does not measure on the texture path or other platforms', () {
+      expect(OhosHdrOutput.measuresPeak(textureOutput), isFalse);
+      expect(
+        OhosHdrOutput.measuresPeak(output(matchVideo: false, pipMode: true)),
+        isFalse,
+      );
+      expect(OhosHdrOutput.measuresPeak(null), isFalse);
     });
   });
 }

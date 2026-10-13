@@ -14,7 +14,7 @@ class HdrPeakNitsDialog extends StatefulWidget {
 
   final int value;
 
-  /// 开启「匹配视频亮度」时这里是参考亮度，说明文字随之不同。
+  /// 开启「匹配视频亮度」时这里的值不生效，说明文字随之不同。
   final bool matchVideo;
 
   @override
@@ -65,11 +65,11 @@ class _HdrPeakNitsDialogState extends State<HdrPeakNitsDialog> {
         children: [
           Text(
             widget.matchVideo
-                ? '已开启「匹配视频亮度」：片源带亮度元数据时按片源输出，这里是片源'
-                      '没有元数据时使用的参考亮度。重新打开视频后生效。'
-                : '鸿蒙无法读取屏幕的峰值亮度，HDR 色调映射需要这个值。'
-                      '请填写屏幕参数里的峰值亮度：填高了高光细节会被屏幕截断，'
-                      '填低了高光会偏暗。重新打开视频后生效。',
+                ? '已开启「匹配视频亮度」：HDR 画面保持片源亮度，不随系统亮度变化，'
+                      '这里的值不生效，关闭后才按它做色调映射。'
+                : '片源的峰值映射到这里：比它亮的高光由播放器压缩进这个范围，'
+                      '而不是被屏幕截断。按屏幕的峰值亮度填写；填得比屏幕能达到'
+                      '的还高时，超出的部分仍会被屏幕截断。',
           ),
           const SizedBox(height: 12),
           Slider(

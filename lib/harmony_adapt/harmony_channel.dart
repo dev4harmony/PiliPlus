@@ -12,10 +12,8 @@ import 'package:get/get.dart';
 import 'package:os_type/os_type.dart';
 
 abstract class HarmonyChannel {
-  /// @ohos.graphics.hdrCapability 的 HDRFormat 取值。
-  static const int hdrFormatHlg = 1;
-  static const int hdrFormatHdr10 = 2;
-  static const int hdrFormatVivid = 3;
+  /// @ohos.graphics.hdrCapability 的 HDRFormat 中 HDR Vivid 的取值。
+  static const int _hdrFormatVivid = 3;
 
   /// 面板实际支持的 HDR 类型，启动时查一次。
   ///
@@ -24,25 +22,17 @@ abstract class HarmonyChannel {
   /// 完全正常的设备上被静默禁用；后者才是这块屏确实不支持。
   static Set<int>? _displayHdrFormats;
 
-  static Set<int> get displayHdrFormats => _displayHdrFormats ?? const {};
-
   /// 面板是否**明确**不支持任何 HDR 格式。只有问出过结果才敢下这个结论，
   /// 见 [_displayHdrFormats] 对 null 的说明。
   static bool get displayHasNoHdr => _displayHdrFormats?.isEmpty ?? false;
 
-  /// 面板**确证**支持 HDR Vivid（保守口径，未知按不支持）。
+  /// 面板**没有明确表示**不支持 HDR Vivid（未知按支持）。
   ///
-  /// 用于杜比视界：它只是借 Vivid 的标签让面板拉峰值亮度，自己没有 CUVA
-  /// 载荷，没确证就退回 hdr10 更稳。
-  static bool get displaySupportsHdrVivid =>
-      _displayHdrFormats?.contains(hdrFormatVivid) ?? false;
-
-  /// 面板**没有明确表示**不支持 HDR Vivid（乐观口径，未知按支持）。
-  ///
-  /// 用于原生 HDR Vivid 片源：片源自己带 CUVA，本来就该按 Vivid 上报。
-  /// 与 [displayHasNoHdr] 同一个口径——查询失败不该把它静默降级成 hdr10。
+  /// HDR Vivid 是鸿蒙唯一带动态元数据的类型，HDR Vivid、杜比视界、HDR10+
+  /// 都靠它上报。与 [displayHasNoHdr] 同一个口径——查询失败不该把它们静默
+  /// 降级成只有静态元数据的 HDR10。
   static bool get displayMaySupportHdrVivid =>
-      _displayHdrFormats?.contains(hdrFormatVivid) ?? true;
+      _displayHdrFormats?.contains(_hdrFormatVivid) ?? true;
 
   /// 查询面板的 HDR 能力。只在鸿蒙上有意义。
   ///
@@ -60,8 +50,7 @@ abstract class HarmonyChannel {
       };
       if (kDebugMode) {
         debugPrint(
-          '[HDRCAP] display hdrFormats=$_displayHdrFormats '
-          'vivid=$displaySupportsHdrVivid',
+          '[HDRCAP] display hdrFormats=$_displayHdrFormats',
         );
       }
     } catch (e) {
@@ -184,15 +173,19 @@ abstract class HarmonyChannel {
 
   /// 控制原生 HDS 底栏/顶栏的显隐（弹窗、全屏页等场景）
   static Future<void> setShellBarsHidden(
-    bool hidden, 
-    {bool retry = false, bool force = false,}
-  ) async {
+    bool hidden, {
+    bool retry = false,
+    bool force = false,
+  }) async {
     if (!OS.isHarmony) return;
     _hiddenByPage = hidden;
     final int total = retry ? 8 : 1;
     for (int i = 0; i < total; i++) {
       try {
-        _channel.invokeMethod('setShellBarsHidden', {'hidden': hidden,'force': force});
+        _channel.invokeMethod('setShellBarsHidden', {
+          'hidden': hidden,
+          'force': force,
+        });
         return;
       } catch (_) {
         if (i == total - 1) return;
@@ -346,8 +339,9 @@ abstract class HarmonyChannel {
   static Future<void> setWindowOrientation(int orientation) async {
     if (!OS.isHarmony) return;
     try {
-      await _channel.invokeMethod(
-          'setWindowOrientation', {'orientation': orientation});
+      await _channel.invokeMethod('setWindowOrientation', {
+        'orientation': orientation,
+      });
     } catch (_) {}
   }
 

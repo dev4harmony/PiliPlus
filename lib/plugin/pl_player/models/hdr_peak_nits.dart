@@ -1,8 +1,7 @@
-/// 鸿蒙 HDR 输出的峰值亮度（nit），即传给 mpv 的 `--target-peak`。
+/// 「HDR 峰值亮度」设置：HDR 画面在屏幕上的峰值（nit），由用户按屏幕能力填写。
+/// 关闭「匹配视频亮度」时片源的峰值映射到这里，即 mpv 的 `--target-peak`。
 ///
-/// 鸿蒙没有公开查询面板峰值亮度的接口（`display` 只给得出支持哪些 HDR 格式），
-/// 所以由用户在设置里填写。开启「匹配视频亮度」时它是参考亮度：只在片源
-/// 没有亮度元数据时使用，见 [OhosHdrOutput.targetPeak]。
+/// 开启「匹配视频亮度」时不使用，见 [OhosHdrOutput.targetPeak]。
 abstract final class HdrPeakNits {
   /// 未设置时的取值：1000 nit 是 HDR 的常用参考亮度（HLG 名义参考显示器、
   /// 多数 HDR10 母版的峰值）。

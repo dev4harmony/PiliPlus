@@ -98,8 +98,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// setDataSource 与渲染路径重建共用的串行队列，见 [PlayerRebuildQueue]。
   late final PlayerRebuildQueue _playerQueue = PlayerRebuildQueue(
     hasPlayer: () => _videoPlayerController != null,
-    isStale: () =>
-        _usesPlatformView != usePlatformView || _appliedHdrMode != ohosHdrMode,
+    isStale: () => _appliedOutput != _ohosOutput,
     rebuild: _rebuildForRenderPath,
     onError: _onRenderPathRebuildFailed,
   );
@@ -579,98 +578,41 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 当前播放源的画质，用于判断是否为 HDR 片源。由 [setDataSource] 传入。
   VideoQuality? _hdrQuality;
 
-  /// 面板**明确**不支持任何 HDR 格式时不进 HDR 路径：既不该发 HDR 信令，也不
-  /// 该按 [_displayPeakNits] 去标定一块 SDR 屏。能力未知（查询失败 / 老版本
-  /// 原生侧没有这个 method）时按支持处理，免得一次偶发失败就把 HDR 关掉。
-  bool get _isHDRPlayback =>
-      enableHDR &&
-      (_hdrQuality?.isHDR ?? false) &&
-      !HarmonyChannel.displayHasNoHdr;
-
-  /// 鸿蒙上 HDR 必须走平台视图（XComponent）渲染。
+  /// 鸿蒙上现在需要的视频输出，规则见 [OhosHdrOutput]；其他平台为 null。
   ///
-  /// Flutter 纹理会把视频重采样进 Flutter 自己的 SDR 合成层，libmpv 挂在
-  /// NativeWindow 上的色域与 HDR 元数据在这一步就丢了，系统因此不会进入 HDR
-  /// 模式（没有峰值亮度，PQ 画面被按 sRGB 显示所以颜色也不对）。
+  /// HDR 必须走平台视图（XComponent）渲染。Flutter 纹理会把视频重采样进
+  /// Flutter 自己的 SDR 合成层，libmpv 挂在 NativeWindow 上的色域与 HDR 元数据
+  /// 在这一步就丢了，系统因此不会进入 HDR 模式（没有峰值亮度，PQ 画面被按
+  /// sRGB 显示所以颜色也不对）。
   ///
   /// 平台视图由 RenderService 合成在 Flutter 表面「之下」，因此视频区域上方的
   /// 每一层 Flutter 都必须透明：全屏时整屏都是播放器；内嵌时页面 scaffold
   /// 底色改透明，视频矩形以外的区域由页面内容自带的背景色兜底
   /// （见 videoDetailPage 的 ColoredBox）。
   ///
-  /// 没有开关：关掉平台视图等于关掉 HDR（元数据会在 Flutter 纹理那一步丢光），
-  /// 所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。
-  /// 渲染路径与全屏状态无关：进出全屏不再重建播放器，避免 HDR 切换时的
-  /// 重新缓冲。画中画要排除：PiP 是另一块 XComponent（FloatingPlugin 会把
-  /// Flutter 引擎重新 attach 上去），平台视图不会跟过去，留在平台视图路径上
-  /// 的结果是 PiP 窗口里一片空白。退回纹理路径至少画面还在，只是没有 HDR。
-  bool get usePlatformView => OS.isHarmony && _isHDRPlayback && !isPipMode;
-
-  /// 当前 VideoController 实际使用的渲染路径，用于判断是否需要重建播放器。
-  bool _usesPlatformView = false;
-
-  /// 当前播放器实际带着的 `--ohos-hdr-mode`。
-  ///
-  /// 这个属性只在创建 Player 时写一次，之后改不了。两档 HDR 之间切换（例如
-  /// 杜比视界 → HDR10）渲染路径并没有变，只看 [_usesPlatformView] 会以为无事
-  /// 发生，于是新片源顶着上一档的信令上屏，类型报错。
-  String? _appliedHdrMode;
-
-  /// 当前播放器生效的 `--target-peak`。创建时还不知道片源峰值，先按
-  /// [ohosHdrTargetPeak] 下发；「匹配视频亮度」时等 mpv 报出 video-params 再由
-  /// [_syncTargetPeakToVideo] 改成片源峰值。
-  double? _appliedTargetPeak;
-
-  /// 色调映射用的目标峰值亮度（nit），取自设置「HDR 峰值亮度」。
-  ///
-  /// 鸿蒙没有公开查询面板峰值亮度的接口（`display` 只给得出支持哪些 HDR
-  /// 格式），所以由用户填写，默认 1000。开启「匹配视频亮度」时它只是片源没有
-  /// 亮度元数据时的参考亮度。改了设置从下一次重建播放器（重新打开视频、
-  /// 切换清晰度）起生效。
-  ///
-  /// 只在平台视图输出 HDR 时才会用上，规则见 [OhosHdrOutput.targetPeak]。
-  static int get _displayPeakNits => Pref.hdrPeakNits;
-
-  /// 传给 mpv 的 `--ohos-hdr-mode`，规则见 [OhosHdrOutput.mode]。
-  String? get ohosHdrMode => OS.isHarmony
-      ? OhosHdrOutput.mode(
-          quality: _hdrQuality,
-          hdrPlayback: _isHDRPlayback,
-          platformView: usePlatformView,
+  /// 平台视图没有单独的开关：关掉它等于关掉 HDR（元数据会在 Flutter 纹理那一步
+  /// 丢光），所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。峰值亮度
+  /// 由用户在设置里填写，见 [OhosHdrOutput.targetPeak]。
+  OhosOutput? get _ohosOutput => OS.isHarmony
+      ? OhosHdrOutput.output(
+          hdrPlayback: OhosHdrOutput.hdrPlayback(
+            enabled: enableHDR,
+            quality: _hdrQuality,
+            displayHasNoHdr: HarmonyChannel.displayHasNoHdr,
+          ),
+          pipMode: isPipMode,
           displayMaySupportVivid: HarmonyChannel.displayMaySupportHdrVivid,
-          displaySupportsVivid: HarmonyChannel.displaySupportsHdrVivid,
+          peakNits: Pref.hdrPeakNits,
+          matchVideo: Pref.hdrMatchVideoPeak,
         )
       : null;
 
-  /// 传给 mpv 的 `--target-peak`，规则见 [OhosHdrOutput.targetPeak]。
-  /// 创建播放器时还不知道片源峰值，所以这里总是参考值，见 [_appliedTargetPeak]。
-  double? get ohosHdrTargetPeak => OS.isHarmony
-      ? OhosHdrOutput.targetPeak(
-          hdrPlayback: _isHDRPlayback,
-          platformView: usePlatformView,
-          peakNits: _displayPeakNits,
-        )
-      : null;
-
-  /// 「匹配视频亮度」：mpv 解出片源的 video-params 后，把 `--target-peak`
-  /// 改成片源元数据里的峰值。按播放器实际走的渲染路径
-  /// （[_usesPlatformView]）判断，而不是当前的 [usePlatformView]。
-  void _syncTargetPeakToVideo(VideoParams params) {
-    final player = _videoPlayerController;
-    if (player == null) return;
-    final peak = OhosHdrOutput.targetPeak(
-      hdrPlayback: _isHDRPlayback,
-      platformView: _usesPlatformView,
-      peakNits: _displayPeakNits,
-      matchVideo: Pref.hdrMatchVideoPeak,
-      videoSigPeak: params.sigPeak,
-    );
-    if (peak == null || peak == _appliedTargetPeak) return;
-    _appliedTargetPeak = peak;
-    player.platform!.maybeAsNativePlayer
-        .setProperty('target-peak', peak.toStringAsFixed(0))
-        .catchError((Object e) => debugPrint('set target-peak failed: $e'));
-  }
+  /// 当前播放器创建时用的输出。
+  ///
+  /// 这些只在创建 Player 时写一次，与 [_ohosOutput] 不一致就得重建播放器：在
+  /// SDR 与 HDR 片源之间切换、进出画中画、面板能力在首个视频打开后才查到，或是
+  /// 改了峰值亮度设置。几档 HDR 之间切换得到的是同一个输出，不会重建。
+  OhosOutput? _appliedOutput;
 
   late final progressType = Pref.btmProgressBehavior;
   late final enableQuickDouble = Pref.enableQuickDouble;
@@ -1165,7 +1107,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  Future<Player> _initPlayer() async {
+  Future<Player> _initPlayer(OhosOutput? output) async {
     assert(_videoPlayerController == null);
     final opt = {
       'video-sync': Pref.videoSync,
@@ -1176,6 +1118,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
               .toString(),
       // 鸿蒙 media_kit fork 未内置 volume-max（上游换 fork 后删除了这项）
       'volume-max': kMaxVolume.toString(),
+      // 按设定峰值色调映射时测量片源的实际峰值，盖掉 media-kit 默认的 no
+      if (OhosHdrOutput.measuresPeak(output)) 'hdr-compute-peak': 'yes',
     };
     final autosync = Pref.autosync;
     if (autosync != '0') {
@@ -1201,9 +1145,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         enableHardwareAcceleration: hwdec != null,
         androidAttachSurfaceAfterVideoParameters: false,
         hwdec: hwdec,
-        usePlatformView: usePlatformView,
-        ohosHdrMode: ohosHdrMode,
-        ohosHdrTargetPeak: ohosHdrTargetPeak,
+        usePlatformView: output?.platformView ?? false,
+        ohosHdrMode: output?.hdrMode,
+        ohosHdrTargetPeak: output?.targetPeak,
       ),
     );
     // await player.setAudioTrack(.auto());
@@ -1240,14 +1184,12 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     var player = _videoPlayerController;
 
-    // 渲染路径（平台视图 / 纹理）和 HDR 信令都在 VideoController 创建时就固定
-    // 了，改不了。所以两者任一发生变化都必须重建播放器：
+    // 渲染路径（平台视图 / 纹理）和 HDR 参数都在 VideoController 创建时就固定
+    // 了，改不了，与现在需要的不一致就必须重建播放器（见 [_appliedOutput]）：
     //  - 渲染路径变了还不重建：切到 HDR 片源后仍停在纹理路径，HDR 不会触发；
-    //  - 只有信令变了（例如杜比视界 → HDR10，两者都走平台视图）还不重建：
-    //    新片源会顶着上一档的 --ohos-hdr-mode 上屏，类型报错。
-    if (player != null &&
-        (_usesPlatformView != usePlatformView ||
-            _appliedHdrMode != ohosHdrMode)) {
+    //  - 模式变了还不重建：例如面板能力在首个视频打开后才查到不支持 HDR Vivid，
+    //    新片源仍会按 Vivid 上报。
+    if (player != null && _appliedOutput != _ohosOutput) {
       _removeListeners();
       await _disposePlayerSafely(player);
       player = null;
@@ -1256,10 +1198,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     if (player == null) {
-      _usesPlatformView = usePlatformView;
-      _appliedHdrMode = ohosHdrMode;
-      _appliedTargetPeak = ohosHdrTargetPeak;
-      player = await _initPlayer();
+      final output = _ohosOutput;
+      _appliedOutput = output;
+      player = await _initPlayer(output);
       if (_playerCount == 0) {
         _removeListeners();
         await _disposePlayerSafely(player);
@@ -1446,7 +1387,16 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     final stream = player.stream;
     _subscriptions = [
-      if (OS.isHarmony) stream.videoParams.listen(_syncTargetPeakToVideo),
+      // 播放中改了「匹配视频亮度」或峰值亮度也要生效：与当前播放器的输出
+      // 不一致时由 [_syncRenderPath] 重建播放器，进度和播放状态都保留。
+      if (OS.isHarmony)
+        for (final key in const [
+          SettingBoxKey.hdrMatchVideoPeak,
+          SettingBoxKey.hdrPeakNits,
+        ])
+          GStorage.setting
+              .watch(key: key)
+              .listen((_) => unawaited(_syncRenderPath())),
 
       /// playing
       stream.playing.listen((bool playing) {
@@ -2199,7 +2149,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  /// 渲染路径（平台视图 / 纹理）或 HDR 信令变化时重建播放器。
+  /// 输出（渲染路径或 HDR 参数，见 [_appliedOutput]）变化时重建播放器。
   ///
   /// 与 setDataSource 排在同一条队列里，是否真要重建到了队头才判断，
   /// 见 [PlayerRebuildQueue]。

@@ -817,7 +817,8 @@ abstract final class Pref {
   static int get hdrPeakNits =>
       HdrPeakNits.sanitize(_setting.get(SettingBoxKey.hdrPeakNits));
 
-  /// HDR 峰值跟随片源亮度元数据；片源没有元数据时用 [hdrPeakNits] 作参考亮度
+  /// HDR 输出保持片源自身的峰值亮度，由系统按元数据适配屏幕；关闭时按
+  /// [hdrPeakNits] 色调映射
   static bool get hdrMatchVideoPeak =>
       _setting.get(SettingBoxKey.hdrMatchVideoPeak, defaultValue: true);
 

@@ -11,7 +11,6 @@ import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
-import 'package:PiliPlus/plugin/pl_player/models/hdr_peak_nits.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
@@ -20,7 +19,6 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -316,7 +314,7 @@ List<SettingsModel> get playSettings => [
     ),
     const SwitchModel(
       title: '匹配视频亮度',
-      subtitle: 'HDR 峰值跟随片源的亮度元数据，交给系统按屏幕能力显示；片源没有元数据时使用下方的参考亮度',
+      subtitle: '保持片源自身的亮度，不随系统亮度变化',
       leading: Icon(Icons.brightness_auto_outlined),
       setKey: SettingBoxKey.hdrMatchVideoPeak,
       defaultVal: true,
@@ -325,8 +323,8 @@ List<SettingsModel> get playSettings => [
       title: 'HDR 峰值亮度',
       leading: const Icon(Icons.wb_sunny_outlined),
       getSubtitle: () => Pref.hdrMatchVideoPeak
-          ? '当前 ${Pref.hdrPeakNits} nit，片源没有亮度元数据时作为参考亮度'
-          : '当前 ${Pref.hdrPeakNits} nit。系统读不到屏幕峰值亮度，需按屏幕参数填写',
+          ? '当前 ${Pref.hdrPeakNits} nit，开启「匹配视频亮度」时不使用'
+          : '当前 ${Pref.hdrPeakNits} nit，片源的峰值映射到这里',
       onTap: _showHdrPeakNitsDialog,
     ),
   ],
