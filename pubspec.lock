@@ -1198,7 +1198,7 @@ packages:
     description:
       path: media_kit
       ref: feat-ohos-hdr
-      resolved-ref: "1f96a52a72e21632c198b8d5ca6f61f80fc880be"
+      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
       url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "1.2.3"
@@ -1243,7 +1243,7 @@ packages:
     description:
       path: "libs/ohos/media_kit_libs_ohos"
       ref: feat-ohos-hdr
-      resolved-ref: "1f96a52a72e21632c198b8d5ca6f61f80fc880be"
+      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
       url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "1.0.0"
@@ -1252,7 +1252,7 @@ packages:
     description:
       path: "libs/universal/media_kit_libs_video"
       ref: feat-ohos-hdr
-      resolved-ref: "1f96a52a72e21632c198b8d5ca6f61f80fc880be"
+      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
       url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "1.0.7"
@@ -1279,7 +1279,7 @@ packages:
     description:
       path: media_kit_video
       ref: feat-ohos-hdr
-      resolved-ref: "1f96a52a72e21632c198b8d5ca6f61f80fc880be"
+      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
       url: "https://github.com/p1nbored/media-kit.git"
     source: git
     version: "2.0.1"
