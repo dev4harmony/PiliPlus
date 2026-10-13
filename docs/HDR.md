@@ -35,7 +35,7 @@ libmpv 在鸿蒙上已经会把 NativeWindow 切到 BT.2020 PQ / HLG，并挂上
 ## 设置
 
 - **启用 HDR 视频**：默认开启。关闭或面板明确不支持 HDR 时，HDR 片源也按 SDR 输出。
-- **匹配视频亮度**：默认开启。保持片源自身的亮度：mpv 不做色调映射，画面不随系统亮度变化，只有超出屏幕能力的部分由系统按元数据适配。
+- **匹配视频亮度**：默认开启。开启时按片源自身的亮度输出：mpv 不做色调映射，只有超出屏幕能力的部分由系统按元数据适配。关闭时由 mpv 把片源的峰值映射到「HDR 峰值亮度」。两种情况下 HDR 画面都不随系统亮度变化。
 - **HDR 峰值亮度**：关闭「匹配视频亮度」后片源的峰值映射到这里，比它亮的内容由 mpv 压缩进这个范围，而不是被屏幕截断。按屏幕的峰值亮度填写，默认 1000 nit，可在 200–10000 之间修改；填得比屏幕能达到的还高时，超出的部分仍会被屏幕截断。
 
 「匹配视频亮度」与峰值亮度在播放中修改立即生效（重建播放器，保留进度）；「启用 HDR 视频」从下一次打开视频起生效。
@@ -65,7 +65,7 @@ libmpv 在鸿蒙上已经会把 NativeWindow 切到 BT.2020 PQ / HLG，并挂上
 - libplacebo 自己只从 RPU 取 L1（启用 libdovi 时，解析原始 RPU 那一步还会再写一遍），所以 mpv 在这两步之后把 L1 + L3 写回它的 `max_pq_y` / `avg_pq_y`。「匹配视频亮度」关闭时 L3 因此进入色调映射：libplacebo 的曲线（默认的 spline，st2094-10 也一样）按平均值选拐点。正的中间调偏移让中间调明显变暗，以录到的测试片段映射到 1000 nit 为例，100 nit 处暗约 25%；把平均值压到全黑的负偏移却只让画面略暗（约 7%–11%），而不是像杜比调色指南描述的那样（只调中间调的曝光，不动黑位和高光）变亮。这是 libplacebo 选拐点的方式决定的：拐点到下限后按 PQ 线性缩放；杜比自己的显示管理不公开。开启时 mpv 不做映射，偏移只经 HDR Vivid 元数据交给系统适配；片源峰值在屏幕能力之内时系统几乎不映射，偏移也就几乎看不出来（同一片段映射到 1600 nit 时，上述差别只剩 3%–5%）。L1 / L3 的最小值只进 HDR Vivid：libplacebo 映射 PQ 时一律以绝对黑为下限。
 - 静态元数据（母版显示器、MaxCLL / MaxFALL）取自 SEI 137/144，描述的是实际输出：不做色调映射时就是片源自己的值，色调映射时峰值换成目标亮度。杜比视界片源缺这些 SEI 时，由 RPU 的 L6（MaxCLL / MaxFALL、母版亮度）与 L9（母版显示器原色）补齐。系统按 MaxCLL 决定把面板提亮多少，所以它不会是 0：缺 MaxCLL 时用母版峰值；完全没有亮度元数据的 PQ 片源按 libplacebo 的默认值（PQ 名义峰值 10000 nit）上报。
 - `--target-peak`：「匹配视频亮度」开启时不下发，mpv 以片源自身的峰值为目标，不压缩高光；关闭时下发「HDR 峰值亮度」，mpv 把片源的峰值色调映射到它，上报的元数据按映射后的画面计算。片源的峰值按优先级取自：杜比视界 L1 + L3 与 HDR10+ 的逐场景峰值；没有动态元数据时由 libplacebo 在 GPU 上逐帧测量，不只信静态的 MaxCLL——有的 HDR10 片源标 1000 nit，画面却到 10000 nit，只信元数据的话比标称值亮的部分要么被压成一片，要么原样交给屏幕截断。media-kit 默认关掉了测量（`hdr-compute-peak=no`），所以这时播放器显式打开（`OhosHdrOutput.measuresPeak`）；「匹配视频亮度」开启时不测，否则测出的更高峰值会让 mpv 去压缩画面。
-- 鸿蒙按元数据给 HDR 图层分配亮度（graphic_2d `RSHdrUtil::UpdateSurfaceNodeNit`：由 MaxCLL 与动态元数据算出图层亮度，上限是屏幕此刻能达到的亮度），PQ 画面按绝对亮度显示，系统亮度只影响 SDR 界面。实测 HDR 画面在屏时系统把面板拉到 HDR 峰值（约 1600 nit），亮度条只改变 SDR 白（`display.getBrightnessInfo()` 报的 `sdrNits × 余量` 基本不变）。所以「匹配视频亮度」开启时画面不随系统亮度变化。
+- 鸿蒙按元数据给 HDR 图层分配亮度（graphic_2d `RSHdrUtil::UpdateSurfaceNodeNit`：由 MaxCLL 与动态元数据算出图层亮度，上限是屏幕此刻能达到的亮度），PQ 画面按绝对亮度显示，系统亮度只影响 SDR 界面。实测 HDR 画面在屏时系统把面板拉到 HDR 峰值（约 1600 nit），亮度条只改变 SDR 白（`display.getBrightnessInfo()` 报的 `sdrNits × 余量` 基本不变）。所以无论是否开启「匹配视频亮度」，HDR 画面都不随系统亮度变化。
 - 纹理路径输出 SDR 时不能下发 `--target-peak`：SDR 目标配上上千 nit 的峰值，整幅画面会被压暗。
 - 纹理路径沿用 cnoim 的 SDR 目标（media-kit 762fdc63：BT.709 / BT.1886，spline 色调映射）。
 
@@ -81,7 +81,7 @@ hdc shell hidumper -s RenderService -a allInfo | grep -E 'Name \[[0-9]+Surface\]
 
 播放 HDR 片源时，`<viewId>Surface` 节点的 `NodeColorSpace` 应为 `7`（BT.2020）；Flutter 自身的 surface 为 `4`（sRGB）。
 
-mpv 的 `vo/gpu-next/ohos` 模块在 verbose 级别打印 NativeWindow 的色彩空间、HDR 类型和静态元数据（含母版原色 `primaries R … G … B … W …`，可核对 L9），以及杜比视界 RPU 带了哪些层级（`Dolby Vision RPU levels: 1 2x3 3(min … max … avg …) 5 6 8x2 9 11 254`，`xN` 是同一层级的块数，括号里是 L3 的原始码值），在 debug 级别打印每次更新的动态元数据。mpv 做色调映射时，这一行末尾还有曲线的输入（`tone mapped from avg … max …`，4095 码值），可核对 L1 + L3 是否进了色调映射。
+mpv 的 `vo/gpu-next/ohos` 模块在 verbose 级别打印 NativeWindow 的色彩空间、HDR 类型和静态元数据（含母版原色 `primaries R … G … B … W …`，可核对 L9），以及杜比视界 RPU 带了哪些层级（`Dolby Vision RPU levels: 1 2x3 3(min … max … avg …) 5 6 8x2 9 11 254`，`xN` 是同一层级的块数，括号里是 L3 的原始码值），在 debug 级别打印每次更新的动态元数据。mpv 做色调映射时，这一行末尾还有曲线的输入（`tone mapped from avg … max …`，4095 码值；avg 为 0 表示没有动态的平均值，例如 HDR10），可核对 L1 + L3 是否进了色调映射。
 
 渲染服务在 debug 级别打印每个 HDR 视频图层的 `RSHdrUtil::UpdateSurfaceNodeNit`（`layerNits`、`displayNits`、`sdrNits`、`scaler`），可据此核对屏幕上的峰值。
 

@@ -314,7 +314,7 @@ List<SettingsModel> get playSettings => [
     ),
     const SwitchModel(
       title: '匹配视频亮度',
-      subtitle: '保持片源自身的亮度，不随系统亮度变化',
+      subtitle: '开启时按片源自身的亮度输出，不做色调映射；关闭时把片源的峰值映射到「HDR 峰值亮度」',
       leading: Icon(Icons.brightness_auto_outlined),
       setKey: SettingBoxKey.hdrMatchVideoPeak,
       defaultVal: true,
