@@ -74,6 +74,7 @@ jobs:
       - name: Setup flutter-ohos
         run: |
           git clone -b oh-3.44.9-dev https://gitcode.com/CPF-Flutter/flutter_flutter.git $GITHUB_WORKSPACE/flutter
+          git -C $GITHUB_WORKSPACE/flutter apply $GITHUB_WORKSPACE/lib/scripts/double_tap_gesture.patch
           echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
         shell: bash
 
