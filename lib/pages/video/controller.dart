@@ -136,8 +136,7 @@ class VideoDetailController extends GetxController
   final plPlayerController = PlPlayerController.getInstance()
     ..brightness.value = -1;
 
-  /// 渲染路径切换导致播放器重建后，重新绑定绑在 Player 上的东西。
-  /// 见 [onInit]。
+  /// 播放器重建后，重新绑定绑在 Player 上的东西。见 [onInit]。
   Worker? _renderPathWorker;
   bool get setSystemBrightness => plPlayerController.setSystemBrightness;
   bool get removeSafeArea => plPlayerController.removeSafeArea;
@@ -386,14 +385,15 @@ class VideoDetailController extends GetxController
   @override
   void onInit() {
     super.onInit();
-    // 鸿蒙 HDR：进出全屏 / 画中画会切换渲染路径，播放器被整体重建。字幕轨和
+    // 鸿蒙 HDR：进出画中画、改了峰值亮度设置时播放器会被整体重建。字幕轨和
     // SponsorBlock 的进度订阅都绑在旧 Player 上，重建后一起失效（字幕不再出，
     // 片段不再跳），必须重新挂一次。
     //
-    // 订阅的是 playerRebuilt 而不是 playerGeneration：后者在 VideoController
-    // 刚被替换时就自增，那时 `player.open()` 还没调用，这时候设的字幕轨会被
-    // 随后的 loadfile 丢掉。playerRebuilt 只在重建**完成**后自增，且只由
-    // 渲染路径重建（_rebuildForRenderPath）触发——正常 setDataSource 有 onInit 收口，不会重复。
+    // 订阅的是 playerRebuilt 而不是 videoController 的变化：后者在
+    // VideoController 刚被替换时就变了，那时 `player.open()` 还没调用，这时候
+    // 设的字幕轨会被随后的 loadfile 丢掉。playerRebuilt 只在重建**完成**后
+    // 自增，且只由 _rebuildForRenderPath 触发——正常 setDataSource 有 onInit
+    // 收口，不会重复。
     if (OS.isHarmony) {
       _renderPathWorker = ever(plPlayerController.playerRebuilt, (_) {
         if (isClosed) return;

@@ -36,8 +36,7 @@ abstract class HarmonyChannel {
 
   /// 查询面板的 HDR 能力。只在鸿蒙上有意义。
   ///
-  /// 失败时**保持 null**（未知）而不是记成空集：原生侧查询异常与「这块屏真的
-  /// 不支持 HDR」必须区分开，否则一次偶发失败会把 HDR 永久关掉。
+  /// 失败时能力保持未知，不能记成空集，见 [_displayHdrFormats]。
   static Future<void> loadDisplayHdrFormats() async {
     if (!OS.isHarmony) return;
     try {
@@ -48,11 +47,6 @@ abstract class HarmonyChannel {
         for (final e in list ?? const <Object?>[])
           if (e is int) e,
       };
-      if (kDebugMode) {
-        debugPrint(
-          '[HDRCAP] display hdrFormats=$_displayHdrFormats',
-        );
-      }
     } catch (e) {
       // 含 MissingPluginException：原生侧没有这个 method 的旧版本。
       // 不写 _displayHdrFormats，能力保持「未知」。

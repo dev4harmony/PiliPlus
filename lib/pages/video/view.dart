@@ -1756,7 +1756,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       clipBehavior: Clip.none,
       children: [
         const Positioned.fill(
-          child: ColoredBox(color: Colors.black, isAntiAlias: false),
+          child: ColoredBox(
+            color: Colors.black,
+            isAntiAlias: false,
+          ),
         ),
 
         plPlayer(width: width, height: height),

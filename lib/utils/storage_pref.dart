@@ -809,16 +809,17 @@ abstract final class Pref {
   static bool get enableHA =>
       _setting.get(SettingBoxKey.enableHA, defaultValue: true);
 
-  /// 播放 HDR 视频时覆盖播放器设置，启用 HDR 输出
+  /// 启用 HDR 视频：关闭时 HDR 片源也按 SDR 输出
   static bool get enableHDR =>
       _setting.get(SettingBoxKey.enableHDR, defaultValue: true);
 
-  /// HDR 色调映射用的面板峰值亮度（nit）。鸿蒙读不到面板峰值亮度，由用户填写
+  /// 色调映射的目标峰值亮度（nit），「匹配视频亮度」关闭时才用。鸿蒙读不到
+  /// 面板峰值亮度，由用户填写
   static int get hdrPeakNits =>
       HdrPeakNits.sanitize(_setting.get(SettingBoxKey.hdrPeakNits));
 
-  /// HDR 输出保持片源自身的峰值亮度，由系统按元数据适配屏幕；关闭时按
-  /// [hdrPeakNits] 色调映射
+  /// 匹配视频亮度：HDR 输出保持片源自身的峰值亮度，由系统按元数据适配屏幕；
+  /// 关闭时按 [hdrPeakNits] 色调映射
   static bool get hdrMatchVideoPeak =>
       _setting.get(SettingBoxKey.hdrMatchVideoPeak, defaultValue: true);
 

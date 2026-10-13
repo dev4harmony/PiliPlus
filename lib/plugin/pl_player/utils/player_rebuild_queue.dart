@@ -1,9 +1,9 @@
 /// 播放器初始化与渲染路径重建共用的串行队列。
 ///
 /// setDataSource（新片源要的输出与当前播放器不同，例如在 SDR 与 HDR 片源之间
-/// 切换）和渲染路径重建（进出画中画）都会 dispose 旧 Player 再建新的。两者
-/// 交错执行时，同一个 Player 会被 dispose 两次，还会多建出一个没人持有的
-/// Player，所以一律排进 [run]。
+/// 切换）和输出重建（进出画中画、改了峰值亮度设置）都会 dispose 旧 Player
+/// 再建新的。两者交错执行时，同一个 Player 会被 dispose 两次，还会多建出一个
+/// 没人持有的 Player，所以一律排进 [run]。
 ///
 /// 重建请求到了队头才判断 [isStale]：排队期间状态可能已经变回去（例如 PiP
 /// 快速往返），请求时的判断到执行时就过期了。
@@ -34,7 +34,7 @@ class PlayerRebuildQueue {
   /// 排在队尾执行 [task]。前一个任务失败不阻塞本次。
   Future<void> run(Future<void> Function() task) {
     final previous = _tail;
-    final run = () async {
+    return _tail = () async {
       if (previous != null) {
         try {
           await previous;
@@ -44,18 +44,14 @@ class PlayerRebuildQueue {
       }
       await task();
     }();
-    _tail = run;
-    return run;
   }
 
   /// 请求按当前状态重建播放器；不需要时什么都不做。
   Future<void> requestRebuild() => run(() async {
-    if (hasPlayer()) {
-      if (!isStale()) {
-        _retryPending = false;
-        return;
-      }
-    } else if (!_retryPending) {
+    // 没有播放器时没东西可比，只有上一次重建失败了才需要再建
+    final needsRebuild = hasPlayer() ? isStale() : _retryPending;
+    if (!needsRebuild) {
+      _retryPending = false;
       return;
     }
     try {

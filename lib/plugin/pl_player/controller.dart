@@ -90,11 +90,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// `_PLVideoPlayerState.initState` 里的空断言而整页报错。
   final Rxn<VideoController> _videoControllerNotifier = Rxn<VideoController>();
 
-  /// 渲染路径（平台视图 / 纹理）切换时 VideoController 会被整体替换，而它是
-  /// 普通字段，替换不会触发任何 Obx 重建 —— 于是 UI 继续持有已 dispose 的旧
-  /// controller（画面全黑、按钮卡死）。用下面两个 Rx 把替换广播出去。
-  final RxInt playerGeneration = 0.obs;
-
   /// setDataSource 与渲染路径重建共用的串行队列，见 [PlayerRebuildQueue]。
   late final PlayerRebuildQueue _playerQueue = PlayerRebuildQueue(
     hasPlayer: () => _videoPlayerController != null,
@@ -105,10 +100,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   /// 渲染路径重建**完成**后自增（新播放器已经 open 好）。
   ///
-  /// 与 [playerGeneration] 的区别很重要：[playerGeneration] 在 VideoController
-  /// 刚被替换时就自增，供 UI 尽快改挂新 controller，那时 `player.open()` 还没
-  /// 调用；这时候去设字幕轨之类的东西会被随后的 loadfile 丢掉。页面级、需要
-  /// 播放器真正就绪的重挂逻辑要订阅这一个。
+  /// 与 [videoController] 的变化不同：后者在 VideoController 刚被替换时就变了，
+  /// 供 UI 尽快改挂新 controller，那时 `player.open()` 还没调用；这时候去设字幕
+  /// 轨之类的东西会被随后的 loadfile 丢掉。页面级、需要播放器真正就绪的重挂
+  /// 逻辑要订阅这一个。
   ///
   /// 只在 [_rebuildForRenderPath] 里自增——正常的 setDataSource 流程有 onInit 收口，
   /// 不需要也不应该重复触发。
@@ -578,30 +573,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 当前播放源的画质，用于判断是否为 HDR 片源。由 [setDataSource] 传入。
   VideoQuality? _hdrQuality;
 
-  /// 鸿蒙上现在需要的视频输出，规则见 [OhosHdrOutput]；其他平台为 null。
-  ///
-  /// HDR 必须走平台视图（XComponent）渲染。Flutter 纹理会把视频重采样进
-  /// Flutter 自己的 SDR 合成层，libmpv 挂在 NativeWindow 上的色域与 HDR 元数据
-  /// 在这一步就丢了，系统因此不会进入 HDR 模式（没有峰值亮度，PQ 画面被按
-  /// sRGB 显示所以颜色也不对）。
-  ///
-  /// 平台视图由 RenderService 合成在 Flutter 表面「之下」，因此视频区域上方的
-  /// 每一层 Flutter 都必须透明：全屏时整屏都是播放器；内嵌时页面 scaffold
-  /// 底色改透明，视频矩形以外的区域由页面内容自带的背景色兜底
-  /// （见 videoDetailPage 的 ColoredBox）。
+  /// 鸿蒙上现在需要的视频输出，规则见 [OhosHdrOutput.output]；其他平台为 null。
   ///
   /// 平台视图没有单独的开关：关掉它等于关掉 HDR（元数据会在 Flutter 纹理那一步
-  /// 丢光），所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。峰值亮度
-  /// 由用户在设置里填写，见 [OhosHdrOutput.targetPeak]。
+  /// 丢光），所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。
   OhosOutput? get _ohosOutput => OS.isHarmony
       ? OhosHdrOutput.output(
-          hdrPlayback: OhosHdrOutput.hdrPlayback(
-            enabled: enableHDR,
-            quality: _hdrQuality,
-            displayHasNoHdr: HarmonyChannel.displayHasNoHdr,
-          ),
-          pipMode: isPipMode,
+          hdrEnabled: enableHDR,
+          quality: _hdrQuality,
+          displayHasNoHdr: HarmonyChannel.displayHasNoHdr,
           displayMaySupportVivid: HarmonyChannel.displayMaySupportHdrVivid,
+          pipMode: isPipMode,
           peakNits: Pref.hdrPeakNits,
           matchVideo: Pref.hdrMatchVideoPeak,
         )
@@ -1184,11 +1166,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     var player = _videoPlayerController;
 
-    // 渲染路径（平台视图 / 纹理）和 HDR 参数都在 VideoController 创建时就固定
-    // 了，改不了，与现在需要的不一致就必须重建播放器（见 [_appliedOutput]）：
-    //  - 渲染路径变了还不重建：切到 HDR 片源后仍停在纹理路径，HDR 不会触发；
-    //  - 模式变了还不重建：例如面板能力在首个视频打开后才查到不支持 HDR Vivid，
-    //    新片源仍会按 Vivid 上报。
+    // 输出在 VideoController 创建时就固定了，改不了，与现在需要的不一致就必须
+    // 重建播放器，见 [_appliedOutput]。
     if (player != null && _appliedOutput != _ohosOutput) {
       _removeListeners();
       await _disposePlayerSafely(player);
@@ -1209,10 +1188,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         return;
       }
       _videoPlayerController = player;
-      // videoController 由 _initPlayer() 赋值，此处两者均已就绪，可以广播。
-      // 注意不要放进上面 _playerCount == 0 的提前返回分支：那里播放器已被
-      // dispose，videoController 是 null。
-      playerGeneration.value++;
       if (isAnim && superResolutionType.value != .disable) {
         await setShader();
       }
@@ -1381,14 +1356,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         // 画中画是另一块 XComponent，平台视图不会跟过去（PiP 窗口里一片空白），
         // 回到应用时也要切回来。渲染路径在 VideoController 创建时固定，
         // 只能重建播放器。
-        unawaited(_syncRenderPath());
+        unawaited(_playerQueue.requestRebuild());
       };
       pipModeRx.value = Floating().isPipMode;
     }
     final stream = player.stream;
     _subscriptions = [
       // 播放中改了「匹配视频亮度」或峰值亮度也要生效：与当前播放器的输出
-      // 不一致时由 [_syncRenderPath] 重建播放器，进度和播放状态都保留。
+      // 不一致时重建播放器，进度和播放状态都保留。
       if (OS.isHarmony)
         for (final key in const [
           SettingBoxKey.hdrMatchVideoPeak,
@@ -1396,7 +1371,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         ])
           GStorage.setting
               .watch(key: key)
-              .listen((_) => unawaited(_syncRenderPath())),
+              .listen((_) => unawaited(_playerQueue.requestRebuild())),
 
       /// playing
       stream.playing.listen((bool playing) {
@@ -2149,22 +2124,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  /// 输出（渲染路径或 HDR 参数，见 [_appliedOutput]）变化时重建播放器。
-  ///
-  /// 与 setDataSource 排在同一条队列里，是否真要重建到了队头才判断，
-  /// 见 [PlayerRebuildQueue]。
-  Future<void> _syncRenderPath() async {
-    if (!OS.isHarmony) return;
-    await _playerQueue.requestRebuild();
-  }
-
-  /// 按当前渲染路径重建播放器，保留进度、播放状态与倍速。
+  /// 输出（渲染路径或 HDR 参数，见 [_appliedOutput]）变化时按当前输出重建
+  /// 播放器，保留进度、播放状态与倍速。
   /// 只由 [_playerQueue] 调用，失败向上抛，由它记下待重试。
   Future<void> _rebuildForRenderPath() async {
     // 上一次重建失败后，重试可能落在页面已经销毁之后
     if (_playerCount == 0) return;
     final wasPlaying = playerStatus.isPlaying;
-    // 不能只信 state.position：open() 会把它清零，全屏切换恰好落在「新播放器
+    // 不能只信 state.position：open() 会把它清零，重建恰好落在「新播放器
     // 刚建好、mpv 还没上报 time-pos」的窗口里时读到的就是 0，一重建就从头播，
     // 还会把 0 当成观看进度写回历史。position（秒）由监听器维护，可以兜底。
     final live = positionInMilliseconds;

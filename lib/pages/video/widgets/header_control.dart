@@ -544,33 +544,37 @@ class HeaderControlState extends State<HeaderControl>
                   child: Row(
                     spacing: 10,
                     children: [
-                      Obx(() {
-                        final flipX = plPlayerController.flipX.value;
-                        return ActionRowLineItem(
-                          iconData: Icons.flip,
-                          onTap: () =>
-                              plPlayerController.flipX.value = !flipX,
-                          text: " 左右翻转 ",
-                          selectStatus: flipX,
-                        );
-                      }),
-                      Obx(() {
-                        final flipY = plPlayerController.flipY.value;
-                        return ActionRowLineItem(
-                          icon: Icon(
-                            CustomIcons.flip_rotate_90,
-                            size: 13,
-                            color: flipY
-                                ? theme.colorScheme.onSecondaryContainer
-                                : theme.colorScheme.outline,
-                          ),
-                          onTap: () {
-                            plPlayerController.flipY.value = !flipY;
-                          },
-                          text: " 上下翻转 ",
-                          selectStatus: flipY,
-                        );
-                      }),
+                      Obx(
+                        () {
+                          final flipX = plPlayerController.flipX.value;
+                          return ActionRowLineItem(
+                            iconData: Icons.flip,
+                            onTap: () =>
+                                plPlayerController.flipX.value = !flipX,
+                            text: " 左右翻转 ",
+                            selectStatus: flipX,
+                          );
+                        },
+                      ),
+                      Obx(
+                        () {
+                          final flipY = plPlayerController.flipY.value;
+                          return ActionRowLineItem(
+                            icon: Icon(
+                              CustomIcons.flip_rotate_90,
+                              size: 13,
+                              color: flipY
+                                  ? theme.colorScheme.onSecondaryContainer
+                                  : theme.colorScheme.outline,
+                            ),
+                            onTap: () {
+                              plPlayerController.flipY.value = !flipY;
+                            },
+                            text: " 上下翻转 ",
+                            selectStatus: flipY,
+                          );
+                        },
+                      ),
                       if ((isFileSource &&
                               !(plPlayerController.dataSource as FileSource)
                                   .isMp4) ||
