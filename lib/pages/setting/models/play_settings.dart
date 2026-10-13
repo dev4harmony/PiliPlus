@@ -314,7 +314,7 @@ List<SettingsModel> get playSettings => [
     ),
     const SwitchModel(
       title: '匹配视频亮度',
-      subtitle: '开启时按片源自身的亮度输出，不做色调映射；关闭时把片源的峰值映射到「HDR 峰值亮度」',
+      subtitle: '开启时按片源自身的亮度输出，不做色调映射；关闭时只把比「HDR 峰值亮度」亮的片源压缩到该峰值，更暗的保持原亮度',
       leading: Icon(Icons.brightness_auto_outlined),
       setKey: SettingBoxKey.hdrMatchVideoPeak,
       defaultVal: true,
@@ -324,7 +324,7 @@ List<SettingsModel> get playSettings => [
       leading: const Icon(Icons.wb_sunny_outlined),
       getSubtitle: () => Pref.hdrMatchVideoPeak
           ? '当前 ${Pref.hdrPeakNits} nit，开启「匹配视频亮度」时不使用'
-          : '当前 ${Pref.hdrPeakNits} nit，片源的峰值映射到这里',
+          : '当前 ${Pref.hdrPeakNits} nit，比它亮的片源压缩到这里，更暗的保持原亮度',
       onTap: _showHdrPeakNitsDialog,
     ),
   ],

@@ -1,5 +1,6 @@
 /// 「HDR 峰值亮度」设置：HDR 画面在屏幕上的峰值（nit），由用户按屏幕能力填写。
-/// 关闭「匹配视频亮度」时片源的峰值映射到这里，即 mpv 的 `--target-peak`。
+/// 关闭「匹配视频亮度」时比它亮的片源压缩到这里（mpv 的 `--target-peak`），
+/// 更暗的片源保持原亮度。
 ///
 /// 开启「匹配视频亮度」时不使用，见 [OhosHdrOutput.output]。
 abstract final class HdrPeakNits {

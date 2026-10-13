@@ -40,8 +40,10 @@ abstract final class OhosHdrOutput {
   /// 路径）时不传：SDR 目标配上上千 nit 的峰值，整幅画面都会被压暗，那里由
   /// media-kit 显式设回 `auto`。[matchVideo]（「匹配视频亮度」）时也不传：输出
   /// 峰值就是片源自己的峰值，libplacebo 不压缩高光，鸿蒙按 PQ 的绝对亮度显示，
-  /// 不随系统亮度变化。关闭时把片源的峰值色调映射到 [peakNits]，比它亮的内容
-  /// 压进这个范围而不是被屏幕截断；mpv 上报的元数据描述的也是映射之后的画面。
+  /// 不随系统亮度变化。关闭时只把比 [peakNits] 亮的片源色调映射到它，比它亮
+  /// 的内容压进这个范围而不是被屏幕截断，mpv 上报的元数据描述映射之后的画面；
+  /// 更暗的片源原样输出，不会被拉伸到 [peakNits]（libplacebo 只压缩、不扩展），
+  /// 上报的也是片源自己的元数据，与开启时一样。
   static OhosOutput output({
     required bool hdrEnabled,
     required VideoQuality? quality,
@@ -69,7 +71,8 @@ abstract final class OhosHdrOutput {
   ///
   /// 只在按设定峰值色调映射时测：有的 HDR10 片源标 1000 nit，画面却到 10000
   /// nit，只信元数据的话比标称值亮的部分要么被压成一片，要么原样交给屏幕截断。
-  /// 杜比视界、HDR10+ 自带逐场景峰值，libplacebo 用它们，不另外测量。
+  /// 杜比视界、HDR Vivid 自带逐帧峰值，libplacebo 用它们，不另外测量；HDR10+
+  /// 照样测量，测得的峰值优先于它的场景峰值。
   ///
   /// media-kit 为了省电默认关掉了测量（`hdr-compute-peak=no`）。「匹配视频
   /// 亮度」时也不能打开：目标就是片源自己标的峰值，测出更高的峰值会让 mpv
