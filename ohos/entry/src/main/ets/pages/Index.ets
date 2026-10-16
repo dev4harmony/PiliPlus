@@ -1,4 +1,4 @@
-import { curves, LengthMetrics, SymbolGlyphModifier, uiMaterial } from '@kit.ArkUI';
+import { curves, LengthMetrics, SymbolGlyphModifier, uiMaterial, uiObserver } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { HdsAnimationMode, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import common from '@ohos.app.ability.common';
@@ -121,6 +121,8 @@ struct Index {
   private win: window.Window | null = null;
   private sizeCallback: ((size: window.Size) => void) | null = null;
   private rectCallback: ((opts: window.RectChangeOptions) => void) | null = null;
+  /// 显示大小缩放改变后，驱动根 Stack 重布局。
+  private densityCallback: ((info: uiObserver.DensityInfo) => void) | null = null;
 
   /// 转屏旧画面遮罩
   @State rotationMask: image.PixelMap | null = null;
@@ -153,12 +155,30 @@ struct Index {
   }
 
   private applySize(widthPx: number, heightPx: number): void {
-    this.winWidth = px2vp(widthPx);
-    this.winHeight = px2vp(heightPx);
+    // 必须用 UIContext.px2vp：全局 px2vp 已废弃，UI 实例不明确时会退回
+    // 默认屏密度，显示大小缩放变化后算出的 vp 与真实值不符。
+    const uiContext = this.getUIContext();
+    this.winWidth = uiContext.px2vp(widthPx);
+    this.winHeight = uiContext.px2vp(heightPx);
     // 同步到 AppStorage，供 HarmonyChannel.syncTopBarWithShell
     // 按窗口宽高比分流顶栏（收起/隐藏/显示）
     AppStorage.setOrCreate('winWidth', this.winWidth);
     AppStorage.setOrCreate('winHeight', this.winHeight);
+  }
+
+  /// 显示大小缩放变化后重算根容器尺寸：窗口的 px 矩形没变，只有密度变了，
+  /// 因此重新读一次 windowRect 并按新密度换算 vp，赋给 winWidth/winHeight
+  /// 触发根 Stack 重布局，使其重新铺满窗口。
+  private reapplyWindowSize(): void {
+    if (this.win === null) {
+      return;
+    }
+    try {
+      const rect = this.win.getWindowProperties().windowRect;
+      this.applySize(rect.width, rect.height);
+    } catch (err) {
+      console.error(TAG, `reapplyWindowSize failed: ${err}`);
+    }
   }
 
   /// 屏幕旋转动画：模仿安卓CROSSFADE
@@ -224,6 +244,19 @@ struct Index {
       };
       w.on('windowSizeChange', this.sizeCallback);
 
+      // 显示大小缩放变化,重算根容器 vp 尺寸（详见 densityCallback）
+      try {
+        this.densityCallback = (info: uiObserver.DensityInfo) => {
+          console.info(TAG, `densityUpdate: density=${info.density}`);
+          this.reapplyWindowSize();
+        };
+        this.getUIContext()
+          .getUIObserver()
+          .on('densityUpdate', this.densityCallback);
+      } catch (err) {
+        console.error(TAG, `densityUpdate listener failed: ${err}`);
+      }
+
       try {
         this.rectCallback = (opts: window.RectChangeOptions) => {
           this.applySize(opts.rect.width, opts.rect.height);
@@ -274,6 +307,16 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    if (this.densityCallback !== null) {
+      try {
+        this.getUIContext()
+          .getUIObserver()
+          .off('densityUpdate', this.densityCallback);
+      } catch (err) {
+        console.error(TAG, `off densityUpdate failed: ${err}`);
+      }
+      this.densityCallback = null;
+    }
     if (this.win !== null) {
       try {
         if (this.sizeCallback !== null) {
@@ -858,12 +901,7 @@ struct Index {
 
   build() {
     Stack({ alignContent: Alignment.Top }) {
-      // xComponentColor 置透明：HDR 平台视图由 RenderService 合成在
-      // FlutterSurface 之下，不能被 XComponent 的黑底盖住。
-      // 注意上游的 RenderFit.TOP 已经让 FlutterSurface 的黑底判断恒假
-      // （见 FlutterPage.ets 的 backgroundColor 三元），这里是双保险：
-      // 一旦 renderFit 改回 RESIZE_FILL，仍然不会黑屏。
-      FlutterPage({ viewId: this.viewId, xComponentRenderFit: RenderFit.TOP, xComponentColor: Color.Transparent })
+      FlutterPage({ viewId: this.viewId, xComponentRenderFit: RenderFit.TOP})
         .width('100%')
         .height('100%')
         .align(Alignment.Top)
