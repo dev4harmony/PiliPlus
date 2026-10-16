@@ -51,6 +51,8 @@ class ActionPanel extends StatelessWidget {
                           (context as Element?)?.markNeedsBuild();
                         }
                       },
+                      replyInfo: item.basic?.replyInfo,
+                      mentionItem: item.modules.moduleAuthor?.mentionItem,
                     ),
                   ).then((_) {
                     if (wasVisible) {

@@ -5,6 +5,7 @@ import 'dart:ffi';
 
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/media_kit_adapt/media_kit_adapt.dart';
+import 'package:PiliPlus/plugin/pl_player/utils/mpv_handle_releaser.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:material_ui/material_ui.dart';
@@ -12,11 +13,13 @@ import 'package:get/get_rx/get_rx.dart';
 import 'package:media_kit/ffi/src/allocation.dart';
 import 'package:media_kit/ffi/src/utf8.dart';
 import 'package:media_kit/generated/libmpv/bindings.dart' as generated;
+import 'package:media_kit/src/player/native/core/initializer.dart';
 import 'package:media_kit/src/player/native/core/native_library.dart';
 
 class MpvConvertWebp {
   final _mpv = generated.MPV(DynamicLibrary.open(NativeLibrary.path));
   late final Pointer<generated.mpv_handle> _ctx;
+  MpvHandleReleaser? _releaser;
   final _completer = Completer<bool>();
 
   bool _success = false;
@@ -39,8 +42,9 @@ class MpvConvertWebp {
 
   Future<void> _init() async {
     final enableHA = Pref.enableHA;
-    _ctx = await MediaKitAdapt.createInitializer(
-      NativeLibrary.path,
+    // 与主播放器共用 media_kit 的 Initializer；怎样安全释放见 MpvHandleReleaser
+    final initializer = Initializer(_mpv);
+    final ctx = await initializer.create(
       _onEvent,
       options: {
         'idle': 'once',
@@ -56,6 +60,12 @@ class MpvConvertWebp {
           'hwdec':
               '${Pref.hardwareDecoding},auto-copy', // transcode only support copy
       },
+    );
+    _ctx = ctx;
+    _releaser = MpvHandleReleaser(
+      detachEvents: () => initializer.dispose(ctx),
+      quit: () => _command(const ['quit']),
+      destroy: () => _mpv.mpv_terminate_destroy(ctx),
     );
     _mpv.mpv_request_event(
       _ctx,
@@ -79,14 +89,19 @@ class MpvConvertWebp {
     calloc.free(level);
   }
 
+  /// 取消转码。
   void dispose() {
-    MediaKitAdapt.disposeInitializer(_ctx);
-    _mpv.mpv_terminate_destroy(_ctx);
     if (!_completer.isCompleted) _completer.complete(false);
+    _releaser?.release(quitCore: true);
   }
 
   Future<bool> convert() async {
     await _init();
+    // 初始化期间已被取消：dispose 那时还没有 handle 可释放，在这里补上
+    if (_completer.isCompleted) {
+      _releaser?.release(quitCore: true);
+      return _completer.future;
+    }
     _command(['loadfile', url]);
     return _completer.future;
   }
@@ -117,8 +132,9 @@ class MpvConvertWebp {
         break;
       case generated.mpv_event_id.MPV_EVENT_SHUTDOWN:
         progress?.value = 1;
-        _completer.complete(_success);
-        dispose();
+        if (!_completer.isCompleted) _completer.complete(_success);
+        // 仍在事件回调里，handle 由 releaser 延后销毁
+        _releaser?.release(quitCore: false);
         break;
     }
   }

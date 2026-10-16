@@ -60,6 +60,7 @@ import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
@@ -376,6 +377,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Keep playing in the PiP window.
+    if (Platform.isIOS && IOSPipHelper.isActive) return;
     final player = plPlayerController.videoPlayerController;
     if (player == null) return;
     if (state != AppLifecycleState.paused &&
@@ -466,7 +469,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   ) {
     final videoDetail = introController.videoDetail.value;
     final isSeason = videoDetail.ugcSeason != null;
-    final isPart = videoDetail.pages != null && videoDetail.pages!.length > 1;
+    final isPart = videoDetail.hasParts;
     final isPgc = !videoDetailController.isUgc;
     final isPlayAll = videoDetailController.isPlayAll;
     final anySeason = isSeason || isPart || isPgc || isPlayAll;
@@ -974,16 +977,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       if (!plPlayerController.isDesktopPip) .fullscreen,
     ];
     return PlayerBar(
-      children: [
-        Row(
-          mainAxisSize: .min,
-          children: userSpecifyItemLeft.map(progressWidget).toList(),
-        ),
-        Row(
-          mainAxisSize: .min,
-          children: userSpecifyItemRight.map(progressWidget).toList(),
-        ),
-      ],
+      left: Row(
+        mainAxisSize: .min,
+        children: userSpecifyItemLeft.map(progressWidget).toList(),
+      ),
+      right: Row(
+        mainAxisSize: .min,
+        children: userSpecifyItemRight.map(progressWidget).toList(),
+      ),
     );
   }
 
@@ -1478,9 +1479,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                     ..updateSubtitleStyle();
                 },
                 child: Obx(() {
-                  // 同 _videoWidget：渲染路径切换会替换 VideoController，
-                  // 订阅 generation 才能让字幕重新绑到新的 controller 上。
-                  final gen = plPlayerController.playerGeneration.value;
                   final videoController = plPlayerController.videoController;
                   if (videoController == null) {
                     return const SizedBox.shrink();
@@ -1499,7 +1497,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                       // 同 Video：_SubtitleViewState 只在 initState 订阅
                       // controller.player.stream.subtitle，didUpdateWidget
                       // 不会重新订阅，所以换了 controller 必须换 State。
-                      key: ValueKey(gen),
+                      key: ValueKey(videoController),
                       controller: videoController,
                       configuration: SubtitleViewConfiguration(
                         // 去掉 SubtitleView 内部 padding，外部手动管理
@@ -2165,71 +2163,68 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       color: widget.fill,
       child: Obx(
         () => MouseInteractiveViewer(
-            scaleEnabled: !plPlayerController.controlsLock.value,
-            pointerSignalFallback: _onPointerSignal,
-            onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
-            onPointerPanZoomEnd: _onPointerPanZoomEnd,
-            onPointerDown: _onPointerDown,
-            onPointerUp: _onPointerUp,
-            onPointerCancel: _onPointerCancel,
-            onPanStart: _onPanStart,
-            onPanUpdate: _onPanUpdate,
-            onPanEnd: _onPanEnd,
-            onScaleUpdate: _onScaleUpdate,
-            scaleGestureRecognizer: _scaleGestureRecognizer,
-            panEnabled: false,
-            minScale: plPlayerController.enableShrinkVideoSize ? 0.75 : 1,
-            maxScale: 2.0,
-            boundaryMargin: plPlayerController.enableShrinkVideoSize
-                ? const .all(double.infinity)
-                : .zero,
-            panAxis: .aligned,
-            transformationController: _transformationController,
-            childKey: _videoKey,
-            child: RepaintBoundary(
-              key: _videoKey,
-              child: Obx(
-                () {
-                  // 订阅 generation：渲染路径切换会整体替换 VideoController，
-                  // 没有这一行 Obx 不会重建，Video 会一直挂在已 dispose 的旧
-                  // controller 上（切回 SDR 后黑屏，要退出再进全屏才恢复）。
-                  final gen = plPlayerController.playerGeneration.value;
-                  final videoController = plPlayerController.videoController;
-                  if (videoController == null) {
-                    return const SizedBox.shrink();
-                  }
-                  final videoFit = plPlayerController.videoFit.value;
-                  return Transform.flip(
-                    flipX: plPlayerController.flipX.value,
-                    flipY: plPlayerController.flipY.value,
-                    child: FittedBox(
+          scaleEnabled: !plPlayerController.controlsLock.value,
+          pointerSignalFallback: _onPointerSignal,
+          onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+          onPointerPanZoomEnd: _onPointerPanZoomEnd,
+          onPointerDown: _onPointerDown,
+          onPointerUp: _onPointerUp,
+          onPointerCancel: _onPointerCancel,
+          onPanStart: _onPanStart,
+          onPanUpdate: _onPanUpdate,
+          onPanEnd: _onPanEnd,
+          onScaleUpdate: _onScaleUpdate,
+          scaleGestureRecognizer: _scaleGestureRecognizer,
+          panEnabled: false,
+          minScale: plPlayerController.enableShrinkVideoSize ? 0.75 : 1,
+          maxScale: 2.0,
+          boundaryMargin: plPlayerController.enableShrinkVideoSize
+              ? const .all(double.infinity)
+              : .zero,
+          panAxis: .aligned,
+          transformationController: _transformationController,
+          childKey: _videoKey,
+          child: RepaintBoundary(
+            key: _videoKey,
+            child: Obx(
+              () {
+                final videoController = plPlayerController.videoController;
+                if (videoController == null) {
+                  return const SizedBox.shrink();
+                }
+                final videoFit = plPlayerController.videoFit.value;
+                return Transform.flip(
+                  flipX: plPlayerController.flipX.value,
+                  flipY: plPlayerController.flipY.value,
+                  child: FittedBox(
+                    fit: videoFit.boxFit,
+                    alignment: widget.alignment,
+                    child: Video(
+                      // 必须带 key：_VideoState 只在 initState 订阅
+                      // player.stream.width/height，didUpdateWidget 不会重新
+                      // 订阅，所以 controller 换了必须换 State（否则 Video
+                      // 会一直挂在已 dispose 的旧 controller 上，画面全黑）。
+                      key: ValueKey(videoController),
+                      width: maxWidth,
+                      height: maxHeight,
+                      controls: NoVideoControls, // 关闭 media_kit 内置按钮
+                      // 关闭 media_kit 内置 SubtitleView，避免与外层叠加重复
+                      subtitleViewConfiguration:
+                          const SubtitleViewConfiguration(
+                            visible: false,
+                          ),
+                      controller: videoController,
+                      fill: widget.fill,
                       fit: videoFit.boxFit,
-                      alignment: widget.alignment,
-                      child: Video(
-                        // 必须带 key：_VideoState 只在 initState 订阅
-                        // player.stream.width/height，didUpdateWidget 不会重新
-                        // 订阅，所以 controller 换了必须换 State。
-                        key: ValueKey(gen),
-                        width: maxWidth,
-                        height: maxHeight,
-                        controls: NoVideoControls, // 关闭 media_kit 内置按钮
-                        // 关闭 media_kit 内置 SubtitleView，避免与外层叠加重复
-                        subtitleViewConfiguration:
-                            const SubtitleViewConfiguration(
-                              visible: false,
-                            ),
-                        controller: videoController,
-                        fill: widget.fill,
-                        fit: videoFit.boxFit,
-                        aspectRatio: videoFit.aspectRatio,
-                      ),
+                      aspectRatio: videoFit.aspectRatio,
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),
+      ),
     );
   }
 

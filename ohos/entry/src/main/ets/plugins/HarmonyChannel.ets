@@ -442,8 +442,8 @@ export default class HarmonyChannel implements FlutterPlugin {
       case "getDisplayHdrFormats": {
         // 面板实际支持的 HDR 类型。取值见 @ohos.graphics.hdrCapability 的
         // HDRFormat：0=NONE 1=VIDEO_HLG 2=VIDEO_HDR10 3=VIDEO_HDR_VIVID。
-        // 用来决定杜比视界 / HDR10+ 到底能不能按 HDR Vivid 上报，避免在不支持
-        // Vivid 的屏幕上盲目发 Vivid 信令。
+        // Dart 侧据此决定 HDR 片源怎么输出：一个都不支持就按 SDR 输出；不支持
+        // HDR Vivid 就只发 HDR10 静态元数据，不在这块屏上发 Vivid 信令。
         try {
           const d = display.getDefaultDisplaySync();
           const formats: number[] = (d.hdrFormats ?? []) as number[];

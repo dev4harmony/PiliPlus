@@ -15,6 +15,7 @@ import 'package:PiliPlus/services/shutdown_timer_service.dart'
     show shutdownTimerService;
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
+import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -169,6 +170,7 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
             ),
           if (Platform.isAndroid ||
               OS.isHarmony ||
+              (Platform.isIOS && IOSPipHelper.isAvailable) ||
               (PlatformUtils.isDesktop && !isFullScreen))
             ComBtn(
               height: 30,
@@ -176,6 +178,10 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
               onTap: () async {
                 if (PlatformUtils.isDesktop) {
                   plPlayerController.toggleDesktopPip();
+                  return;
+                }
+                if (Platform.isIOS) {
+                  plPlayerController.enterPip();
                   return;
                 }
                 if (await Floating().isPipAvailable) {

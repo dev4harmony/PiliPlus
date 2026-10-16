@@ -1,11 +1,8 @@
 import 'dart:convert';
 import 'dart:ffi';
 
-import 'package:PiliPlus/media_kit_adapt/initializer_isolate.dart';
-import 'package:PiliPlus/media_kit_adapt/initializer_native_event_loop.dart';
 import 'package:media_kit/ffi/ffi.dart';
 import 'package:media_kit/generated/libmpv/bindings.dart' as generated;
-import 'package:media_kit/generated/libmpv/bindings.dart';
 import 'package:media_kit/media_kit.dart';
 
 abstract class MediaKitAdapt {
@@ -45,34 +42,6 @@ abstract class MediaKitAdapt {
       ..free(valList.values)
       ..free(valRef.u.list)
       ..free(value);
-  }
-
-  static void disposeInitializer(Pointer<mpv_handle> handle) {
-    try {
-      InitializerNativeEventLoop.dispose(handle);
-    } catch (_) {
-      InitializerIsolate.dispose(handle);
-    }
-  }
-
-  static Future<Pointer<mpv_handle>> createInitializer(
-    String path,
-    Future<void> Function(Pointer<mpv_event> event)? callback, {
-    Map<String, String> options = const {},
-  }) async {
-    try {
-      return await InitializerNativeEventLoop.create(
-        path,
-        callback,
-        options,
-      );
-    } catch (_) {
-      return InitializerIsolate.create(
-        path,
-        callback,
-        options,
-      );
-    }
   }
 }
 

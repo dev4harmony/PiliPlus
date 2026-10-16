@@ -20,7 +20,7 @@
 > [!TIP]
 > 当前项目编译API已经提升到了26.0.0，请在华为官网下载最新的配套IDE和SDK使用，防止编译异常
 
-- 1、配置鸿蒙flutter3.44.9环境，参考[鸿蒙flutter3.44.9](https://gitcode.com/CPF-Flutter/flutter_flutter/tree/oh-3.44.9-dev)
+- 1、配置鸿蒙flutter3.44.9环境，参考[鸿蒙flutter3.44.9](https://gitcode.com/CPF-Flutter/flutter_flutter/tree/oh-3.44.9-dev)，并在 SDK 根目录打上与上游一致的补丁：`git apply <PiliPlus>/lib/scripts/double_tap_gesture.patch`
 
 - 2、通过vscode运行启动配置或是build_hap任务以确保应用内所需环境变量正确写入
 
@@ -49,7 +49,9 @@
 <div align="center">
     <h1>PiliPlus</h1>
 <div align="center">
-    
+
+中文 | [English](README.en.md)
+
 ![GitHub repo size](https://img.shields.io/github/repo-size/bggRGjQaUbCoE/PiliPlus) 
 ![GitHub Repo stars](https://img.shields.io/github/stars/bggRGjQaUbCoE/PiliPlus) 
 ![GitHub all releases](https://img.shields.io/github/downloads/bggRGjQaUbCoE/PiliPlus/total) 

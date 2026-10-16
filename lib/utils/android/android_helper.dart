@@ -7,7 +7,7 @@ library;
 import 'package:PiliPlus/utils/page_utils.dart';
 
 abstract final class PiliAndroidHelper {
-  static void back() {}
+  static bool get isPipAvailable => false;
 
   static void biliSendCommAntifraud(
     int action,
@@ -23,8 +23,6 @@ abstract final class PiliAndroidHelper {
     int uid,
     String cookie,
   ) {}
-
-  static void openLinkVerifySettings() {}
 
   static bool openMusic(String title, String? artist, String? album) => false;
 

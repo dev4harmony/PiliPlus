@@ -20,10 +20,12 @@ import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/calc_window_position.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/core_palettes_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/font_utils.dart';
 import 'package:PiliPlus/utils/image_memory_cleaner.dart';
+import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/json_file_handler.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
@@ -107,7 +109,7 @@ void main() async {
   } catch (e) {
     await Utils.copyText(e.toString(), needToast: false);
     if (kDebugMode) debugPrint('GStorage init error: $e');
-    exit(0);
+    DeviceUtils.exitApp();
   }
   ScaledWidgetsFlutterBinding.instance.scaleFactor = Pref.uiScale;
   await Future.wait([
@@ -128,6 +130,7 @@ void main() async {
     await Future.wait([
       if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
       setupServiceLocator(),
+      if (Platform.isIOS) IOSPipHelper.init(),
     ]);
   } else if (OS.isHarmony) {
     // 鸿蒙 2in1 设备 isPCOS 为 true（isMobile 为 false），但同样需要媒体服务，
@@ -153,6 +156,8 @@ void main() async {
   RequestUtils.syncHistoryStatus();
 
   SmartDialog.config.toast = SmartConfigToast(displayType: .onlyRefresh);
+
+  FocusManager.instance.addEarlyKeyEventHandler(_onKeyEvent);
 
   if (PlatformUtils.isMobile) {
     if (OS.isHarmony) {
@@ -193,9 +198,7 @@ void main() async {
     final windowOptions = WindowOptions(
       minimumSize: const Size(400, 720),
       skipTaskbar: false,
-      titleBarStyle: Pref.showWindowTitleBar
-          ? TitleBarStyle.normal
-          : TitleBarStyle.hidden,
+      titleBarStyle: Pref.showWindowTitleBar ? .normal : .hidden,
       title: Constants.appName,
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -240,12 +243,21 @@ void main() async {
     // 顺带注册 method channel handler，保证热启动接续推送可达
     WidgetsBinding.instance.addPostFrameCallback((_) {
       HarmonyChannel.checkPendingContinuation();
-      // 查询面板支持的 HDR 类型，决定杜比视界 / HDR10+ 能否按 HDR Vivid 上报
+      // 查询面板支持的 HDR 类型：一个都不支持时 HDR 片源按 SDR 输出，
+      // 不支持 HDR Vivid 时只发 HDR10 静态元数据
       HarmonyChannel.loadDisplayHdrFormats();
       // 将当前主题颜色模式同步给原生层（Rx 初始值相同不触发监听，需显式同步）
       ThemeUtils.syncColorModeToNative();
     });
   }
+}
+
+KeyEventResult _onKeyEvent(KeyEvent event) {
+  if (event is KeyDownEvent && event.logicalKey == .escape) {
+    MyApp._onBack();
+    return .handled;
+  }
+  return .ignored;
 }
 
 class MyApp extends StatelessWidget {

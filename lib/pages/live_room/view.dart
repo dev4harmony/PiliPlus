@@ -437,6 +437,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     fit: BoxFit.cover,
                     width: maxWidth,
                     height: maxHeight,
+                    gaplessPlayback: true,
                     memCacheWidth: maxWidth.cacheSize(context),
                     imageUrl: ImageUtils.safeThumbnailUrl(appBackground),
                     placeholder: (_, _) => const SizedBox.shrink(),
@@ -447,6 +448,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     fit: BoxFit.cover,
                     width: maxWidth,
                     height: maxHeight,
+                    gaplessPlayback: true,
                     cacheWidth: maxWidth.cacheSize(context),
                   );
                 }

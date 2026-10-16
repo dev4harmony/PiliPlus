@@ -1,11 +1,15 @@
-/// 鸿蒙 HDR 色调映射用的面板峰值亮度（nit），即传给 mpv 的 `--target-peak`。
+/// 「HDR 峰值亮度」设置：HDR 画面在屏幕上的峰值（nit），由用户按屏幕能力填写。
+/// 关闭「匹配视频亮度」时比它亮的片源压缩到这里（mpv 的 `--target-peak`），
+/// 更暗的片源保持原亮度。
 ///
-/// 鸿蒙没有公开查询面板峰值亮度的接口（`display` 只给得出支持哪些 HDR 格式），
-/// 所以由用户在设置里按屏幕参数填写。
+/// 开启「匹配视频亮度」时不使用，见 [OhosHdrOutput.output]。
 abstract final class HdrPeakNits {
-  /// 未设置时的取值。按 SLM-W32（典型 700 nit / 峰值 1600 nit）标定，也是
-  /// 目前 HDR 机型比较常见的量级。
-  static const int defaultValue = 1600;
+  /// 未设置时的取值：1000 nit 是 HDR 的常用参考亮度（HLG 名义参考显示器、
+  /// 多数 HDR10 母版的峰值）。
+  static const int defaultValue = 1000;
+
+  /// 设置里滑块的步进。
+  static const int step = 100;
 
   /// 低于 SDR 参考白（203 nit）的屏幕谈不上 HDR，再低只会把整幅画面压暗。
   static const int min = 200;
@@ -13,15 +17,17 @@ abstract final class HdrPeakNits {
   /// PQ 的名义峰值，也是 mpv `--target-peak` 允许的上限。
   static const int max = 10000;
 
-  static bool isValid(int value) => value >= min && value <= max;
+  /// 只有 [min]..[max] 之间的整数原样返回，其余（含 null、非整数）为 null。
+  static int? _inRange(Object? value) =>
+      value is int && value >= min && value <= max ? value : null;
+
+  /// 把滑块位置吸附到 [step] 的整数倍，并限制在 [min]..[max]。
+  static int snap(double value) =>
+      ((value / step).round() * step).clamp(min, max);
 
   /// 解析设置对话框里的输入；不是整数或超出 [min]..[max] 时返回 null。
-  static int? tryParse(String input) {
-    final value = int.tryParse(input.trim());
-    return value != null && isValid(value) ? value : null;
-  }
+  static int? tryParse(String input) => _inRange(int.tryParse(input.trim()));
 
   /// 读取存储值；缺失、类型不对或超出范围时回退到 [defaultValue]。
-  static int sanitize(Object? stored) =>
-      stored is int && isValid(stored) ? stored : defaultValue;
+  static int sanitize(Object? stored) => _inRange(stored) ?? defaultValue;
 }

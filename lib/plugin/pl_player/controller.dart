@@ -33,6 +33,7 @@ import 'package:PiliPlus/plugin/pl_player/models/ohos_hdr_output.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
+import 'package:PiliPlus/plugin/pl_player/utils/danmaku_options.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/player_rebuild_queue.dart';
 import 'package:PiliPlus/services/service_locator.dart';
@@ -44,8 +45,10 @@ import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/box_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
+import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
@@ -58,7 +61,8 @@ import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:floating/floating.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/services.dart' show HapticFeedback, DeviceOrientation;
+import 'package:flutter/services.dart'
+    show DeviceOrientation, HapticFeedback, KeyDownEvent;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:get/get.dart';
@@ -74,6 +78,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 typedef PlayCallback = Future<void>? Function();
+typedef PlayOwner = ({String tag, Type type});
 
 class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Player? _videoPlayerController;
@@ -85,26 +90,20 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// `_PLVideoPlayerState.initState` 里的空断言而整页报错。
   final Rxn<VideoController> _videoControllerNotifier = Rxn<VideoController>();
 
-  /// 渲染路径（平台视图 / 纹理）切换时 VideoController 会被整体替换，而它是
-  /// 普通字段，替换不会触发任何 Obx 重建 —— 于是 UI 继续持有已 dispose 的旧
-  /// controller（画面全黑、按钮卡死）。用下面两个 Rx 把替换广播出去。
-  final RxInt playerGeneration = 0.obs;
-
   /// setDataSource 与渲染路径重建共用的串行队列，见 [PlayerRebuildQueue]。
   late final PlayerRebuildQueue _playerQueue = PlayerRebuildQueue(
     hasPlayer: () => _videoPlayerController != null,
-    isStale: () =>
-        _usesPlatformView != usePlatformView || _appliedHdrMode != ohosHdrMode,
+    isStale: () => _appliedOutput != _ohosOutput,
     rebuild: _rebuildForRenderPath,
     onError: _onRenderPathRebuildFailed,
   );
 
   /// 渲染路径重建**完成**后自增（新播放器已经 open 好）。
   ///
-  /// 与 [playerGeneration] 的区别很重要：[playerGeneration] 在 VideoController
-  /// 刚被替换时就自增，供 UI 尽快改挂新 controller，那时 `player.open()` 还没
-  /// 调用；这时候去设字幕轨之类的东西会被随后的 loadfile 丢掉。页面级、需要
-  /// 播放器真正就绪的重挂逻辑要订阅这一个。
+  /// 与 [videoController] 的变化不同：后者在 VideoController 刚被替换时就变了，
+  /// 供 UI 尽快改挂新 controller，那时 `player.open()` 还没调用；这时候去设字幕
+  /// 轨之类的东西会被随后的 loadfile 丢掉。页面级、需要播放器真正就绪的重挂
+  /// 逻辑要订阅这一个。
   ///
   /// 只在 [_rebuildForRenderPath] 里自增——正常的 setDataSource 流程有 onInit 收口，
   /// 不需要也不应该重复触发。
@@ -292,6 +291,58 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   final RxBool pipModeRx = false.obs;
   late bool isDesktopPip = false;
   late Rect _lastWindowBounds;
+  static Rect? _lastPipBounds;
+
+  Rect _adjustPipBounds(Rect lastRect, Size size, double aspectRatio) {
+    final lastSize = lastRect.size;
+    final lastOrientation = lastSize.orientation;
+    final orientation = size.orientation;
+
+    if (lastOrientation != orientation) {
+      final double width, height;
+      switch (orientation) {
+        case .portrait:
+          if (lastSize.width > size.height) {
+            height = min(lastSize.width, _lastWindowBounds.size.height);
+            width = height * aspectRatio;
+          } else {
+            height = size.height;
+            width = size.width;
+          }
+        case .landscape:
+          if (lastSize.height > size.width) {
+            width = lastSize.height;
+            height = width / aspectRatio;
+          } else {
+            height = size.height;
+            width = size.width;
+          }
+      }
+
+      return _lastPipBounds = Rect.fromLTWH(
+        lastRect.left,
+        lastRect.top,
+        width,
+        height,
+      );
+    }
+    return _lastPipBounds = Rect.fromLTWH(
+      lastRect.left,
+      lastRect.top,
+      lastSize.width,
+      lastSize.width / aspectRatio,
+    );
+  }
+
+  bool updatePipBounds() {
+    if (isDesktopPip) {
+      windowManager.getBounds().then((rect) {
+        if (isDesktopPip) _lastPipBounds = rect;
+      });
+      return true;
+    }
+    return false;
+  }
 
   late final showWindowTitleBar = Pref.showWindowTitleBar;
   late final RxBool isAlwaysOnTop = false.obs;
@@ -330,25 +381,27 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     final state = videoPlayerController!.state;
     int width = state.width ?? this.width ?? 16;
     int height = state.height ?? this.height ?? 9;
-    if (width == 0) {
-      width = this.width ?? 16;
-    }
-    if (height == 0) {
-      height = this.height ?? 9;
-    }
+    if (width == 0) width = this.width ?? 16;
+    if (height == 0) height = this.height ?? 9;
+    final aspectRatio = width / height;
     if (height > width) {
-      size = Size(shortSide, shortSide * height / width);
-      minimumSize = Size(minShortSide, minShortSide * height / width);
+      size = Size(shortSide, shortSide / aspectRatio);
+      minimumSize = Size(minShortSide, minShortSide / aspectRatio);
     } else {
-      size = Size(shortSide * width / height, shortSide);
-      minimumSize = Size(minShortSide * width / height, minShortSide);
+      size = Size(shortSide * aspectRatio, shortSide);
+      minimumSize = Size(minShortSide * aspectRatio, minShortSide);
     }
 
     await windowManager.setMinimumSize(minimumSize);
     setAlwaysOnTop(true);
-    windowManager
-      ..setSize(size)
-      ..setAspectRatio(width / height);
+    if (_lastPipBounds != null) {
+      windowManager.setBounds(
+        _adjustPipBounds(_lastPipBounds!, size, aspectRatio),
+      );
+    } else {
+      windowManager.setSize(size);
+    }
+    windowManager.setAspectRatio(width / height);
   }
 
   void toggleDesktopPip() {
@@ -389,6 +442,19 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     if (videoPlayerController != null) {
       final state = videoPlayerController!.state;
+      if (Platform.isIOS) {
+        if (videoController?.id.value case final textureId?) {
+          IOSPipHelper.enter(
+            textureId,
+            width: state.width == 0 ? width : state.width,
+            height: state.height == 0 ? height : state.height,
+            autoEnter: isAuto,
+            state: _iosPipState(state),
+          );
+          return Future.value(PiPStatus.enabled);
+        }
+        return Future.value(PiPStatus.unavailable);
+      }
       return PageUtils.enterPip(
         isAuto: isAuto,
         width: state.width == 0 ? width : state.width,
@@ -402,10 +468,31 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (_isAutoEnterPip) {
       if (OS.isHarmony) {
         Floating().setAutoPip(false);
+      } else if (Platform.isIOS) {
+        IOSPipHelper.disableAutoEnter();
       } else {
         Utils.channel.invokeMethod('setPipAutoEnterEnabled', {
           'autoEnable': false,
         });
+      }
+    }
+  }
+
+  Map<String, Object> _iosPipState(PlayerState state, [Duration? position]) {
+    return {
+      'isPlaying': playerStatus.isPlaying,
+      'isBuffering': isBuffering.value,
+      'isLive': isLive,
+      'position': (position ?? state.position).inMilliseconds,
+      'duration': durationInMilliseconds,
+      'speed': state.rate,
+    };
+  }
+
+  void _updateIOSPip([Duration? position]) {
+    if (Platform.isIOS && IOSPipHelper.needsUpdate) {
+      if (_videoPlayerController case final player?) {
+        IOSPipHelper.update(_iosPipState(player.state, position));
       }
     }
   }
@@ -486,72 +573,28 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 当前播放源的画质，用于判断是否为 HDR 片源。由 [setDataSource] 传入。
   VideoQuality? _hdrQuality;
 
-  /// 面板**明确**不支持任何 HDR 格式时不进 HDR 路径：既不该发 HDR 信令，也不
-  /// 该按 [_displayPeakNits] 去标定一块 SDR 屏。能力未知（查询失败 / 老版本
-  /// 原生侧没有这个 method）时按支持处理，免得一次偶发失败就把 HDR 关掉。
-  bool get _isHDRPlayback =>
-      enableHDR &&
-      (_hdrQuality?.isHDR ?? false) &&
-      !HarmonyChannel.displayHasNoHdr;
-
-  /// 鸿蒙上 HDR 必须走平台视图（XComponent）渲染。
+  /// 鸿蒙上现在需要的视频输出，规则见 [OhosHdrOutput.output]；其他平台为 null。
   ///
-  /// Flutter 纹理会把视频重采样进 Flutter 自己的 SDR 合成层，libmpv 挂在
-  /// NativeWindow 上的色域与 HDR 元数据在这一步就丢了，系统因此不会进入 HDR
-  /// 模式（没有峰值亮度，PQ 画面被按 sRGB 显示所以颜色也不对）。
-  ///
-  /// 平台视图由 RenderService 合成在 Flutter 表面「之下」，因此视频区域上方的
-  /// 每一层 Flutter 都必须透明：全屏时整屏都是播放器；内嵌时页面 scaffold
-  /// 底色改透明，视频矩形以外的区域由页面内容自带的背景色兜底
-  /// （见 videoDetailPage 的 ColoredBox）。
-  ///
-  /// 没有开关：关掉平台视图等于关掉 HDR（元数据会在 Flutter 纹理那一步丢光），
-  /// 所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。
-  /// 渲染路径与全屏状态无关：进出全屏不再重建播放器，避免 HDR 切换时的
-  /// 重新缓冲。画中画要排除：PiP 是另一块 XComponent（FloatingPlugin 会把
-  /// Flutter 引擎重新 attach 上去），平台视图不会跟过去，留在平台视图路径上
-  /// 的结果是 PiP 窗口里一片空白。退回纹理路径至少画面还在，只是没有 HDR。
-  bool get usePlatformView => OS.isHarmony && _isHDRPlayback && !isPipMode;
-
-  /// 当前 VideoController 实际使用的渲染路径，用于判断是否需要重建播放器。
-  bool _usesPlatformView = false;
-
-  /// 当前播放器实际带着的 `--ohos-hdr-mode`。
-  ///
-  /// 这个属性只在创建 Player 时写一次，之后改不了。两档 HDR 之间切换（例如
-  /// 杜比视界 → HDR10）渲染路径并没有变，只看 [_usesPlatformView] 会以为无事
-  /// 发生，于是新片源顶着上一档的信令上屏，类型报错。
-  String? _appliedHdrMode;
-
-  /// 色调映射用的目标屏幕峰值亮度（nit），取自设置「HDR 峰值亮度」。
-  ///
-  /// 鸿蒙没有公开查询面板峰值亮度的接口（`display` 只给得出支持哪些 HDR
-  /// 格式），所以由用户按屏幕参数填写，默认 1600（按 SLM-W32 标定）。
-  /// 它随 VideoController 的配置一起下发，只在创建播放器时读取：改了设置从
-  /// 下一次重建播放器（重新打开视频、切换清晰度）起生效。
-  ///
-  /// 只在平台视图输出 HDR 时才会用上，规则见 [OhosHdrOutput.targetPeak]。
-  static int get _displayPeakNits => Pref.hdrPeakNits;
-
-  /// 传给 mpv 的 `--ohos-hdr-mode`，规则见 [OhosHdrOutput.mode]。
-  String? get ohosHdrMode => OS.isHarmony
-      ? OhosHdrOutput.mode(
+  /// 平台视图没有单独的开关：关掉它等于关掉 HDR（元数据会在 Flutter 纹理那一步
+  /// 丢光），所以它不是一个用户能做的取舍，跟随「启用 HDR 视频」即可。
+  OhosOutput? get _ohosOutput => OS.isHarmony
+      ? OhosHdrOutput.output(
+          hdrEnabled: enableHDR,
           quality: _hdrQuality,
-          hdrPlayback: _isHDRPlayback,
-          platformView: usePlatformView,
+          displayHasNoHdr: HarmonyChannel.displayHasNoHdr,
           displayMaySupportVivid: HarmonyChannel.displayMaySupportHdrVivid,
-          displaySupportsVivid: HarmonyChannel.displaySupportsHdrVivid,
+          pipMode: isPipMode,
+          peakNits: Pref.hdrPeakNits,
+          matchVideo: Pref.hdrMatchVideoPeak,
         )
       : null;
 
-  /// 传给 mpv 的 `--target-peak`，规则见 [OhosHdrOutput.targetPeak]。
-  double? get ohosHdrTargetPeak => OS.isHarmony
-      ? OhosHdrOutput.targetPeak(
-          hdrPlayback: _isHDRPlayback,
-          platformView: usePlatformView,
-          peakNits: _displayPeakNits,
-        )
-      : null;
+  /// 当前播放器创建时用的输出。
+  ///
+  /// 这些只在创建 Player 时写一次，与 [_ohosOutput] 不一致就得重建播放器：在
+  /// SDR 与 HDR 片源之间切换、进出画中画、面板能力在首个视频打开后才查到，或是
+  /// 改了峰值亮度设置。几档 HDR 之间切换得到的是同一个输出，不会重建。
+  OhosOutput? _appliedOutput;
 
   late final progressType = Pref.btmProgressBehavior;
   late final enableQuickDouble = Pref.enableQuickDouble;
@@ -622,10 +665,16 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     return _instance != null;
   }
 
-  static void setPlayCallBack(PlayCallback? playCallBack) {
+  static void setPlayCallBack(
+    PlayCallback? playCallBack, {
+    PlayOwner? playOwner,
+  }) {
     _playCallBack = playCallBack;
+    _playOwner = playOwner;
   }
 
+  static PlayOwner? _playOwner;
+  static PlayOwner? get playOwner => _playOwner;
   static PlayCallback? _playCallBack;
 
   static Future<void>? playIfExists() {
@@ -805,6 +854,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           _isAutoEnterPip = true;
         }
       } else if (OS.isHarmony) {
+        _isAutoEnterPip = true;
+      } else if (Platform.isIOS && IOSPipHelper.isAvailable) {
         _isAutoEnterPip = true;
       }
     }
@@ -1038,7 +1089,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  Future<Player> _initPlayer() async {
+  Future<Player> _initPlayer(OhosOutput? output) async {
     assert(_videoPlayerController == null);
     final opt = {
       'video-sync': Pref.videoSync,
@@ -1049,6 +1100,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
               .toString(),
       // 鸿蒙 media_kit fork 未内置 volume-max（上游换 fork 后删除了这项）
       'volume-max': kMaxVolume.toString(),
+      // 按设定峰值色调映射时测量片源的实际峰值，盖掉 media-kit 默认的 no
+      if (OhosHdrOutput.measuresPeak(output)) 'hdr-compute-peak': 'yes',
     };
     final autosync = Pref.autosync;
     if (autosync != '0') {
@@ -1074,12 +1127,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         enableHardwareAcceleration: hwdec != null,
         androidAttachSurfaceAfterVideoParameters: false,
         hwdec: hwdec,
-        usePlatformView: usePlatformView,
-        ohosHdrMode: ohosHdrMode,
-        ohosHdrTargetPeak: ohosHdrTargetPeak,
+        usePlatformView: output?.platformView ?? false,
+        ohosHdrMode: output?.hdrMode,
+        ohosHdrTargetPeak: output?.targetPeak,
       ),
     );
     // await player.setAudioTrack(.auto());
+
+    if (Platform.isAndroid) {
+      // Avoid sizing the surface using mpv's idle window between media loads.
+      pp.setProperty('force-window', 'no');
+    }
 
     _startListeners(player.platform!.maybeAsNativePlayer);
 
@@ -1108,14 +1166,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     var player = _videoPlayerController;
 
-    // 渲染路径（平台视图 / 纹理）和 HDR 信令都在 VideoController 创建时就固定
-    // 了，改不了。所以两者任一发生变化都必须重建播放器：
-    //  - 渲染路径变了还不重建：切到 HDR 片源后仍停在纹理路径，HDR 不会触发；
-    //  - 只有信令变了（例如杜比视界 → HDR10，两者都走平台视图）还不重建：
-    //    新片源会顶着上一档的 --ohos-hdr-mode 上屏，类型报错。
-    if (player != null &&
-        (_usesPlatformView != usePlatformView ||
-            _appliedHdrMode != ohosHdrMode)) {
+    // 输出在 VideoController 创建时就固定了，改不了，与现在需要的不一致就必须
+    // 重建播放器，见 [_appliedOutput]。
+    if (player != null && _appliedOutput != _ohosOutput) {
       _removeListeners();
       await _disposePlayerSafely(player);
       player = null;
@@ -1124,9 +1177,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     if (player == null) {
-      _usesPlatformView = usePlatformView;
-      _appliedHdrMode = ohosHdrMode;
-      player = await _initPlayer();
+      final output = _ohosOutput;
+      _appliedOutput = output;
+      player = await _initPlayer(output);
       if (_playerCount == 0) {
         _removeListeners();
         await _disposePlayerSafely(player);
@@ -1135,10 +1188,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         return;
       }
       _videoPlayerController = player;
-      // videoController 由 _initPlayer() 赋值，此处两者均已就绪，可以广播。
-      // 注意不要放进上面 _playerCount == 0 的提前返回分支：那里播放器已被
-      // dispose，videoController 是 null。
-      playerGeneration.value++;
       if (isAnim && superResolutionType.value != .disable) {
         await setShader();
       }
@@ -1290,6 +1339,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       speed: playbackSpeed,
       debugLabel: debugLabel,
     );
+    _updateIOSPip(position);
   }
 
   /// 播放事件监听
@@ -1306,12 +1356,23 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         // 画中画是另一块 XComponent，平台视图不会跟过去（PiP 窗口里一片空白），
         // 回到应用时也要切回来。渲染路径在 VideoController 创建时固定，
         // 只能重建播放器。
-        unawaited(_syncRenderPath());
+        unawaited(_playerQueue.requestRebuild());
       };
       pipModeRx.value = Floating().isPipMode;
     }
     final stream = player.stream;
     _subscriptions = [
+      // 播放中改了「匹配视频亮度」或峰值亮度也要生效：与当前播放器的输出
+      // 不一致时重建播放器，进度和播放状态都保留。
+      if (OS.isHarmony)
+        for (final key in const [
+          SettingBoxKey.hdrMatchVideoPeak,
+          SettingBoxKey.hdrPeakNits,
+        ])
+          GStorage.setting
+              .watch(key: key)
+              .listen((_) => unawaited(_playerQueue.requestRebuild())),
+
       /// playing
       stream.playing.listen((bool playing) {
         if (playing) {
@@ -1352,6 +1413,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           }
 
           _startWakeLockTimer();
+          _updateIOSPip();
         }
         if (OS.isHarmony) {
           // 同步鸿蒙小窗控制面板的播放/暂停图标
@@ -1400,7 +1462,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           element(position);
         }
       }),
-      stream.duration.listen(updateDuration),
+      stream.duration.listen((Duration duration) {
+        updateDuration(duration);
+        _updateIOSPip();
+      }),
       stream.buffer.listen((Duration buffer) {
         buffered.value = buffer.inSeconds;
       }),
@@ -1563,6 +1628,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     danmakuController?.clear();
     try {
       await _videoPlayerController?.seek(position);
+      _updateIOSPip(position);
     } catch (e) {
       if (kDebugMode) debugPrint('seek failed: $e');
     }
@@ -1594,33 +1660,21 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Future<void> setPlaybackSpeed(double speed) async {
     lastPlaybackSpeed = playbackSpeed;
 
-    if (speed == _videoPlayerController?.state.rate) {
-      return;
-    }
+    if (speed == _videoPlayerController?.state.rate) return;
 
     await _setRate(speed);
-    _playbackSpeed.value = speed;
+    if (!isLive) _playbackSpeed.value = speed;
     _updatePlaybackState();
     if (danmakuController != null) {
       try {
-        DanmakuOption currentOption = danmakuController!.option;
-        double defaultDuration = currentOption.duration * lastPlaybackSpeed;
-        double defaultStaticDuration =
-            currentOption.staticDuration * lastPlaybackSpeed;
-        DanmakuOption updatedOption = currentOption.copyWith(
-          duration: defaultDuration / speed,
-          staticDuration: defaultStaticDuration / speed,
+        danmakuController?.updateOption(
+          danmakuController!.option.copyWith(
+            duration: DanmakuOptions.danmakuDuration / speed,
+            staticDuration: DanmakuOptions.danmakuStaticDuration / speed,
+          ),
         );
-        danmakuController!.updateOption(updatedOption);
       } catch (_) {}
     }
-  }
-
-  // 还原默认速度
-  double playSpeedDefault = Pref.playSpeedDefault;
-  Future<void> setDefaultSpeed() async {
-    await _setRate(playSpeedDefault);
-    _playbackSpeed.value = playSpeedDefault;
   }
 
   Future<void> _setRate(double speed) async {
@@ -2070,22 +2124,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  /// 渲染路径（平台视图 / 纹理）或 HDR 信令变化时重建播放器。
-  ///
-  /// 与 setDataSource 排在同一条队列里，是否真要重建到了队头才判断，
-  /// 见 [PlayerRebuildQueue]。
-  Future<void> _syncRenderPath() async {
-    if (!OS.isHarmony) return;
-    await _playerQueue.requestRebuild();
-  }
-
-  /// 按当前渲染路径重建播放器，保留进度、播放状态与倍速。
+  /// 输出（渲染路径或 HDR 参数，见 [_appliedOutput]）变化时按当前输出重建
+  /// 播放器，保留进度、播放状态与倍速。
   /// 只由 [_playerQueue] 调用，失败向上抛，由它记下待重试。
   Future<void> _rebuildForRenderPath() async {
     // 上一次重建失败后，重试可能落在页面已经销毁之后
     if (_playerCount == 0) return;
     final wasPlaying = playerStatus.isPlaying;
-    // 不能只信 state.position：open() 会把它清零，全屏切换恰好落在「新播放器
+    // 不能只信 state.position：open() 会把它清零，重建恰好落在「新播放器
     // 刚建好、mpv 还没上报 time-pos」的窗口里时读到的就是 0，一重建就从头播，
     // 还会把 0 当成观看进度写回历史。position（秒）由监听器维护，可以兜底。
     final live = positionInMilliseconds;
@@ -2280,8 +2326,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       _clearPreview();
     }
     if (Platform.isAndroid) {
-      AndroidHelper$ToDart.onUserLeaveHint?.release();
       AndroidHelper$ToDart.onUserLeaveHint = null;
+    } else if (Platform.isIOS) {
+      IOSPipHelper.dispose();
     }
     _timer?.cancel();
     // _position.close();
@@ -2398,53 +2445,78 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     videoShot = await VideoHttp.videoshot(bvid: bvid, cid: cid!);
   }
 
+  int _screenshotState = 0;
   Future<void> takeScreenshot() async {
+    if (_screenshotState > 0) return;
+    _screenshotState = 1;
     SmartDialog.showToast('截图中');
     // 鸿蒙 media_kit fork 的 screenshot 返回 Uint8List（上游 fork 返回 ui.Image）
     final bytes = await videoPlayerController?.screenshot(format: 'image/png');
     if (bytes == null) {
       SmartDialog.showToast('截图失败');
+      _screenshotState = 0;
       return;
     }
     final time = DurationUtils.formatDuration(
       positionInMilliseconds / 1000,
     ).replaceAll(':', '-');
-    SmartDialog.showToast('点击弹窗保存截图');
-    showDialog(
+    SmartDialog.showToast('点击弹窗或按 Enter 保存截图');
+    await showDialog(
       context: Get.context!,
-      builder: (context) => GestureDetector(
-        onTap: () {
+      requestFocus: true,
+      builder: (context) {
+        void save() {
+          if (_screenshotState > 1) return;
+          _screenshotState = 2;
           Get.back();
           ImageUtils.saveByteImg(
             bytes: bytes,
             fileName: 'screenshot_${cid}_$time',
           );
-        },
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: min(MediaQuery.widthOf(context) / 3, 350),
-              ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    width: 5,
-                    color: ColorScheme.of(context).surface,
+        }
+
+        return Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent) {
+              final key = event.logicalKey;
+              if (key == .keyS || key == .enter || key == .numpadEnter) {
+                save();
+                return .handled;
+              }
+            }
+            return .ignored;
+          },
+          child: GestureDetector(
+            onTap: save,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: min(MediaQuery.widthOf(context) / 3, 350),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(5),
-                  child: Image.memory(bytes),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        width: 5,
+                        color: ColorScheme.of(context).surface,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Image.memory(bytes),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+    _screenshotState = 0;
   }
 
   void onPopInvokedWithResult(bool didPop, Object? result) {

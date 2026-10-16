@@ -5,6 +5,7 @@ import 'package:PiliPlus/http/dynamics.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/reply.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_mention/item.dart';
 import 'package:PiliPlus/pages/common/dyn/common_dyn_controller.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -18,6 +19,8 @@ class DynamicDetailController extends CommonDynController with ReloadMixin {
   @override
   late int replyType;
   late DynamicItemModel dynItem;
+  @override
+  MentionItem? get mentionItem => dynItem.modules.moduleAuthor?.mentionItem;
 
   @override
   dynamic get sourceId => replyType == 1 ? IdUtils.av2bv(oid) : oid;

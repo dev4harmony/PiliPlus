@@ -11,13 +11,38 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
+void showPgcCover({
+  required String? title,
+  required String? cover,
+  dynamic aid,
+  String? bvid,
+}) => imageSaveDialog(
+  title: title,
+  cover: cover,
+  aid: aid,
+  bvid: bvid,
+  orientation: .portrait,
+  aspectRatio: Style.aspectRatio3x4,
+);
+
 void imageSaveDialog({
   required String? title,
   required String? cover,
   dynamic aid,
   String? bvid,
+  Orientation orientation = .landscape,
+  double aspectRatio = Style.aspectRatio16x9,
 }) {
-  final double imgWidth = MediaQuery.sizeOf(Get.context!).shortestSide - 16;
+  final screenShortestSide = MediaQuery.sizeOf(Get.context!).shortestSide;
+  final double imgWidth, imgHeight;
+  switch (orientation) {
+    case .portrait:
+      imgHeight = screenShortestSide * 0.8;
+      imgWidth = imgHeight * aspectRatio;
+    case .landscape:
+      imgWidth = screenShortestSide - 16;
+      imgHeight = imgWidth / aspectRatio;
+  }
   final wasVisible = HarmonyChannel.hdsBarVisible;
   HarmonyChannel.setShellBarsHidden(true);
   SmartDialog.show(
@@ -47,7 +72,7 @@ void imageSaveDialog({
                     src: cover,
                     quality: 100,
                     width: imgWidth,
-                    height: imgWidth / Style.aspectRatio16x9,
+                    height: imgHeight,
                     borderRadius: const .vertical(top: Style.imgRadius),
                   ),
                 ),

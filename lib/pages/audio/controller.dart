@@ -129,8 +129,6 @@ class AudioController extends GetxController
   String? _prev;
   String? _next;
   bool get reachStart => _prev == null;
-  Future<bool>? Function()? _savedOnSkipToPrevious;
-  Future<bool>? Function()? _savedOnSkipToNext;
 
   ListOrder order = ListOrder.ORDER_NORMAL;
 
@@ -224,11 +222,9 @@ class AudioController extends GetxController
       handler
         ..onPlay = onPlay
         ..onPause = onPause
-        ..onSeek = onSeek;
-      _savedOnSkipToPrevious = handler.onSkipToPrevious;
-      _savedOnSkipToNext = handler.onSkipToNext;
-      handler.onSkipToPrevious = () async => playPrev();
-      handler.onSkipToNext = () async => playNext();
+        ..onSeek = onSeek
+        ..onSkipToNext = playNext
+        ..onSkipToPrevious = playPrev;
       // 循环模式：应用→播控中心（实况窗图标），播控中心→应用（点按钮切换）
       _savedOnRepeatModeChanged = handler.onRepeatModeChanged;
       handler.onRepeatModeChanged = (repeat) async {
@@ -913,8 +909,8 @@ class AudioController extends GetxController
       ..onPlay = null
       ..onPause = null
       ..onSeek = null
-      ..onSkipToPrevious = _savedOnSkipToPrevious
-      ..onSkipToNext = _savedOnSkipToNext
+      ..onSkipToNext = null
+      ..onSkipToPrevious = null
       ..onRepeatModeChanged = _savedOnRepeatModeChanged
       ..clearIfNeeded();
     _playModeSub?.cancel();
