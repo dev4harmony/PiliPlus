@@ -114,7 +114,6 @@ struct Index {
   @State winWidth: number = 0;
   @State winHeight: number = 0;
   @State bottomAvoidAreaHeight: number = 0;
-  @State bgColor: ResourceColor = $r("app.color.start_window_background")
 
   private categoryController: TabsController = new TabsController();
   private controller: HdsTabsController = new HdsTabsController();
@@ -128,9 +127,11 @@ struct Index {
   @State rotationMask: image.PixelMap | null = null;
   @State rotationMaskOpacity: number = 1;
   private rotationCallback: ((info: window.RotationChangeInfo) => void) | null = null;
-  private rotatingCount: number = 0;
   private rotationMaskTimers: number[] = [];
   private currentOrientation: number = 0;
+
+  /// 背景色
+  private isBlackBg: boolean = false;
 
   onHomeTabIndexChanged(): void {
     if (this.homeActiveTabIndex >= 0 && this.homeActiveTabIndex < this.homeTabs.length) {
@@ -184,6 +185,10 @@ struct Index {
   /// 屏幕旋转动画：模仿安卓CROSSFADE
   /// 旋转开始时捕获旧画面快照，新旧界面淡入淡出
   private RotatationAnimation(w: window.Window): void {
+    // 更新遮罩前先释放上一张快照并清掉旧定时器，避免 PixelMap 被覆盖后
+    // 无法回收造成图片资源泄露，也避免旧定时器误清新遮罩
+    this.releaseRotationMask();
+    this.clearRotationMaskTimers();
     try {
       this.rotationMask = w.snapshotSync();
       this.rotationMaskOpacity = 1;
@@ -207,12 +212,26 @@ struct Index {
     }, ROTATION_MASK_MAX_LIFETIME));
   }
 
-  private cleanupRotationMask(): void {
-    this.clearRotationMaskTimers();
-    if (this.rotationMask !== null) {
-      this.rotationMask.release();
+  /// 释放遮罩 PixelMap：先判空、再判是否已释放，避免重复 release；
+  /// release 抛错（如已被释放）时兜底忽略，不影响后续流程
+  private releaseRotationMask(): void {
+    const mask = this.rotationMask;
+    if (mask === null) {
+      return;
     }
     this.rotationMask = null;
+    try {
+      if (!mask.isReleased()) {
+        mask.release();
+      }
+    } catch (err) {
+      console.error(TAG, `release rotation mask failed: ${err}`);
+    }
+  }
+
+  private cleanupRotationMask(): void {
+    this.clearRotationMaskTimers();
+    this.releaseRotationMask();
     this.rotationMaskOpacity = 1;
   }
 
@@ -269,18 +288,13 @@ struct Index {
       try {
         this.rotationCallback = (info: window.RotationChangeInfo) => {
           if (info.type === window.RotationChangeType.WINDOW_WILL_ROTATE) {
-            this.bgColor = Color.Black;
-            this.rotatingCount++;
-            if (((info.orientation+this.currentOrientation)&1) === 1 && this.rotatingCount === 1) {
-              // 旋转角为 90° 或 270°，播放转屏动画
+            // 旋转角为 90° 或 270°，播放转屏动画；以遮罩是否为 null 判断
+            // 上一次动画是否已结束，仍在播时不重复截图覆盖
+            if (((info.orientation+this.currentOrientation)&1) === 1 && this.rotationMask === null) {
               this.RotatationAnimation(w);
             }
           } else if (info.type === window.RotationChangeType.WINDOW_DID_ROTATE) {
             this.currentOrientation = info.orientation;
-            this.rotatingCount--;
-            if (this.rotatingCount === 0) {
-              this.bgColor = $r("app.color.start_window_background");
-            }
           }
         };
         w.on('rotationChange', this.rotationCallback);
@@ -304,6 +318,10 @@ struct Index {
     }).catch((err: Object) => {
       console.error(TAG, `getLastWindow failed: ${err}`);
     });
+
+    setTimeout(() => {
+      this.isBlackBg = true;
+    }, 3000);
   }
 
   aboutToDisappear(): void {
@@ -336,12 +354,6 @@ struct Index {
       this.rotationCallback = null;
     }
     this.clearRotationMaskTimers();
-  }
-
-  onPageShow(): void {
-    //防止退出后台计数出错
-    this.rotatingCount = 0;
-    this.bgColor = $r("app.color.start_window_background");
   }
 
   @Builder
@@ -933,7 +945,7 @@ struct Index {
     }
     .width(this.winWidth > 0 ? this.winWidth : '100%')
     .height(this.winHeight > 0 ? this.winHeight : '100%')
-    .backgroundColor(this.bgColor)
+    .backgroundColor(this.isBlackBg ? Color.Black: $r("app.color.start_window_background"))
   }
 
   onBackPress(): boolean {
