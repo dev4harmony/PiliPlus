@@ -29,13 +29,6 @@ jobs:
           flutter-version: "3.44.9"
           cache: true
 
-      # the cached SDK may already carry the patch from a previous run
-      - name: Patch flutter
-        run: |
-          patch="$GITHUB_WORKSPACE/lib/scripts/double_tap_gesture.patch"
-          git -C "$FLUTTER_ROOT" apply --reverse --check "$patch" 2>/dev/null ||
-            git -C "$FLUTTER_ROOT" apply "$patch"
-
       - name: Get Flutter dependencies
         run: flutter pub get
         env:
