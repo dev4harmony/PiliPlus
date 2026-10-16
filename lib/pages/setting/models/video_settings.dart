@@ -6,6 +6,7 @@ import 'package:PiliPlus/models/common/video/live_quality.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
 import 'package:PiliPlus/models/common/video/video_quality.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
+import 'package:PiliPlus/pages/setting/widgets/hdr_settings_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/ordered_multi_select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/models/audio_output_type.dart';
@@ -21,6 +22,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:os_type/os_type.dart';
 
 List<SettingsModel> get videoSettings => [
   const SwitchModel(
@@ -177,7 +179,38 @@ List<SettingsModel> get videoSettings => [
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: _showHwDecDialog,
   ),
+    if (OS.isHarmony)
+    const SplitModel(
+      normalModel: NormalModel.split(
+        title: 'HDR 视频',
+        subtitle: '点击配置峰值亮度',
+        leading: Icon(Icons.settings_brightness_outlined),
+      ),
+      switchModel: SwitchModel.split(
+        defaultVal: true,
+        setKey: SettingBoxKey.enableHDR,
+        onTap: _showHdrSettingsDialog,
+      ),
+    ),
 ];
+
+/// HDR峰值亮度设置
+Future<void> _showHdrSettingsDialog(
+  BuildContext context
+) async {
+  final res = await showDialog<HdrSettings>(
+    context: context,
+    builder: (context) => HdrSettingsDialog(
+      matchVideo: Pref.hdrMatchVideoPeak,
+      value: Pref.hdrPeakNits,
+    ),
+  );
+  if (res == null) return;
+  await GStorage.setting.putAll({
+    SettingBoxKey.hdrMatchVideoPeak: res.matchVideo,
+    SettingBoxKey.hdrPeakNits: res.nits,
+  });
+}
 
 Future<void> _showCDNDialog(BuildContext context, VoidCallback setState) async {
   final res = await showDialog<CDNService>(

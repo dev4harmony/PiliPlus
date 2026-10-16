@@ -6,7 +6,6 @@ import 'package:PiliPlus/models/common/video/subtitle_pref_type.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/pages/fullscreen_sc_size.dart';
-import 'package:PiliPlus/pages/setting/widgets/hdr_peak_nits_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
@@ -304,47 +303,7 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.tempPlayerConf,
     defaultVal: false,
   ),
-  if (OS.isHarmony) ...[
-    const SwitchModel(
-      title: '启用 HDR 视频',
-      subtitle: '播放 HDR / HDR Vivid / 杜比视界片源时按 HDR 输出，触发峰值亮度',
-      leading: Icon(Icons.settings_brightness_outlined),
-      setKey: SettingBoxKey.enableHDR,
-      defaultVal: true,
-    ),
-    const SwitchModel(
-      title: '匹配视频亮度',
-      subtitle: '开启时按片源自身的亮度输出，不做色调映射；关闭时只把比「HDR 峰值亮度」亮的片源压缩到该峰值，更暗的保持原亮度',
-      leading: Icon(Icons.brightness_auto_outlined),
-      setKey: SettingBoxKey.hdrMatchVideoPeak,
-      defaultVal: true,
-    ),
-    NormalModel(
-      title: 'HDR 峰值亮度',
-      leading: const Icon(Icons.wb_sunny_outlined),
-      getSubtitle: () => Pref.hdrMatchVideoPeak
-          ? '当前 ${Pref.hdrPeakNits} nit，开启「匹配视频亮度」时不使用'
-          : '当前 ${Pref.hdrPeakNits} nit，比它亮的片源压缩到这里，更暗的保持原亮度',
-      onTap: _showHdrPeakNitsDialog,
-    ),
-  ],
 ];
-
-Future<void> _showHdrPeakNitsDialog(
-  BuildContext context,
-  VoidCallback setState,
-) async {
-  final value = await showDialog<int>(
-    context: context,
-    builder: (context) => HdrPeakNitsDialog(
-      value: Pref.hdrPeakNits,
-      matchVideo: Pref.hdrMatchVideoPeak,
-    ),
-  );
-  if (value == null) return;
-  await GStorage.setting.put(SettingBoxKey.hdrPeakNits, value);
-  setState();
-}
 
 Future<void> _showSubtitleDialog(
   BuildContext context,
