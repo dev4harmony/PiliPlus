@@ -302,8 +302,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             // toolbarHeight 为 0、自身 primary 也关了，但 Scaffold 的 primary
             // 仍为 true，这一格照样占 padding.top，正文（播放器）整体下移；
             // _buildPP/_buildPH 里 videoHeight 减掉的正是这一段。隐藏状态栏后
-            // padding.top 即摄像头挖孔高度（鸿蒙见 HarmonyChannel.cutoutInsets，
-            // 与 Android 语义一致），播放器已经整个在挖孔之下，再传 topInset
+            // padding.top 即挖孔高度，播放器已经整个在挖孔之下，再传 topInset
             // 就是同一个值避让两次。
             topInset: null,
             headerControl: LiveHeaderControl(

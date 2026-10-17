@@ -247,10 +247,9 @@ export default class EntryAbility extends FlutterAbility {
   /**
    * 自由多窗（FLOATING）/ 最大化（MAXIMIZE，2in1）下提前隐藏系统装饰栏。
    *
-   * 真正的策略由 Dart 侧 HarmonyChannel._syncWindowDecor 通过 embedding 的
-   * SystemChrome 通道维护（只保留 'navigation' → embedding 自己会
-   * setWindowDecorVisible(false) 并把 viewPadding.top 钉成三键高度）；这里
-   * 只是在窗口创建 / 进入自由窗口的第一时间先隐藏一次，否则 Dart 首帧前
+   * 策略的唯一维护者是 Dart 侧 HarmonyChannel._syncWindowDecor → 原生
+   * HarmonyChannel.setWindowDecorVisible（直接调官方 window.setWindowDecorVisible）。
+   * 这里只是在窗口创建 / 进入自由窗口的第一时间先隐藏一次，否则 Dart 首帧前
    * 装饰栏会先出现再收回。非自由窗口不调用：手机全屏下该接口会抛 1300004。
    */
   private hideWindowDecorIfFloating(w: window.Window, status?: window.WindowStatusType): void {
@@ -264,12 +263,7 @@ export default class EntryAbility extends FlutterAbility {
     if (status != window.WindowStatusType.FLOATING && status != window.WindowStatusType.MAXIMIZE) {
       return;
     }
-    try {
-      w.setWindowDecorVisible(false);
-    } catch (err) {
-      const e = err as BusinessError;
-      console.warn('EntryAbility', `setWindowDecorVisible(false) skipped: ${e.code} ${e.message}`);
-    }
+    this.harmonyChannel.setWindowDecorVisible(false);
   }
 
   onDestroy(): void {

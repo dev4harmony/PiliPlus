@@ -72,11 +72,8 @@ abstract class HarmonyChannel {
       case 'onWindowModeChange':
         _windowMode = call.arguments['isWindowMode'] as bool? ?? false;
         break;
-      case 'onCutoutAvoidAreaChange':
-        _updateCutout(call.arguments);
-        break;
-      case 'onDecorTopInsetChange':
-        _updateDecorTop(call.arguments['top']);
+      case 'onSafeAreaChange':
+        _updateSafeArea(call.arguments);
         break;
       // 源端 onContinue 拉取当前播放状态
       case 'getContinuationState':
@@ -426,15 +423,15 @@ abstract class HarmonyChannel {
     _channel.invokeMethod('setMiniWindowLandscape', {'landscape': landscape});
   }
 
-  /// 启动时（runApp 之前）拉取窗口初始状态（是否自由多窗 / 受限窗口模式），
-  /// 并据此一次性下发系统栏模式（代替 main.dart 里的 edgeToEdge）。
+  /// 启动时（runApp 之前）主动拉取窗口初始状态：是否自由多窗 / 受限窗口模式
+  /// （据此下发系统栏模式）、安全区避让区初值（见 [safeAreaInsets]）、装饰栏
+  /// 策略（见 [_syncWindowDecor]）。
   ///
-  /// 原生只在 windowStatusChange 时推送 onFloatingWindowChange，应用直接在
-  /// 自由多窗里启动时收不到；且 Dart 侧 handler 注册前的通道消息最多缓存
-  /// 一条，靠原生「补发」不可靠，这里改为主动拉取。放在首帧之前、且不先发
-  /// edgeToEdge，是为了避免装饰栏「先出现再收回」的闪动；原生侧
-  /// EntryAbility 在窗口创建时已先隐藏一次，这里只是让 embedding 的状态与之
-  /// 一致（并把 viewPadding.top 钉成三键高度）。
+  /// 主动拉取的必要性：原生只在 windowStatusChange 时推送
+  /// onFloatingWindowChange，应用直接在自由多窗里启动时收不到；且 Dart 侧
+  /// handler 注册前的通道消息最多缓存一条，靠原生「补发」不可靠。放在首帧之前
+  /// 是为了避免装饰栏「先出现再收回」的闪动（原生侧 EntryAbility 在窗口创建时
+  /// 已先隐藏一次）。
   static Future<void> initWindowState() async {
     if (!OS.isHarmony) return;
     try {
@@ -449,31 +446,24 @@ abstract class HarmonyChannel {
       }
     } catch (_) {}
     try {
-      _updateCutout(await _channel.invokeMethod<Map>('getCutoutAvoidArea'));
-    } catch (_) {}
-    try {
-      _updateDecorTop(await _channel.invokeMethod<num>('getDecorTopInset'));
+      _updateSafeArea(await _channel.invokeMethod<Map>('getSafeArea'));
     } catch (_) {}
     _syncWindowDecor();
   }
 
-  /// 摄像头挖孔（TYPE_CUTOUT）避让区，**物理像素**，窗口相对坐标，随旋转
-  /// 变化；由原生 getCutoutAvoidArea / onCutoutAvoidAreaChange 维护。
+  /// 窗口安全区避让区，**物理像素**，窗口相对坐标，随旋转/窗口形态变化；
+  /// 四边为 max(TYPE_SYSTEM, TYPE_CUTOUT)。由原生 getSafeArea /
+  /// onSafeAreaChange 上报，在 main.dart 根 MediaQuery 里并入
+  /// padding/viewPadding，供 ViewSafeArea/SafeArea 直接使用。
   ///
-  /// 鸿蒙 embedding 算 viewPadding 只读 TYPE_SYSTEM（状态栏/导航栏），不读
-  /// 挖孔：横屏时 viewPadding.left/right 恒为 0、竖屏隐藏状态栏后
-  /// viewPadding.top 归 0，ViewSafeArea/SafeArea 都避不开挖孔。Android
-  /// embedding 会把 cutout 并进 viewPadding，上上游代码按该语义写，故在
-  /// main.dart 的根 MediaQuery 里把这里的值按边取 max 合并进
-  /// padding/viewPadding，让下游无需感知平台差异。
-  ///
-  /// 仅手机上报：平板/2in1 的摄像头在边框上，避让只会平白让出一条空带，
-  /// 原生侧直接不报（见 ETS HarmonyChannel.cutoutEnabled），此处恒为 zero。
-  static final ValueNotifier<EdgeInsets> cutoutInsets = ValueNotifier(
+  /// 独立上报的原因：embedding 算 viewPadding 只读 TYPE_SYSTEM，不读挖孔，
+  /// 横屏时 left/right 恒为 0、竖屏隐藏状态栏后 top 归 0。自由窗口的三键带
+  /// 也含在 TYPE_SYSTEM 内，一并覆盖。
+  static final ValueNotifier<EdgeInsets> safeAreaInsets = ValueNotifier(
     EdgeInsets.zero,
   );
 
-  static void _updateCutout(dynamic args) {
+  static void _updateSafeArea(dynamic args) {
     if (args is! Map) return;
     double side(String key) => (args[key] as num?)?.toDouble() ?? 0;
     final insets = EdgeInsets.fromLTRB(
@@ -482,23 +472,9 @@ abstract class HarmonyChannel {
       side('right'),
       side('bottom'),
     );
-    if (insets != cutoutInsets.value) {
-      cutoutInsets.value = insets;
+    if (insets != safeAreaInsets.value) {
+      safeAreaInsets.value = insets;
     }
-  }
-
-  /// 窗口顶部系统控件的避让高度，**物理像素**：系统顶部避让区（状态栏/小窗
-  /// 顶条）与自由多窗三键高度取 max。由原生 getDecorTopInset / onDecorTopInsetChange 维护。
-  ///
-  /// 原先完全依赖 embedding 把 viewPadding.top 钉成三键高度（见
-  /// [_syncWindowDecor]），但 embedding 新版在小窗、以及运行中才打开系统
-  /// 「自由多窗」时会把它钉成 0 且不再刷新，顶部内容压到系统控件下面。
-  /// 这里自己上报一份，在 [mergeCutout] 里与 top 取 max 兜底。
-  static final ValueNotifier<double> decorTopInset = ValueNotifier(0);
-
-  static void _updateDecorTop(dynamic top) {
-    if (top is! num) return;
-    decorTopInset.value = top.toDouble();
   }
 
   /// 根视图的顶部避让（逻辑像素，已按 uiScale 换算），等价于根 MediaQuery 的
@@ -510,71 +486,45 @@ abstract class HarmonyChannel {
   static double rootTopInset(BuildContext context) {
     final view = View.of(context);
     final dpr = view.devicePixelRatio;
-    final top = mergeCutout(
+    final top = mergeSafeArea(
       EdgeInsets.only(top: view.viewPadding.top / dpr),
       dpr,
     ).top;
     return top / ScaledWidgetsFlutterBinding.instance.scaleFactor;
   }
 
-  /// 把 [cutoutInsets]、[decorTopInset]（物理像素）换算为逻辑像素后与
-  /// [padding] 按边取 max。
+  /// 把 [safeAreaInsets]（物理像素）换算为逻辑像素后与 [padding] 按边取 max。
   /// [devicePixelRatio] 须是引擎上报的原始 DPR（uiScale 缩放前）。
-  static EdgeInsets mergeCutout(EdgeInsets padding, double devicePixelRatio) {
-    final cutout = cutoutInsets.value;
-    final decorTop = decorTopInset.value;
-    if (cutout == EdgeInsets.zero && decorTop == 0) return padding;
-    final c = cutout / devicePixelRatio;
+  static EdgeInsets mergeSafeArea(EdgeInsets padding, double devicePixelRatio) {
+    final area = safeAreaInsets.value;
+    if (area == EdgeInsets.zero) return padding;
+    final a = area / devicePixelRatio;
     return EdgeInsets.fromLTRB(
-      max(padding.left, c.left),
-      max(padding.top, max(c.top, decorTop / devicePixelRatio)),
-      max(padding.right, c.right),
-      max(padding.bottom, c.bottom),
+      max(padding.left, a.left),
+      max(padding.top, a.top),
+      max(padding.right, a.right),
+      max(padding.bottom, a.bottom),
     );
   }
 
-  /// 已下发给 embedding 的装饰栏策略：true = 隐藏（自由多窗沉浸），
+  /// 已下发给原生的装饰栏策略：true = 隐藏（自由多窗沉浸），
   /// false = 显示，null = 尚未下发。
   static bool? _decorHidden;
 
   /// 自由多窗（平板全景多窗 / 2in1）下隐藏系统装饰栏，让窗口顶部随内容沉浸。
   ///
-  /// 系统装饰栏是一条带应用图标 + 标题的独立色条（浅/深色各一套灰），与
-  /// colorScheme.surface 永远对不上色；只调 setDecorButtonStyle 改按钮颜色
-  /// 是不够的，栏本身得隐藏。
+  /// 系统装饰栏是一条带应用图标 + 标题的独立色条，与 colorScheme.surface 对不
+  /// 上色，只能整条隐藏（只改按钮颜色不够）。走原生 [setWindowDecorVisible]，
+  /// 不用 embedding 的 shouldHideWindowDecor 间接路径，原因见该方法注释。
   ///
-  /// 不能直接调 window.setWindowDecorVisible(false)：鸿蒙 embedding 的
-  /// PlatformPlugin.updateSystemUiOverlays 在每次 SystemChrome 设置系统栏、
-  /// 以及 app 回前台 restoreSystemUiOverlays 时，都会按自己的
-  /// showBarOrNavigation 重写装饰栏可见性——edgeToEdge（['status',
-  /// 'navigation']）→ 显示装饰栏并把 paddingTop 钉 0，直接调的隐藏会被覆盖。
-  /// embedding 约定的隐藏方式是只保留 'navigation'，即
-  /// setEnabledSystemUIOverlays([SystemUiOverlay.bottom])：它会
-  /// setWindowDecorVisible(false) 并把 viewPadding.top 钉成右上角三键区域
-  /// 高度（getTitleButtonRect），SimpleScaffold 的状态栏占位、首页零高
-  /// AppBar、视频页顶部黑条都据此避让，内容不会压到按钮下面。三键仍由系统
-  /// 悬浮绘制，颜色跟随应用颜色模式，视频/直播页顶部为黑时由
-  /// [setDecorDark] 切浅色。
-  ///
-  /// 自由窗口内没有状态栏，去掉 'status' 无副作用；回到全屏窗口时必须恢复
-  /// edgeToEdge，否则状态栏会被隐藏。代价：没有标题栏后不能再拖标题栏移动
-  /// 窗口（边缘缩放、三键不受影响）。
+  /// 自由窗口内没有状态栏，故隐藏装饰栏不会误伤。代价：没有标题栏后不能再拖
+  /// 标题栏移动窗口（边缘缩放、三键不受影响）。
   static void _syncWindowDecor() {
     if (!OS.isHarmony) return;
     final hide = _miniWindow;
     if (_decorHidden == hide) return;
     _decorHidden = hide;
-    if (hide) {
-      // SystemChrome.setEnabledSystemUIOverlays 在 Dart 侧已被移除，但鸿蒙
-      // embedding 的 PlatformChannel 仍处理这条消息，参数为
-      // SystemUiOverlay 的枚举名列表。
-      SystemChannels.platform.invokeMethod<void>(
-        'SystemChrome.setEnabledSystemUIOverlays',
-        const ['SystemUiOverlay.bottom'],
-      );
-    } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    }
+    _channel.invokeMethod('setWindowDecorVisible', {'visible': !hide});
   }
 
   /// 自由多窗装饰栏按钮（全屏/最小化/关闭）的颜色跟随「按钮下方那条顶栏

@@ -1514,8 +1514,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 heroTag: heroTag,
               ),
               // 竖屏全屏时本页保留一条 padding.top 高的黑边（SimpleAppBar），
-              // 隐藏状态栏后其高度即挖孔高度（鸿蒙见 HarmonyChannel.cutoutInsets），
-              // 播放器整体已在挖孔之下，顶部控件/弹幕不再额外下移。
+              // 隐藏状态栏后其高度即挖孔高度，播放器整体已在挖孔之下，
+              // 顶部控件/弹幕不再额外下移。
               danmuWidget: isPipMode && pipNoDanmaku
                   ? null
                   : Obx(
