@@ -1278,9 +1278,9 @@ packages:
     dependency: "direct main"
     description:
       path: media_kit_video
-      ref: feat-ohos-hdr
-      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
-      url: "https://github.com/p1nbored/media-kit.git"
+      ref: feat-simple-video
+      resolved-ref: "8babdf4f456142fc8027f475838c5006da4656dd"
+      url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "2.0.1"
   menu_base:

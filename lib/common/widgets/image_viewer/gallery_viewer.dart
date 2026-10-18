@@ -509,7 +509,7 @@ class _GalleryViewerState extends State<GalleryViewer>
                       _horizontalDragGestureRecognizer,
                   onChangePage: _onChangePage,
                   child: FittedBox(
-                    child: Video(
+                    child: SimpleVideo(
                       controller: _videoController!,
                       fill: Colors.transparent,
                     ),
