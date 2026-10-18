@@ -1198,8 +1198,8 @@ packages:
     description:
       path: media_kit
       ref: feat-ohos-hdr
-      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
-      url: "https://github.com/p1nbored/media-kit.git"
+      resolved-ref: ebb387adeaec7ceb6495c2587af1b2bd89600cd8
+      url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.2.3"
   media_kit_libs_android_video:

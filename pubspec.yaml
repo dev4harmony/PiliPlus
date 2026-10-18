@@ -339,7 +339,7 @@ dependency_overrides:
   rxdart: ^0.28.0
   media_kit:
     git:
-      url: https://github.com/p1nbored/media-kit.git
+      url: https://github.com/HelloZeroNick/media-kit.git
       ref: feat-ohos-hdr
       path: ./media_kit
   media_kit_libs_linux:
