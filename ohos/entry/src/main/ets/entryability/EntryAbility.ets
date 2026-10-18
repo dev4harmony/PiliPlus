@@ -183,6 +183,10 @@ export default class EntryAbility extends FlutterAbility {
   async onWindowStageCreate(windowStage: window.WindowStage): Promise<void> {
     super.onWindowStageCreate(windowStage);
     let w = windowStage.getMainWindowSync();
+    // 窗口尺寸记忆：交系统托管，冷启动时按上次关闭的主窗尺寸/状态恢复。
+    windowStage.setWindowRectAutoSave(true).catch((err: BusinessError) => {
+      console.error(`setWindowRectAutoSave failed: ${err.code} ${err.message}`);
+    });
     // 窗口沉浸：布局延伸到状态栏区域，配合 ArkTS 顶部沉浸栏
     // （Index.ets 顶栏自绘 + statusBarHeight 避让）实现“顶部沉浸光感”。
     // 与「仅隐藏安全区、保留状态栏图标」的关键：setWindowLayoutFullScreen
