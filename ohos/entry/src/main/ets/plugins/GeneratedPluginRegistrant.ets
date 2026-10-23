@@ -20,7 +20,7 @@ import FloatingPlugin from 'floating';
 import FilePickerPlugin from 'file_picker_ohos';
 import DeviceInfoPlusOhosPlugin from 'device_info_plus';
 import ConnectivityPlusOhosPlugin from 'connectivity_plus_ohos';
-import BatteryPlusOhosPlugin from 'battery_plus_ohos';
+import BatteryPlusPlugin from 'battery_plus';
 import AudioSessionPlugin from 'audio_session';
 import AudioServicePlugin from 'audio_service';
 import AppLinksOhosPlugin from 'app_links_ohos';
@@ -58,7 +58,7 @@ export class GeneratedPluginRegistrant {
       flutterEngine.getPlugins()?.add(new FilePickerPlugin());
       flutterEngine.getPlugins()?.add(new DeviceInfoPlusOhosPlugin());
       flutterEngine.getPlugins()?.add(new ConnectivityPlusOhosPlugin());
-      flutterEngine.getPlugins()?.add(new BatteryPlusOhosPlugin());
+      flutterEngine.getPlugins()?.add(new BatteryPlusPlugin());
       flutterEngine.getPlugins()?.add(new AudioSessionPlugin());
       flutterEngine.getPlugins()?.add(new AudioServicePlugin());
       flutterEngine.getPlugins()?.add(new AppLinksOhosPlugin());

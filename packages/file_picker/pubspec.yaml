@@ -1,0 +1,16 @@
+name: file_picker
+description: A Flutter plugin that allows you to pick single or multiple absolute file paths, with extensions filtering support.
+version: 10.3.8
+publish_to: none
+
+environment:
+  sdk: '>=3.12.2 <4.0.0'
+  flutter: ">=2.5.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  file_picker_ohos:
+    git:
+      url: https://gitcode.com/hellozeronick/fluttertpc_file_picker.git
+      ref: br_v10.3.8_ohos

@@ -17,7 +17,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 # update when release
-version: 2.1.6+6332
+version: 2.1.6+6333
 
 environment:
   sdk: ">=3.12.2"
@@ -256,10 +256,8 @@ dependencies:
   # 鸿蒙 SDK 为 Dart 3.12.2 / Flutter 3.44.9，暂留 0.5.x 及旧 TrayListener 写法
   tray_manager: ^0.5.3
   # file_picker: ^10.3.3
-  file_picker_ohos:
-    git:
-      url: https://gitcode.com/hellozeronick/fluttertpc_file_picker.git
-      ref: br_v10.3.8_ohos
+  file_picker:
+    path: packages/file_picker
   super_sliver_list:
     git:
       url: https://github.com/bggRGjQaUbCoE/super_sliver_list.git
