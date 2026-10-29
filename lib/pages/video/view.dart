@@ -1175,19 +1175,54 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   }
 
   Widget _childWhenDisabledLandscapeInner(bool isFullScreen) {
-    double width =
+    // 原来的宽度算法作为「未手动拖动」时的默认值。
+    double defaultVideoWidth =
         clampDouble(maxHeight / maxWidth * 1.08, 0.5, 0.7) * maxWidth;
     if (maxWidth >= 560) {
-      width = maxWidth - clampDouble(maxWidth - width, 280, 425);
+      defaultVideoWidth =
+          maxWidth - clampDouble(maxWidth - defaultVideoWidth, 280, 425);
     }
-    final videoWidth = isFullScreen ? maxWidth : width;
-    final double height = width / Style.aspectRatio16x9;
-    final videoHeight = isFullScreen ? maxHeight : height;
-    if (height > maxHeight) {
+
+    final double availableWidth = maxWidth - padding.horizontal;
+    const double minPanelWidth = 280;
+    final double maxVideoWidth = min(
+      availableWidth - _landscapeDividerWidth - minPanelWidth,
+      (maxHeight - padding.top) * Style.aspectRatio16x9,
+    );
+    if (maxVideoWidth <= 0) {
+      if (isFullScreen) {
+        return SizedBox(
+          width: maxWidth,
+          height: maxHeight,
+          child: videoPlayer(width: maxWidth, height: maxHeight),
+        );
+      }
       return childSplit(Style.aspectRatio16x9);
     }
-    final introHeight = maxHeight - height - padding.top;
-    final showIntro =
+
+    final double minVideoWidth = min(availableWidth * 0.38, 640.0);
+    final double clampedMinVideoWidth = min(minVideoWidth, maxVideoWidth);
+    final double minRatio = clampedMinVideoWidth / availableWidth;
+    final double maxRatio = maxVideoWidth / availableWidth;
+    final double defaultRatio = clampDouble(
+      defaultVideoWidth / availableWidth,
+      minRatio,
+      maxRatio,
+    );
+    final double savedRatio =
+        _landscapeSplitRatio ?? Pref.videoLandscapeSplitRatio;
+    final double width =
+        availableWidth *
+        (savedRatio > 0
+            ? clampDouble(savedRatio, minRatio, maxRatio)
+            : defaultRatio);
+
+    final double videoWidth = isFullScreen ? maxWidth : width;
+    final double height = width / Style.aspectRatio16x9;
+    final double videoHeight = isFullScreen ? maxHeight : height;
+    final double introHeight = max(0.0, maxHeight - height - padding.top);
+    final double panelWidth = availableWidth - _landscapeDividerWidth - width;
+    final bool showIntro =
         videoDetailController.isUgc && videoDetailController.showRelatedVideo;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1219,10 +1254,19 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
               ),
           ],
         ),
+        if (!isFullScreen)
+          _buildLandscapeDivider(
+            availableWidth: availableWidth,
+            minRatio: minRatio,
+            maxRatio: maxRatio,
+            ratio: width / availableWidth,
+          ),
         Offstage(
           offstage: isFullScreen,
           child: SizedBox(
-            width: maxWidth - width - padding.horizontal,
+            width: isFullScreen
+                ? maxWidth - width - padding.horizontal
+                : panelWidth,
             height: maxHeight - padding.top,
             child: MiniScaffold(
               key: videoDetailController.childKey,
@@ -1266,6 +1310,78 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLandscapeDivider({
+    required double availableWidth,
+    required double minRatio,
+    required double maxRatio,
+    required double ratio,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      onEnter: (_) {
+        if (!_landscapeDividerHovered) {
+          setState(() => _landscapeDividerHovered = true);
+        }
+      },
+      onExit: (_) {
+        if (_landscapeDividerHovered) {
+          setState(() => _landscapeDividerHovered = false);
+        }
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: (details) {
+          _landscapeDragStartX = details.globalPosition.dx;
+          _landscapeDragStartRatio = ratio;
+        },
+        onHorizontalDragUpdate: (details) {
+          final double? startX = _landscapeDragStartX;
+          final double? startRatio = _landscapeDragStartRatio;
+          if (startX == null || startRatio == null) {
+            return;
+          }
+          final double newRatio = clampDouble(
+            startRatio + (details.globalPosition.dx - startX) / availableWidth,
+            minRatio,
+            maxRatio,
+          );
+          if (newRatio != _landscapeSplitRatio) {
+            setState(() => _landscapeSplitRatio = newRatio);
+          }
+        },
+        onHorizontalDragEnd: (_) {
+          _landscapeDragStartX = null;
+          _landscapeDragStartRatio = null;
+          if (_landscapeSplitRatio case final double value) {
+            GStorage.setting.put(
+              SettingBoxKey.videoLandscapeSplitRatio,
+              value,
+            );
+          }
+        },
+        child: Semantics(
+          label: '调整视频与侧栏宽度',
+          child: SizedBox(
+            width: _landscapeDividerWidth,
+            height: maxHeight - padding.top,
+            child: Center(
+              child: Container(
+                width: 3,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _landscapeDividerHovered
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1547,6 +1663,15 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   /// 状态栏显隐不再改变页面布局，避免旋转退出全屏时状态栏在动画末尾
   /// 显现导致画面下移。null 表示未捕获到（如移除安全边距场景），退化为 0。
   double? _fixedTopInset;
+
+  /// 横屏「左视频 + 右侧栏」布局的分隔条宽度。
+  static const double _landscapeDividerWidth = 12;
+
+  /// 用户手动拖动后的视频宽度占可用宽度的比例；null 表示使用默认比例。
+  double? _landscapeSplitRatio;
+  double? _landscapeDragStartX;
+  double? _landscapeDragStartRatio;
+  bool _landscapeDividerHovered = false;
 
   /// 鸿蒙受限窗口（分屏/自由多窗/悬浮窗）内没有系统状态栏，但引擎仍会上报
   /// 设备状态栏高度。仅在全屏时顶部安全区应被移除（视频铺满窗口、plplayer

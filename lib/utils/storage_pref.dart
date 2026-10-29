@@ -636,6 +636,11 @@ abstract final class Pref {
     return horizontalScreen;
   }
 
+  /// 横屏「左视频 + 右侧栏」布局中视频所占宽度比例。
+  /// 0 表示未手动调整，使用布局自身的默认比例。
+  static double get videoLandscapeSplitRatio =>
+      _setting.get(SettingBoxKey.videoLandscapeSplitRatio, defaultValue: 0.0);
+
   static String get banWordForDyn =>
       _setting.get(SettingBoxKey.banWordForDyn, defaultValue: '');
 
