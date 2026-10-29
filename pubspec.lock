@@ -134,19 +134,12 @@ packages:
   battery_plus:
     dependency: "direct main"
     description:
-      name: battery_plus
-      sha256: "3853aa1e18ea1d15493dd1d3edac05770b4b95c1e691fb85934c5fd3b1ac0fcc"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "7.1.1"
-  battery_plus_ohos:
-    dependency: "direct main"
-    description:
-      name: battery_plus_ohos
-      sha256: "94fcf4d39509c72944c86c2285fafa88b38be168e315535623d67cf84245d74e"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "0.0.3"
+      path: "packages/battery_plus/battery_plus"
+      ref: "br_battery_plus-v7.0.0_ohos"
+      resolved-ref: b8647bf46219d7d0a5235766aea0974d999f130f
+      url: "https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git"
+    source: git
+    version: "7.0.0"
   battery_plus_platform_interface:
     dependency: transitive
     description:

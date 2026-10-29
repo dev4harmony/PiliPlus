@@ -20,7 +20,7 @@ import FloatingPlugin from 'floating';
 import FilePickerPlugin from 'file_picker_ohos';
 import DeviceInfoPlusOhosPlugin from 'device_info_plus';
 import ConnectivityPlusOhosPlugin from 'connectivity_plus_ohos';
-import BatteryPlusOhosPlugin from 'battery_plus_ohos';
+import BatteryPlusOhosPlugin from 'battery_plus';
 import AudioSessionPlugin from 'audio_session';
 import AudioServicePlugin from 'audio_service';
 import AppLinksOhosPlugin from 'app_links_ohos';
