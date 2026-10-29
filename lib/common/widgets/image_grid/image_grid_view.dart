@@ -146,6 +146,19 @@ class ImageGridView extends StatelessWidget {
 
   static bool enableImgMenu = Pref.enableImgMenu;
 
+  /// 把图片请求尺寸量化到 256 的倍数。
+  ///
+  /// 横屏拖动分栏时右侧栏宽度会逐帧变化；如果直接按当前宽度生成
+  /// `@Nw.webp`，每一帧都会得到新的 URL，从而反复走网络请求。量化后
+  /// 只有跨过尺寸档位时才会换 URL，拖动过程中通常只请求 1~3 次。
+  static int? _stableCacheSize(int? size) {
+    if (size == null || size <= 0) {
+      return null;
+    }
+    const bucket = 256;
+    return ((size + bucket - 1) ~/ bucket) * bucket;
+  }
+
   void _showMenu(BuildContext context, int index, Offset offset) {
     HapticFeedback.mediumImpact();
     final item = picArr[index];
@@ -211,6 +224,8 @@ class ImageGridView extends StatelessWidget {
         builder: (BuildContext context, ImageGridInfo info) {
           final width = info.size.width;
           final height = info.size.height;
+          final cacheWidth = _stableCacheSize(width.cacheSize(context));
+          final cacheHeight = _stableCacheSize(height.cacheSize(context));
           late final placeHolder = Container(
             width: width,
             height: height,
@@ -223,7 +238,7 @@ class ImageGridView extends StatelessWidget {
               Assets.loading,
               width: width,
               height: height,
-              cacheWidth: width.cacheSize(context),
+              cacheWidth: _stableCacheSize(width.cacheSize(context)),
             ),
           );
           return List.generate(picArr.length, (index) {
@@ -245,6 +260,8 @@ class ImageGridView extends StatelessWidget {
                   borderRadius: borderRadius,
                   alignment: item.isLongPic ? .topCenter : .center,
                   cacheWidth: item.width <= item.height,
+                  memCacheWidth: item.width <= item.height ? cacheWidth : null,
+                  memCacheHeight: item.width <= item.height ? null : cacheHeight,
                   getPlaceHolder: () => placeHolder,
                 ),
                 if (item.isLivePhoto)

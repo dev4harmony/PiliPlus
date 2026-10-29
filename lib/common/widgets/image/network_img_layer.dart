@@ -22,6 +22,8 @@ class NetworkImgLayer extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.cacheWidth,
+    this.memCacheWidth,
+    this.memCacheHeight,
   });
 
   final String? src;
@@ -36,6 +38,10 @@ class NetworkImgLayer extends StatelessWidget {
   final BoxFit fit;
   final Alignment alignment;
   final bool? cacheWidth;
+
+  /// 显式指定解码/请求尺寸，用于在布局宽度连续变化时保持图片 URL 稳定。
+  final int? memCacheWidth;
+  final int? memCacheHeight;
 
   static Color? reduceLuxColor = Pref.reduceLuxColor;
   static bool reduce = false;
@@ -64,11 +70,14 @@ class NetworkImgLayer extends StatelessWidget {
     required bool isEmote,
     required bool isAvatar
   }) {
-    int? memCacheWidth, memCacheHeight;
-    if (cacheWidth ?? (width <= height)) {
-      memCacheWidth = width.cacheSize(context);
-    } else {
-      memCacheHeight = height.cacheSize(context);
+    int? cacheW = memCacheWidth;
+    int? cacheH = memCacheHeight;
+    if (cacheW == null && cacheH == null) {
+      if (cacheWidth ?? (width <= height)) {
+        cacheW = width.cacheSize(context);
+      } else {
+        cacheH = height.cacheSize(context);
+      }
     }
 
     return CachedNetworkImage(
@@ -77,14 +86,14 @@ class NetworkImgLayer extends StatelessWidget {
           ? ImageUtils.thumbnailUrl(src, quality)
           : ImageUtils.thumbnailUrlWithSize(
               src,
-              memCacheWidth,
-              memCacheHeight,
+              cacheW,
+              cacheH,
               quality,
             ),
       width: width,
       height: height,
-      memCacheWidth: memCacheWidth,
-      memCacheHeight: memCacheHeight,
+      memCacheWidth: cacheW,
+      memCacheHeight: cacheH,
       fit: fit,
       alignment: alignment,
       fadeOutDuration: fadeOutDuration,
