@@ -1681,7 +1681,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   double? _fixedTopInset;
 
   /// 横屏「左视频 + 右侧栏」布局的分隔条视觉间距。
-  static const double _landscapeDividerWidth = 12;
+  static const double _landscapeDividerWidth = 6;
 
   /// 分隔条实际可拖动/点击的命中宽度，向两侧扩展但不改变视觉间距。
   static const double _landscapeDividerHitWidth = 28;
