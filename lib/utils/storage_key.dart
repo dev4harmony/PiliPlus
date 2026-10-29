@@ -89,6 +89,7 @@ abstract final class SettingBoxKey {
       schemeVariant = 'schemeVariant',
       showViewPoints = 'showViewPoints',
       showRelatedVideo = 'showRelatedVideo',
+      autoPlaySeason = 'autoPlaySeason',
       showVideoReply = 'showVideoReply',
       showBangumiReply = 'showBangumiReply',
       alwaysExpandIntroPanel = 'alwaysExapndIntroPanel',

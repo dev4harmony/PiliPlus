@@ -297,6 +297,13 @@ List<SettingsModel> get playSettings => [
         .whenComplete(setState),
   ),
   const SwitchModel(
+    title: '自动连播合集',
+    subtitle: '当前视频的分P播完后，自动播放合集内的其他视频；关闭则播完当前视频即停止',
+    leading: Icon(Icons.playlist_play),
+    setKey: SettingBoxKey.autoPlaySeason,
+    defaultVal: false,
+  ),
+  const SwitchModel(
     title: '播放器设置仅对当前生效',
     subtitle: '弹幕、字幕及部分设置中没有的设置除外',
     leading: Icon(Icons.video_settings_outlined),

@@ -576,13 +576,17 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
       episodes.addAll(videoDetail.pages!);
     } else if (videoDetailCtr.isPlayAll) {
       episodes.addAll(videoDetailCtr.mediaList);
-    } else if (videoDetail.ugcSeason != null) {
+    } else if (Pref.autoPlaySeason && videoDetail.ugcSeason != null) {
       final UgcSeason ugcSeason = videoDetail.ugcSeason!;
       final List<SectionItem> sections = ugcSeason.sections!;
       for (int i = 0; i < sections.length; i++) {
         final List<EpisodeItem> episodesList = sections[i].episodes!;
         episodes.addAll(episodesList);
       }
+    }
+
+    if (episodes.isEmpty) {
+      return false;
     }
 
     final int currentIndex = episodes.indexWhere(
@@ -601,7 +605,8 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
     // 列表循环
     if (prevIndex < 0) {
       if (isPart &&
-          (videoDetailCtr.isPlayAll || videoDetail.ugcSeason != null)) {
+          (videoDetailCtr.isPlayAll ||
+              (Pref.autoPlaySeason && videoDetail.ugcSeason != null))) {
         return prevPlay(true);
       }
       if (playRepeat == PlayRepeat.listCycle) {
@@ -636,14 +641,14 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
       bool isPart = false;
       final videoDetail = this.videoDetail.value;
 
-      // part -> playall -> season
+      // part -> playall -> season（合集自动连播开启时）
       if (!skipPart && videoDetail.hasParts) {
         isPart = true;
         final List<Part> pages = videoDetail.pages!;
         episodes.addAll(pages);
       } else if (videoDetailCtr.isPlayAll) {
         episodes.addAll(videoDetailCtr.mediaList);
-      } else if (videoDetail.ugcSeason != null) {
+      } else if (Pref.autoPlaySeason && videoDetail.ugcSeason != null) {
         final UgcSeason ugcSeason = videoDetail.ugcSeason!;
         final List<SectionItem> sections = ugcSeason.sections!;
         for (int i = 0; i < sections.length; i++) {
@@ -687,12 +692,18 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
 
       // 列表循环
       if (nextIndex >= episodes.length) {
-        if (isPart &&
-            (videoDetailCtr.isPlayAll || videoDetail.ugcSeason != null)) {
-          return nextPlay(true);
-        }
-
-        if (playRepeat == PlayRepeat.listCycle) {
+        if (isPart) {
+          if (videoDetailCtr.isPlayAll ||
+              (Pref.autoPlaySeason && videoDetail.ugcSeason != null)) {
+            return nextPlay(true);
+          }
+          // 当前视频的分P已播完，不再跳转到合集或相关视频
+          if (playRepeat == PlayRepeat.listCycle) {
+            nextIndex = 0;
+          } else {
+            return false;
+          }
+        } else if (playRepeat == PlayRepeat.listCycle) {
           nextIndex = 0;
         } else if (playRepeat == PlayRepeat.autoPlayRelated &&
             videoDetailCtr.plPlayerController.showRelatedVideo) {

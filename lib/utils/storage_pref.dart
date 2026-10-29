@@ -380,6 +380,10 @@ abstract final class Pref {
   static bool get showRelatedVideo =>
       _setting.get(SettingBoxKey.showRelatedVideo, defaultValue: true);
 
+  /// 分P/单个视频播完后是否自动进入合集继续播放
+  static bool get autoPlaySeason =>
+      _setting.get(SettingBoxKey.autoPlaySeason, defaultValue: false);
+
   static bool get showVideoReply =>
       _setting.get(SettingBoxKey.showVideoReply, defaultValue: true);
 
