@@ -1224,7 +1224,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final double panelWidth = availableWidth - _landscapeDividerWidth - width;
     final bool showIntro =
         videoDetailController.isUgc && videoDetailController.showRelatedVideo;
-    return Row(
+    final Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
@@ -1254,13 +1254,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
               ),
           ],
         ),
-        if (!isFullScreen)
-          _buildLandscapeDivider(
-            availableWidth: availableWidth,
-            minRatio: minRatio,
-            maxRatio: maxRatio,
-            ratio: width / availableWidth,
-          ),
+        if (!isFullScreen) const SizedBox(width: _landscapeDividerWidth),
         Offstage(
           offstage: isFullScreen,
           child: SizedBox(
@@ -1307,6 +1301,28 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 ],
               ),
             ),
+          ),
+        ),
+      ],
+    );
+    if (isFullScreen) {
+      return row;
+    }
+    // 视觉间距仍为 _landscapeDividerWidth，命中区域向视频/侧栏两侧扩展。
+    return Stack(
+      children: [
+        row,
+        Positioned(
+          top: 0,
+          bottom: 0,
+          left: width -
+              (_landscapeDividerHitWidth - _landscapeDividerWidth) / 2,
+          width: _landscapeDividerHitWidth,
+          child: _buildLandscapeDivider(
+            availableWidth: availableWidth,
+            minRatio: minRatio,
+            maxRatio: maxRatio,
+            ratio: width / availableWidth,
           ),
         ),
       ],
@@ -1365,7 +1381,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         child: Semantics(
           label: '调整视频与侧栏宽度',
           child: SizedBox(
-            width: _landscapeDividerWidth,
+            width: _landscapeDividerHitWidth,
             height: maxHeight - padding.top,
             child: Center(
               child: Container(
@@ -1664,8 +1680,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   /// 显现导致画面下移。null 表示未捕获到（如移除安全边距场景），退化为 0。
   double? _fixedTopInset;
 
-  /// 横屏「左视频 + 右侧栏」布局的分隔条宽度。
+  /// 横屏「左视频 + 右侧栏」布局的分隔条视觉间距。
   static const double _landscapeDividerWidth = 12;
+
+  /// 分隔条实际可拖动/点击的命中宽度，向两侧扩展但不改变视觉间距。
+  static const double _landscapeDividerHitWidth = 28;
 
   /// 用户手动拖动后的视频宽度占可用宽度的比例；null 表示使用默认比例。
   double? _landscapeSplitRatio;
