@@ -16,7 +16,6 @@ import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
-import 'package:PiliPlus/media_kit_adapt/media_kit_adapt.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/audio_quality.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
@@ -802,10 +801,9 @@ class HeaderControlState extends State<HeaderControl>
     BuildContext context, {
     required Player player,
   }) async {
-    // 鸿蒙 media_kit fork 的 getProperty 为异步，且需经 media_kit_adapt 取原生播放器
-    final nativePlayer = player.platform!.maybeAsNativePlayer;
-    final hwdec = await nativePlayer.getProperty('hwdec-current');
-    final volume = (await nativePlayer.getProperty('volume')).subLength(3);
+    // 鸿蒙 media_kit fork 的 getProperty 为异步
+    final hwdec = await player.getProperty('hwdec-current');
+    final volume = (await player.getProperty('volume')).subLength(3);
     showDialog(
       context: context,
       builder: (context) {

@@ -1198,7 +1198,7 @@ packages:
     description:
       path: media_kit
       ref: feat-ohos-hdr
-      resolved-ref: ebb387adeaec7ceb6495c2587af1b2bd89600cd8
+      resolved-ref: e1d14a00ffe861f6b4c51c94e9d0a5e674e2a003
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.2.3"

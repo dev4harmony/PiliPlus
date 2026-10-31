@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'package:PiliPlus/http/constants.dart';
-import 'package:PiliPlus/media_kit_adapt/media_kit_adapt.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/mpv_handle_releaser.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
@@ -13,6 +12,7 @@ import 'package:get/get_rx/get_rx.dart';
 import 'package:media_kit/ffi/src/allocation.dart';
 import 'package:media_kit/ffi/src/utf8.dart';
 import 'package:media_kit/generated/libmpv/bindings.dart' as generated;
+import 'package:media_kit/media_kit.dart';
 import 'package:media_kit/src/player/native/core/initializer.dart';
 import 'package:media_kit/src/player/native/core/native_library.dart';
 
@@ -72,14 +72,11 @@ class MpvConvertWebp {
       generated.mpv_event_id.MPV_EVENT_VIDEO_RECONFIG,
       0,
     );
-    MediaKitAdapt.setPlayerHeader(
-      const {
-        'user-agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
-        'referer': HttpString.baseUrl,
-      },
-      _mpv,
+    _mpv.setHeader(
       _ctx,
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
+      referer: HttpString.baseUrl,
     );
     if (progress != null) {
       _observeProperty('time-pos');
@@ -110,7 +107,7 @@ class MpvConvertWebp {
     switch (event.ref.event_id) {
       case generated.mpv_event_id.MPV_EVENT_PROPERTY_CHANGE:
         final prop = event.ref.data.cast<generated.mpv_event_property>().ref;
-        if (prop.name.toDartString() == 'time-pos' &&
+        if (prop.name.cast<Utf8>().toDartString() == 'time-pos' &&
             prop.format == generated.mpv_format.MPV_FORMAT_DOUBLE) {
           progress!.value = (prop.data.cast<Double>().value - start) / duration;
         }
@@ -120,9 +117,9 @@ class MpvConvertWebp {
         break;
       case generated.mpv_event_id.MPV_EVENT_LOG_MESSAGE:
         final log = event.ref.data.cast<generated.mpv_event_log_message>().ref;
-        final prefix = log.prefix.toDartString().trim();
-        final level = log.level.toDartString().trim();
-        final text = log.text.toDartString().trim();
+        final prefix = log.prefix.cast<Utf8>().toDartString().trim();
+        final level = log.level.cast<Utf8>().toDartString().trim();
+        final text = log.text.cast<Utf8>().toDartString().trim();
         debugPrint('WebpConvert: $level $prefix : $text');
         if (kDebugMode) {
           if (level == 'error' || level == 'fatal') _success = false;
