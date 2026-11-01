@@ -82,6 +82,15 @@ export class WindowChromeController {
   /// FlutterAbility 不会暴露 loadContent 回调，因此由 Index 页面
   /// aboutToAppear 回调 [onContentLoaded] 补上。
   attach(win: window.Window): void {
+    // 幂等：热启动接续会再次走到窗口创建流程，若这里重复 on()，同一个窗口上
+    // 会挂上 N 份监听，之后每次窗口状态变化都触发 N 次 sync + 下发。同一窗口
+    // 已登记时直接返回；换窗口则先摘掉旧监听再重新登记。
+    if (this.win === win) {
+      return;
+    }
+    if (this.win !== null) {
+      this.detach();
+    }
     this.win = win;
     try {
       if (deviceInfo.sdkApiVersion >= 20) {
@@ -151,6 +160,15 @@ export class WindowChromeController {
 
   onChange(listener: WindowChromeListener): void {
     this.listeners.push(listener);
+  }
+
+  /// 反注册监听。引擎 detach（热重启 / 插件卸载）后订阅方必须摘掉自己，
+  /// 否则旧订阅会继续持有已失效的 channel，并被后续状态变化反复回调。
+  offChange(listener: WindowChromeListener): void {
+    const index = this.listeners.indexOf(listener);
+    if (index >= 0) {
+      this.listeners.splice(index, 1);
+    }
   }
 
   getState(): WindowChromeState {

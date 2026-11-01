@@ -46,8 +46,18 @@ export class WindowState {
   private safeAreaListening: boolean = false;
   private safeAreaStarting: Promise<void> | null = null;
   private lastSnapshotSignature: string = "";
+  /// 登记到 WindowChrome 的订阅。detach 时用它反注册，避免重复 attach 时
+  /// 在 chrome 上堆积多份（每次都会触发一遍快照 + 安全区重算与推送）。
+  private chromeListener: ((s: WindowChromeState) => void) | null = null;
 
   attach(win: window.Window, chrome: WindowChromeController): void {
+    if (this.win === win && this.chrome === chrome && this.chromeListener !== null) {
+      // 幂等：热启动接续会再走一遍窗口创建流程，重复登记只会让推送翻倍。
+      this.emitSnapshot();
+      this.emitSafeArea();
+      return;
+    }
+    this.detach();
     this.win = win;
     this.chrome = chrome;
     chrome.onChange((s: WindowChromeState) => {
@@ -77,6 +87,10 @@ export class WindowState {
     this.stopSafeAreaListener();
     this.systemBars?.detach();
     this.systemBars = null;
+    if (this.chrome !== null && this.chromeListener !== null) {
+      this.chrome.offChange(this.chromeListener);
+    }
+    this.chromeListener = null;
     this.chrome = null;
     this.win = null;
     this.snapshotListener = null;
