@@ -83,7 +83,12 @@ Future<void> _initDownPath() async {
       downloadPath = defDownloadPath;
     }
   } else if (OS.isHarmony) {
-    downloadPath = 'storage/Users/currentUser/Download/com.example.piliplus';
+    // 主应用与分身应用共用包名，但分身应用不允许访问下载目录：只有主应用能
+    // 落到系统的 Download/<bundle>，分身仍走应用私有目录。
+    await HarmonyChannel.loadAppCloneIndex();
+    downloadPath = HarmonyChannel.isAppClone
+        ? defDownloadPath
+        : 'storage/Users/currentUser/Download/com.example.piliplus';
   } else if (Platform.isAndroid) {
     final externalStorageDirPath = (await getExternalStorageDirectory())?.path;
     downloadPath = externalStorageDirPath != null

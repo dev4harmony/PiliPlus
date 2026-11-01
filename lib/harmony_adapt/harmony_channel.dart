@@ -57,6 +57,31 @@ abstract class HarmonyChannel {
     }
   }
 
+  /// 应用分身索引：0 = 主应用，1~5 = 分身应用
+  static int _appCloneIndex = 0;
+
+  /// 当前是否运行在分身应用里。主应用为 false
+  static bool get isAppClone => _appCloneIndex > 0;
+
+  /// 当前是否运行在主应用里
+  static bool get isMainApp => _appCloneIndex == 0;
+
+  /// 查询当前是否为主应用。
+  static Future<void> loadAppCloneIndex() async {
+    if (!OS.isHarmony) return;
+    try {
+      final index = await _channel.invokeMethod<int>('getAppCloneIndex');
+      _appCloneIndex = index ?? 0;
+    } catch (e) {
+      // 含 MissingPluginException：原生侧没有这个 method 的旧版本。
+      // 不写非 0 值，按主应用处理，避免把下载目录误降到应用私有目录。
+      _appCloneIndex = 0;
+      if (kDebugMode) {
+        debugPrint('[APPCLONE] query failed, treat as main app: $e');
+      }
+    }
+  }
+
   static final MethodChannel _channel = const MethodChannel('harmonyChannel')
     ..setMethodCallHandler(handler);
 

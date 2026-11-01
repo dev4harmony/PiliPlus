@@ -176,6 +176,21 @@ export default class HarmonyChannel implements FlutterPlugin {
         }
         break;
       }
+      case "getAppCloneIndex": {
+        // 应用分身索引：0 = 主应用，1~5 = 分身应用（见 ApplicationInfo.appIndex）。
+        // 供 Dart 侧判断「当前是否主应用」——分身与主应用共用包名和公共下载目录，
+        // 只有主应用才该把下载落到 storage/Users/currentUser/Download/<bundle>。
+        let appCloneIndex: number = 0;
+        try {
+          const appContext = (getContext() as common.UIAbilityContext)
+            .getApplicationContext();
+          appCloneIndex = appContext.getCurrentAppCloneIndex();
+        } catch (err) {
+          console.error("HarmonyChannel", `getCurrentAppCloneIndex failed: ${err}`);
+        }
+        result.success(appCloneIndex);
+        break;
+      }
       case "setFullScreenBars": {
         const fullscreen: boolean = call.argument("fullscreen") ?? false;
         await this.setFullScreenBars(fullscreen);
