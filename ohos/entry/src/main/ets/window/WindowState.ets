@@ -57,15 +57,22 @@ export class WindowState {
       this.emitSafeArea();
       return;
     }
-    this.detach();
+    // 避让区监听可能已经由 Dart 侧 getSafeArea 抢先装在同一个窗口上（插件
+    // attach 早于窗口创建，Dart 首帧也可能早于 onWindowStageCreate）。下面
+    // 的窗口级清理会把监听摘掉，必须在末尾按原状态重新装上，否则旋转后再
+    // 也没有 avoidAreaChange 推送。
+    const wasListening = this.safeAreaListening;
+    this.detachWindow();
     this.win = win;
     this.chrome = chrome;
-    chrome.onChange((s: WindowChromeState) => {
+    const listener = (s: WindowChromeState): void => {
       this.emitSnapshot();
       // 标题带占位等价于一条顶部安全区，状态一变必须重推安全区，
       // 否则 Dart 侧留白与原生实际占位错位。
       this.emitSafeArea();
-    });
+    };
+    this.chromeListener = listener;
+    chrome.onChange(listener);
     // 系统栏状态机独立于标题带：apply 完成同时通知标题带收起与安全区重推。
     if (this.systemBars === null) {
       const bars = new SystemBarsController();
@@ -78,12 +85,23 @@ export class WindowState {
       chrome.bindSystemBars(bars);
       this.systemBars = bars;
     }
+    if (wasListening) {
+      // 换窗口后重新挂避让监听（旧窗口的监听已在 detachWindow 里摘掉）。
+      this.startSafeAreaListener();
+    }
     // attach 时的首次 sync 发生在订阅之前，这里补推一次初值。
     this.emitSnapshot();
     this.emitSafeArea();
   }
 
-  detach(): void {
+  /**
+   * 只清理**窗口作用域**的资源：避让监听、系统栏状态机、chrome 订阅。
+   *
+   * 与 [detach] 的区别：不清 [snapshotListener] / [safeAreaListener]——那两个
+   * 是插件挂上来的引擎级推送回调，只在 onDestroy 时才解除。attach 复用它，
+   * 避免重挂窗口时把推送通道一并拔掉（表现为初值正常、之后再也不更新）。
+   */
+  private detachWindow(): void {
     this.stopSafeAreaListener();
     this.systemBars?.detach();
     this.systemBars = null;
@@ -93,9 +111,13 @@ export class WindowState {
     this.chromeListener = null;
     this.chrome = null;
     this.win = null;
+    this.lastSnapshotSignature = "";
+  }
+
+  detach(): void {
+    this.detachWindow();
     this.snapshotListener = null;
     this.safeAreaListener = null;
-    this.lastSnapshotSignature = "";
   }
 
   /** 登记窗口快照推送回调（传 null 解除）；登记即补推一次当前值。 */
@@ -203,27 +225,145 @@ export class WindowState {
     if (chrome !== undefined && chrome.titleBarVisible) {
       titleInset = this.vp2px(chrome.titleBarHeight);
     }
-    const top = Math.max(
-      Math.max(
-        sys ? WindowState.leadingInset(sys.topRect, false) : 0,
-        cut ? WindowState.leadingInset(cut.topRect, false) : 0),
-      titleInset);
-    // 角落挖孔去重：顶部已经避让到的挖孔，不在侧边重复避让。
-    const leftCutCovered = WindowState.cutoutCoveredByTop(cut?.leftRect, top);
-    const rightCutCovered = WindowState.cutoutCoveredByTop(cut?.rightRect, top);
+    // 先只算系统避让带（四边），它们构成「已经让位过」的区域，
+    // 后面判断挖孔是否落在其中。
+    const sysLeft = sys !== undefined ? WindowState.leadingInset(sys.leftRect, true) : 0;
+    const sysTop = sys !== undefined ? WindowState.leadingInset(sys.topRect, false) : 0;
+    const sysRight = sys !== undefined
+      ? WindowState.trailingInset(sys.rightRect, winWidth, true) : 0;
+    const sysBottom = sys !== undefined
+      ? WindowState.trailingInset(sys.bottomRect, winHeight, false) : 0;
+    let top = Math.max(sysTop, titleInset);
+    let left = sysLeft;
+    let right = sysRight;
+    let bottom = sysBottom;
+
+    // CUTOUT 逐边并入。
+    //
+    // 关键：OpenHarmony 的 TYPE_CUTOUT 只把挖孔矩形写进**一条边**（见
+    // window_window_manager 的 avoid_area_controller.cpp，GetAvoidPosType 用两条
+    // 对角线把挖孔中心归类到 top/left/right/bottom 之一）。所以角落挖孔会被
+    // 归到 LEFT 或 TOP 而不是"两边都有"，若直接按该边并入，落在状态栏里的
+    // 角落挖孔就会凭空多出「挖孔宽/高」的侧边距——它其实已被状态栏那条带盖住。
+    //
+    // 因此逐边判断：该边的挖孔矩形若整段落在任一已避让带内，就不计这一边。
+    const cutLeftRect = cut?.leftRect;
+    const cutTopRect = cut?.topRect;
+    const cutRightRect = cut?.rightRect;
+    const cutBottomRect = cut?.bottomRect;
+    let cutoutCovered = false;
+    if (cut !== undefined) {
+      cutoutCovered = WindowState.cutoutInsideBands(cut, winWidth, winHeight,
+        left, top, right, bottom);
+    }
+    if (!cutoutCovered) {
+      // 顶部：挖孔整段落在左右系统带里时不重复让位。
+      if (cutTopRect !== undefined && cutTopRect.height > 0 &&
+        !WindowState.rectInsideSideBands(cutTopRect, winWidth, left, right)) {
+        top = Math.max(top, WindowState.leadingInset(cutTopRect, false));
+      }
+      // 左/右：挖孔整段落在顶部（含标题带）或底部带里时不重复让位。
+      if (cutLeftRect !== undefined && cutLeftRect.width > 0 &&
+        !WindowState.rectInsideVerticalBands(cutLeftRect, winHeight, top, bottom)) {
+        left = Math.max(left, WindowState.leadingInset(cutLeftRect, true));
+      }
+      if (cutRightRect !== undefined && cutRightRect.width > 0 &&
+        !WindowState.rectInsideVerticalBands(cutRightRect, winHeight, top, bottom)) {
+        right = Math.max(right, WindowState.trailingInset(cutRightRect, winWidth, true));
+      }
+      if (cutBottomRect !== undefined && cutBottomRect.height > 0 &&
+        !WindowState.rectInsideSideBands(cutBottomRect, winWidth, left, right)) {
+        bottom = Math.max(bottom, WindowState.trailingInset(cutBottomRect, winHeight, false));
+      }
+    }
     const insets: SafeAreaInsets = {
-      'left': Math.max(
-        sys ? WindowState.leadingInset(sys.leftRect, true) : 0,
-        cut && !leftCutCovered ? WindowState.leadingInset(cut.leftRect, true) : 0),
+      'left': left,
       'top': top,
-      'right': Math.max(
-        sys ? WindowState.trailingInset(sys.rightRect, winWidth, true) : 0,
-        cut && !rightCutCovered ? WindowState.trailingInset(cut.rightRect, winWidth, true) : 0),
-      'bottom': Math.max(
-        sys ? WindowState.trailingInset(sys.bottomRect, winHeight, false) : 0,
-        cut ? WindowState.trailingInset(cut.bottomRect, winHeight, false) : 0),
+      'right': right,
+      'bottom': bottom,
     };
     return insets;
+  }
+
+  /**
+   * 挖孔避让区是否**整体**已被系统避让带覆盖（此时并入它没有任何新增让位）。
+   *
+   * 只检出非空的那条矩形（OpenHarmony 只填一条边），再看它是否整段落在
+   * 顶部 / 底部 / 左侧 / 右侧任一条带内。
+   */
+  private static cutoutInsideBands(cut: window.AvoidArea, winWidth: number, winHeight: number,
+    left: number, top: number, right: number, bottom: number): boolean {
+    const rect = WindowState.nonEmptyRect(cut);
+    if (rect === undefined) {
+      return true;
+    }
+    return WindowState.rectInsideVerticalBands(rect, winHeight, top, bottom) ||
+      WindowState.rectInsideSideBands(rect, winWidth, left, right);
+  }
+
+  /// 取避让区里第一条非空矩形（OpenHarmony 的 CUTOUT 只填一条边）。
+  private static nonEmptyRect(cut: window.AvoidArea | undefined): window.Rect | undefined {
+    if (cut === undefined) {
+      return undefined;
+    }
+    const rects: window.Rect[] = [cut.leftRect, cut.topRect, cut.rightRect, cut.bottomRect];
+    for (const rect of rects) {
+      if (rect !== undefined && (rect.width > 0 || rect.height > 0)) {
+        return rect;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * 矩形是否被顶部带 [0, top] 或底部带 [winHeight - bottom, winHeight] 吃掉。
+   *
+   * 两种情形算吃掉：
+   * 1. **整段包含**：矩形整个落在带内（状态栏比挖孔高时最常见）；
+   * 2. **角落锚定**：矩形近侧边贴在带内（`rect.top <= top`），说明它是顶角/底角
+   *    的挖孔——平台按对角线把它归到了 LEFT/RIGHT，但它其实是"角上的孔"，
+   *    顶部避让带已经把那个角让出来了。若不这么判，横屏角落挖孔会凭空多出
+   *    一整个挖孔宽度的左边距（真实坐标只被顶部带挡住）。
+   *
+   * 代价：一个从角上起始、却向下伸得远比状态栏高的挖孔，会被少让一点侧边
+   * 距离。真机上挖孔直径远小于状态栏高度，不构成实际问题。
+   */
+  private static rectInsideVerticalBands(rect: window.Rect, winHeight: number,
+    top: number, bottom: number): boolean {
+    if (rect.height <= 0) {
+      return false;
+    }
+    if (top > 0 && rect.top >= 0 && rect.top + rect.height <= top) {
+      return true;
+    }
+    if (top > 0 && rect.top >= 0 && rect.top <= top) {
+      // 角落锚定：孔的近侧边已经在顶部带里。
+      return true;
+    }
+    if (bottom > 0 && rect.top + rect.height <= winHeight && rect.top >= winHeight - bottom) {
+      return true;
+    }
+    if (bottom > 0 && rect.top + rect.height <= winHeight &&
+      rect.top + rect.height >= winHeight - bottom) {
+      // 底角锚定：孔的远侧边已经在底部带里。
+      return true;
+    }
+    return false;
+  }
+
+  /** 矩形是否整段落在左侧带 [0, left] 或右侧带 [winWidth - right, winWidth] 内。 */
+  private static rectInsideSideBands(rect: window.Rect, winWidth: number,
+    left: number, right: number): boolean {
+    if (rect.width <= 0) {
+      return false;
+    }
+    if (left > 0 && rect.left >= 0 && rect.left + rect.width <= left) {
+      return true;
+    }
+    if (right > 0 && rect.left + rect.width <= winWidth && rect.left >= winWidth - right) {
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -250,14 +390,6 @@ export class WindowState {
       return rect.width > 0 ? winSize - rect.left : 0;
     }
     return rect.height > 0 ? winSize - rect.top : 0;
-  }
-
-  /** 该侧 cutout 矩形是否已经被顶部避让带整块盖住（平板前摄常在角落）。 */
-  private static cutoutCoveredByTop(rect: window.Rect | undefined, topInset: number): boolean {
-    if (topInset <= 0 || rect === undefined || rect.height <= 0) {
-      return false;
-    }
-    return rect.top >= 0 && rect.top + rect.height <= topInset;
   }
 
   /** vp → 物理像素。避让区接口一律返回像素，标题带高度是 vp，并入前需换算。 */
