@@ -31,6 +31,10 @@
     {
       "name": "top_bar_mask_end",
       "value": "#00FFFFFF"
+    },
+    {
+      "name": "title_bar_background",
+      "value": "#F2F2F2"
     }
   ]
 }

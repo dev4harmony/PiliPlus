@@ -19,6 +19,8 @@ import {
 } from "@ohos/flutter_ohos";
 
 import display from "@ohos.display";
+import { windowChrome } from "../window/WindowChrome";
+import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
 
 const colorModeMap: Record<string, ConfigurationConstant.ColorMode> = {
   "light": ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT,
@@ -39,6 +41,19 @@ export default class HarmonyChannel implements FlutterPlugin {
   /// 由 Dart 侧就绪后主动拉取（getPendingContinuation），规避冷启动时
   /// Dart handler 尚未注册导致推送丢失的问题。
   private pendingContinuation: string | null = null;
+  /**
+   * 兼容旧通道 setFullScreenBars 用的序号与「会话 epoch」。
+   *
+   * 新链路（Dart SystemBars.sync）自带 revision/epoch；旧链路没有，这里补上，
+   * 两者都汇入 WindowState 的同一个状态机，晚到的旧命令不会覆盖新状态。
+   */
+  private barsRevision: number = 0;
+  private barsEpoch: number = Date.now() & 0x7fffffff;
+
+  private nextBarsRevision(): number {
+    this.barsRevision += 1;
+    return this.barsRevision;
+  }
 
   getUniqueClassName(): string {
     return "HarmonyChannel";
@@ -47,6 +62,15 @@ export default class HarmonyChannel implements FlutterPlugin {
   onAttachedToEngine(binding: FlutterPluginBinding): void {
     this.channel = new MethodChannel(binding.getBinaryMessenger(), "harmonyChannel");
     this.channel.setMethodCallHandler(this);
+    // 窗口级状态中心 → Flutter 的反向推送。窗口快照（自由窗口/小窗/受限窗口、
+    // 自绘标题带显隐）与安全区避让区都从 windowState 出来，推送名与 Dart 侧
+    // HarmonyChannel 的 handler 一一对应。
+    windowState.setSnapshotListener((snapshot: WindowSnapshot): void => {
+      this.channel?.invokeMethod("onWindowSnapshot", snapshot);
+    });
+    windowState.setSafeAreaListener((insets: SafeAreaInsets): void => {
+      this.channel?.invokeMethod("onSafeAreaChange", insets);
+    });
     // // 监听画面方向
     // display.on('change', () => {
     //   // 获取当前旋转角度
@@ -57,7 +81,8 @@ export default class HarmonyChannel implements FlutterPlugin {
 
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
     this.channel?.setMethodCallHandler(null);
-    this.stopSafeAreaListener();
+    windowState.setSnapshotListener(null);
+    windowState.setSafeAreaListener(null);
     this.stopFreeWindowModeListener();
   }
 
@@ -107,137 +132,6 @@ export default class HarmonyChannel implements FlutterPlugin {
     }
   }
 
-  /**
-   * 安全区避让区（物理像素，窗口相对坐标）：TYPE_SYSTEM 与 TYPE_CUTOUT 逐边取
-   * max，即官方「各类型避让区在同一方向上的最大值」。embedding 算 viewPadding
-   * 只读 TYPE_SYSTEM，挖孔（横屏左右、竖屏隐藏状态栏后的顶部）避不开，故由这里
-   * 上报、在 Dart 根 MediaQuery 里并进 padding（见 Dart 侧 [safeAreaInsets]）。
-   * 自由窗口的三键带也含在 TYPE_SYSTEM 里，一并覆盖。
-   */
-  private safeAreaListening: boolean = false;
-  // 合并并发安装（见 [startSafeAreaListener]）。
-  private safeAreaStarting: Promise<void> | null = null;
-  // 不做值去重：旋转时避让区四元组可能逐位不变（如竖横屏顶部高度相同），去重会
-  // 吞掉这次方向变化。重复推送无害，Dart 侧 _updateSafeArea 自带判等。
-  private safeAreaChangeCallback = (): void => {
-    this.channel?.invokeMethod("onSafeAreaChange", this.readSafeArea());
-  };
-
-  /**
-   * 左/上边的安全距离，0 宽/高视为无障碍。
-   *
-   * 避让区矩形贴窗口左/上缘（left=0 / top=0），故取「近侧坐标 + 尺寸」；竖屏
-   * 挖孔不贴屏幕顶边，只取 height 会少让出 top 这段。
-   */
-  private static leadingInset(rect: window.Rect, horizontal: boolean): number {
-    if (horizontal) {
-      return rect.width > 0 ? rect.left + rect.width : 0;
-    }
-    return rect.height > 0 ? rect.top + rect.height : 0;
-  }
-
-  /**
-   * 右/下边的安全距离，0 宽/高视为无障碍。
-   *
-   * 从窗口远侧缘量起：横屏右旋时挖孔落在右边，rightRect 为
-   * {left: W - d, width: d}，用 [leadingInset] 的 left + width 会算出整窗宽度。
-   */
-  private static trailingInset(
-    rect: window.Rect,
-    winSize: number,
-    horizontal: boolean,
-  ): number {
-    if (horizontal) {
-      return rect.width > 0 ? winSize - rect.left : 0;
-    }
-    return rect.height > 0 ? winSize - rect.top : 0;
-  }
-
-  private readSafeArea(): Record<string, number> {
-    let sys: window.AvoidArea | undefined = undefined;
-    let cut: window.AvoidArea | undefined = undefined;
-    let winWidth = 0;
-    let winHeight = 0;
-    try {
-      sys = this.lastWindow?.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
-      cut = this.lastWindow?.getWindowAvoidArea(window.AvoidAreaType.TYPE_CUTOUT);
-      const winRect = this.lastWindow?.getWindowProperties().windowRect;
-      if (winRect) {
-        winWidth = winRect.width;
-        winHeight = winRect.height;
-      }
-    } catch (err) {
-      console.error("HarmonyChannel", `readSafeArea failed: ${err}`);
-    }
-    // 逐边取 max（官方语义）。左右两边量法不同见 [leadingInset] / [trailingInset]。
-    const res: Record<string, number> = {
-      'left': Math.max(
-        sys ? HarmonyChannel.leadingInset(sys.leftRect, true) : 0,
-        cut ? HarmonyChannel.leadingInset(cut.leftRect, true) : 0),
-      'top': Math.max(
-        sys ? HarmonyChannel.leadingInset(sys.topRect, false) : 0,
-        cut ? HarmonyChannel.leadingInset(cut.topRect, false) : 0),
-      'right': Math.max(
-        sys ? HarmonyChannel.trailingInset(sys.rightRect, winWidth, true) : 0,
-        cut ? HarmonyChannel.trailingInset(cut.rightRect, winWidth, true) : 0),
-      'bottom': Math.max(
-        sys ? HarmonyChannel.trailingInset(sys.bottomRect, winHeight, false) : 0,
-        cut ? HarmonyChannel.trailingInset(cut.bottomRect, winHeight, false) : 0),
-    };
-    return res;
-  }
-
-  private async startSafeAreaListener(): Promise<void> {
-    // 不能提前置位 safeAreaListening 防重入：await 期间再进来会重复 on()，而
-    // await 抛错时提前置位会让后续调用全部 return、监听器永不安装。故复用同一个
-    // Promise 等待上次安装完成，只在真正 on() 成功后置位。
-    if (this.safeAreaListening) {
-      return;
-    }
-    if (this.safeAreaStarting != null) {
-      return this.safeAreaStarting;
-    }
-    this.safeAreaStarting = this.doStartSafeAreaListener();
-    try {
-      await this.safeAreaStarting;
-    } finally {
-      this.safeAreaStarting = null;
-    }
-  }
-
-  private async doStartSafeAreaListener(): Promise<void> {
-    try {
-      this.lastWindow ??= await window.getLastWindow(getContext());
-    } catch (err) {
-      // 拿不到窗口就保持未监听状态，下一次 getSafeArea 会重试。
-      console.error("HarmonyChannel", `getLastWindow for safe area failed: ${err}`);
-      return;
-    }
-    const w = this.lastWindow;
-    try {
-      w.on('avoidAreaChange', this.safeAreaChangeCallback);
-      // 旋转/窗口尺寸变化后兜底重读一次：部分机型旋转时不会单独推送
-      // TYPE_CUTOUT 的 avoidAreaChange。
-      w.on('windowSizeChange', this.safeAreaChangeCallback);
-      this.safeAreaListening = true;
-    } catch (err) {
-      console.error("HarmonyChannel", `safe area listener failed: ${err}`);
-    }
-  }
-
-  private stopSafeAreaListener(): void {
-    if (!this.safeAreaListening) {
-      return;
-    }
-    this.safeAreaListening = false;
-    try {
-      this.lastWindow?.off('avoidAreaChange', this.safeAreaChangeCallback);
-      this.lastWindow?.off('windowSizeChange', this.safeAreaChangeCallback);
-    } catch (err) {
-      console.error("HarmonyChannel", `safe area listener off failed: ${err}`);
-    }
-  }
-
   public getChannel(): MethodChannel | null {
     return this.channel;
   }
@@ -251,18 +145,15 @@ export default class HarmonyChannel implements FlutterPlugin {
    * 故切换后主动重推一次。
    */
   async setFullScreenBars(fullscreen: boolean) {
-    this.lastWindow ??= await window.getLastWindow(getContext());
-    const w = this.lastWindow;
-    await w.setSpecificSystemBarEnabled("status", !fullscreen, false);
-    await w.setSpecificSystemBarEnabled("navigation", !fullscreen, false);
-    await w.setSpecificSystemBarEnabled("navigationIndicator", !fullscreen, false);
+    // 走窗口级系统栏状态机：串行 apply、失败重试、旋转后按最新意图重放，
+    // 避免旋转与全屏切换并发时状态栏显隐被后到的一次吃掉（见 SystemBars）。
+    await windowState.syncSystemBars(fullscreen, this.nextBarsRevision(), this.barsEpoch);
     // 状态栏显隐会改 TYPE_SYSTEM.topRect，重推一次兜底。
-    this.safeAreaChangeCallback();
+    windowState.notifySafeArea();
   }
 
   async setWindowOrientation(orientation: number) {
-    this.lastWindow ??= await window.getLastWindow(getContext());
-    await this.lastWindow.setPreferredOrientation(orientation);
+    await windowState.setWindowOrientation(orientation);
   }
 
   async onMethodCall(call: MethodCall, result: MethodResult): Promise<void> {
@@ -332,10 +223,39 @@ export default class HarmonyChannel implements FlutterPlugin {
       }
       case "getSafeArea": {
         // 启动时供 Dart 拉取安全区避让初值，并从此开始监听变化推送
-        // onSafeAreaChange。见 [readSafeArea] 与 Dart 侧
+        // onSafeAreaChange。见 WindowState.readSafeArea 与 Dart 侧
         // HarmonyChannel.initWindowState。
-        await this.startSafeAreaListener();
-        result.success(this.readSafeArea());
+        await windowState.startSafeAreaListener();
+        result.success(windowState.readSafeArea());
+        break;
+      }
+      case "getWindowSnapshot": {
+        // 与 getWindowState 同源，但多了自绘标题带与全屏信息（WindowState）。
+        result.success(windowState.readSnapshot());
+        break;
+      }
+      case "setSystemBarsHidden": {
+        // 幂等下发：hidden + 单调递增 revision + 会话 epoch。旋转后由原生按
+        // 最新意图重放，Dart 侧无需在旋转回调里补发。
+        const hidden: boolean = call.argument("hidden") ?? false;
+        const revision: number = call.argument("revision") ?? 0;
+        const epoch: number = call.argument("epoch") ?? 0;
+        await windowState.syncSystemBars(hidden, revision, epoch);
+        result.success(true);
+        break;
+      }
+      case "enterContentFullScreen": {
+        result.success(await windowChrome.enterContentFullScreen());
+        break;
+      }
+      case "exitContentFullScreen": {
+        result.success(await windowChrome.exitContentFullScreen());
+        break;
+      }
+      case "setTitleBarBackground": {
+        const color: string = call.argument("color") ?? "";
+        windowChrome.setTitleBarBackground(color);
+        result.success(true);
         break;
       }
       case "setWindowDecorVisible": {
@@ -821,12 +741,7 @@ export default class HarmonyChannel implements FlutterPlugin {
   }
 
   private async setMiniWindowLandscape(landscape: boolean) {
-    this.lastWindow ??= await window.getLastWindow(getContext());
-    if (landscape) {
-      this.lastWindow.enableLandscapeMultiWindow();
-    } else {
-      this.lastWindow.disableLandscapeMultiWindow();
-    }
+    await windowState.setMiniWindowLandscape(landscape);
   }
 
   /**
@@ -845,15 +760,14 @@ export default class HarmonyChannel implements FlutterPlugin {
     if (deviceInfo.sdkApiVersion < 18) {
       return false;
     }
-    try {
-      this.lastWindow?.setWindowDecorVisible(visible);
-      return true;
-    } catch (err) {
-      const e = err as BusinessError;
-      console.warn("HarmonyChannel",
-        `setWindowDecorVisible(${visible}) skipped: ${e.code} ${e.message}`);
+    // 自由窗口形态下装饰栏（含系统三键）由 WindowChrome 独占：那里会先隐藏
+    // 系统标题栏、再把高度设为自绘标题带高度并把三键隐藏，页面顶部由自绘
+    // 标题带接管。此时 Dart 侧不要从外面把装饰栏重新打开，否则会把自绘
+    // 标题带顶掉。Dart 侧 [WindowBridge] 已按同样条件跳过下发。
+    if (windowChrome.getState().isFreeWindowMode) {
       return false;
     }
+    return windowState.setDecorVisible(visible);
   }
 
   /**
@@ -862,6 +776,8 @@ export default class HarmonyChannel implements FlutterPlugin {
    * 时有视觉效果，其余窗口形态下为无害空操作。
    */
   private async setDecorButtonDark(dark: boolean) {
+    // 自绘标题带跟随同一信号（AppStorage titleBarDark），系统装饰栏仍按原样设置。
+    windowChrome.setTitleBarDark(dark);
     this.lastWindow ??= await window.getLastWindow(getContext());
     try {
       this.lastWindow.setDecorButtonStyle({

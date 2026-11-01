@@ -11,7 +11,6 @@ class AppBarAni extends StatelessWidget {
     required this.isTop,
     required this.isFullScreen,
     required this.removeSafeArea,
-    this.topInset,
   });
 
   final Widget child;
@@ -19,10 +18,6 @@ class AppBarAni extends StatelessWidget {
   final bool isTop;
   final bool isFullScreen;
   final bool removeSafeArea;
-
-  /// 竖屏全屏时顶部控件的避让高度（页面传入的状态栏/挖孔高度），
-  /// 见 [portraitFullscreenTopInset]
-  final double? topInset;
 
   static final _topPos = Tween<Offset>(
     begin: const Offset(0.0, -1.0),
@@ -56,21 +51,13 @@ class AppBarAni extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var top = portraitFullscreenTopInset(
+    // 鸿蒙：窗口化全屏时原生装饰（挖孔/自绘标题带）的安全区参与避让；
+    // 其余场景返回 null，行为与上游一致。
+    final top = harmonyDecorTopInset(
+      context,
       isFullScreen: isFullScreen,
-      isPortrait:
-          MediaQuery.sizeOf(context).height >= MediaQuery.sizeOf(context).width,
       removeSafeArea: removeSafeArea,
-      topInset: topInset,
     );
-    // 鸿蒙自由多窗全屏：顶部沉浸后系统三键仍悬浮在窗口右上角，顶栏得避开，
-    // 否则右上角图标点不到。见 [harmonyDecorTopInset]。
-    if (isTop && isFullScreen && !removeSafeArea) {
-      final decorTop = harmonyDecorTopInset(context);
-      if (decorTop != null && decorTop > (top ?? 0)) {
-        top = decorTop;
-      }
-    }
     Widget result = child;
     if (!removeSafeArea) {
       result = ViewSafeArea(

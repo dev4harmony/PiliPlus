@@ -5,6 +5,8 @@ import common from '@ohos.app.ability.common';
 import image from '@ohos.multimedia.image';
 import window from '@ohos.window';
 import { FlutterPage } from '@ohos/flutter_ohos';
+import { windowChrome } from '../window/WindowChrome';
+import { WindowTitleBar } from '../window/WindowTitleBar';
 
 let storage = LocalStorage.getShared();
 
@@ -107,6 +109,18 @@ struct Index {
   @StorageLink('dynBadgeCount') dynBadgeCount: number = 0;
   /// 沉浸光感底栏材质等级（Flutter 按设置下发；0=精美 1=轻柔 2=流畅 10=自适应）
   @StorageLink('tabMaterialLevel') tabMaterialLevel: number = 10;
+  /// 自绘标题带显隐与占位高度，由 WindowChrome 下发（自由窗口形态下为 true）
+  @StorageLink('titleBarVisible') @Watch('onTitleBarVisibleChanged') titleBarVisible: boolean = false;
+  @StorageLink('titleBarHeight') titleBarHeight: number = 0;
+  /// 窗口是否处于自由窗口形态（2in1/PC、平板自由多窗、电脑模式）
+  @StorageLink('windowFreeMode') windowFreeMode: boolean = false;
+  /// 顶栏右侧需让出的系统三键宽度（vp）。
+  ///
+  /// 隐藏系统标题栏（setWindowDecorVisible(false)）后，右上角三键并不消失，
+  /// 而是下沉到页面可绘制区顶部 —— 官方 FAQ 明确「设置隐藏后，标题栏中的
+  /// 三键区域会下沉到页面区域中显示」，需由页面自行避让（getTitleButtonRect）。
+  /// 自绘标题带会整条盖住这一区域，故只有未显示标题带时才让位。
+  @State titleButtonInset: number = 0;
   /// 当前选中的底部 Navbar 页签索引（自定义 tabBar 需自行区分选中态）
   @State currentNavIndex: number = 0;
   @State statusBarHeight: number = 0;
@@ -128,6 +142,8 @@ struct Index {
   @State rotationMaskOpacity: number = 1;
   private rotationCallback: ((info: window.RotationChangeInfo) => void) | null = null;
   private rotationMaskTimers: number[] = [];
+  /// aboutToDisappear 早于 getLastWindow 回调时，避免继续装监听
+  private disposed: boolean = false;
   private currentOrientation: number = 0;
 
   /// 背景色
@@ -247,7 +263,15 @@ struct Index {
     });
 
     window.getLastWindow(this.context).then((w: window.Window) => {
+      if (this.disposed) {
+        return;
+      }
       this.win = w;
+      // 页面已挂载并即将首帧布局：此时才是装饰栏接口（setWindowDecorVisible /
+      // setWindowDecorHeight / setWindowTitleButtonVisible）的合法时机，
+      // 通知 WindowChrome 正式下发「隐藏系统标题栏 + 三键」，内容区随之铺满整窗。
+      windowChrome.onContentLoaded();
+      this.refreshTitleButtonInset();
       let topAvoidArea = w.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       this.statusBarHeight = px2vp(topAvoidArea.topRect.height);
       w.on('avoidAreaChange', (data) => {
@@ -324,7 +348,36 @@ struct Index {
     }, 3000);
   }
 
+  /// 自绘标题带显隐后，三键是否还露在内容区上方会变，需重算顶栏避让
+  onTitleBarVisibleChanged(): void {
+    this.refreshTitleButtonInset();
+  }
+
+  /// 读取系统三键区尺寸，用于顶栏右侧避让。
+  /// 隐藏系统标题栏后三键并不消失，而是下沉到页面可绘制区右上角；
+  /// 自绘标题带会整条盖住它（此时不需要让位），未显示标题带时必须让位，
+  /// 否则顶栏的头像/消息按钮会与系统三键重叠。
+  private refreshTitleButtonInset(): void {
+    if (this.win === null) {
+      this.titleButtonInset = 0;
+      return;
+    }
+    if (!this.windowFreeMode) {
+      this.titleButtonInset = 0;
+      return;
+    }
+    try {
+      const rect: window.TitleButtonRect = this.win.getTitleButtonRect();
+      // titleBarVisible 时标题带压在顶部，三键被完全盖住，留给内容的是 0
+      this.titleButtonInset = this.titleBarVisible ? 0 : this.getUIContext().px2vp(rect.width);
+    } catch (err) {
+      console.error(TAG, `getTitleButtonRect failed: ${err}`);
+      this.titleButtonInset = 0;
+    }
+  }
+
   aboutToDisappear(): void {
+    this.disposed = true;
     if (this.densityCallback !== null) {
       try {
         this.getUIContext()
@@ -568,7 +621,7 @@ struct Index {
         .width('100%')
         .padding({
           left: 14,
-          right: 14,
+          right: 14 + this.titleButtonInset,
         })
         .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
         // .animation() 只作用于它之前、上一个 .animation() 之后的属性，
@@ -591,6 +644,8 @@ struct Index {
       }
       .width('100%')
       .padding({ top: this.statusBarHeight})
+      // 自绘标题带压在窗口最顶部（不吃布局），顶栏内容需整体下移一个标题带高度
+      .margin({ top: this.titleBarHeight })
       .id('topBarContent')
       .hitTestBehavior(HitTestMode.Default)
       .align(Alignment.Top)
@@ -817,7 +872,7 @@ struct Index {
         .width('100%')
         .padding({
           left: 14,
-          right: 14,
+          right: 14 + this.titleButtonInset,
         })
         .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
         .animation({
@@ -838,6 +893,8 @@ struct Index {
       }
       .width('100%')
       .padding({ top: this.statusBarHeight})
+      // 自绘标题带压在窗口最顶部（不吃布局），顶栏内容需整体下移一个标题带高度
+      .margin({ top: this.titleBarHeight })
       .id('topBarContent')
       .hitTestBehavior(HitTestMode.Default)
       .align(Alignment.Top)
@@ -926,6 +983,11 @@ struct Index {
         this.homeTopBarHost()
       } else if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 23) {
         this.homeTopBarHdsHost()
+      }
+      // 自绘标题带：自由窗口形态下替代被隐藏的系统标题栏，压在顶栏之上
+      if (this.titleBarVisible) {
+        WindowTitleBar()
+          .align(Alignment.Top)
       }
       // 转屏遮罩
       if (this.rotationMask !== null) {

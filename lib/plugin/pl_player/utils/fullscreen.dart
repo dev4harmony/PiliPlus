@@ -1,42 +1,35 @@
 import 'dart:io' show Platform;
 
+import 'package:PiliPlus/harmony/window/content_fullscreen.dart';
+import 'package:PiliPlus/harmony/window/system_bars.dart';
+import 'package:PiliPlus/harmony/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:flutter/services.dart'
-    show SystemChrome, MethodChannel, SystemUiOverlay, DeviceOrientation;
-import 'package:flutter/widgets.dart' show BuildContext, MediaQuery;
+    show SystemChrome, SystemUiOverlay, MethodChannel, DeviceOrientation;
+import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:os_type/os_type.dart';
 
-/// 竖屏全屏时的顶部避让高度：仅在全屏 + 竖屏 + 未移除安全边距时返回
-/// [topInset]（页面传入的状态栏/挖孔高度，如直播页的 viewPadding.top），
-/// 否则返回 null（不避让）。播控顶部组件与弹幕共用这一套判断，保证两处
-/// 行为一致。页面自身已在播放器上方留出安全区（如视频页的黑边）时应传 null。
-double? portraitFullscreenTopInset({
+/// 鸿蒙：窗口化（小窗/分屏/自由窗口）全屏且未移除播放页安全边距时，原生
+/// 装饰（状态栏/挖孔/自绘标题带）合并出的顶部安全区（逻辑像素，已按
+/// uiScale 换算）。
+///
+/// 原生侧已把自由窗口标题带并进顶部上报，[HarmonyChannel.rootTopInset] 即
+/// 「播放器顶部必须让出的高度」。普通全屏页面自身已有黑边占位（上游行为），
+/// 不在此重复让位。
+double? harmonyDecorTopInset(
+  BuildContext context, {
   required bool isFullScreen,
-  required bool isPortrait,
   required bool removeSafeArea,
-  required double? topInset,
 }) {
-  if (!isFullScreen || !isPortrait || removeSafeArea) return null;
-  final inset = topInset ?? 0;
+  if (!OS.isHarmony ||
+      !WindowFacts.isWindowMode ||
+      !isFullScreen ||
+      removeSafeArea) {
+    return null;
+  }
+  final inset = HarmonyChannel.rootTopInset(context);
   return inset > 0 ? inset : null;
-}
-
-/// 鸿蒙自由多窗/悬浮窗内播控顶栏的额外避让高度。
-///
-/// 这类窗口的系统装饰栏已被隐藏以实现顶部沉浸（见
-/// HarmonyChannel._syncWindowDecor），但最小化/最大化/关闭三键仍由系统悬浮
-/// 绘制在窗口右上角，embedding 把该区域高度钉进 viewPadding.top。全屏时页面
-/// 不再为播放器留顶部黑边，播控顶栏若不自己避开这一带，右上角那两排图标
-/// （空降助手/弹幕/画中画/点赞/投币/收藏…）就压在三键下面，点不到。
-///
-/// 只认自由窗口（[HarmonyChannel.isMiniWindow]）：分屏等其它受限窗口没有这排
-/// 按钮，viewPadding.top 只是引擎照搬的设备状态栏高度，避让了反而会平白多出
-/// 一条空白。返回 null 表示不需要额外避让。
-double? harmonyDecorTopInset(BuildContext context) {
-  if (!OS.isHarmony || !HarmonyChannel.isMiniWindow) return null;
-  final top = MediaQuery.viewPaddingOf(context).top;
-  return top > 0 ? top : null;
 }
 
 bool _isDesktopFullScreen = false;
@@ -46,6 +39,8 @@ Future<void> enterDesktopFullScreen({bool inAppFullScreen = false}) async {
   if (!inAppFullScreen && !_isDesktopFullScreen) {
     _isDesktopFullScreen = true;
     try {
+      // 自由窗口形态交给原生（记状态、可还原），其余形态回退 media_kit 旧实现。
+      if (await enterContentFullScreen()) return;
       await const MethodChannel(
         'com.alexmercerind/media_kit_video',
       ).invokeMethod('Utils.EnterNativeFullscreen');
@@ -58,6 +53,7 @@ Future<void> exitDesktopFullScreen() async {
   if (_isDesktopFullScreen) {
     _isDesktopFullScreen = false;
     try {
+      if (await exitContentFullScreen()) return;
       await const MethodChannel(
         'com.alexmercerind/media_kit_video',
       ).invokeMethod('Utils.ExitNativeFullscreen');
@@ -100,7 +96,7 @@ Future<void>? fullMode() {
 Future<void>? harmonyForcePortrait() {
   if (!OS.isHarmony) return null;
   _lastOrientation = null;
-  return HarmonyChannel.setWindowOrientation(1);
+  return setWindowOrientation(1);
 }
 
 bool _showSystemBar = true;
@@ -110,10 +106,7 @@ Future<void>? hideSystemBar() {
     return null;
   }
   _showSystemBar = false;
-  if (OS.isHarmony) {
-    // 只切换系统栏显隐，不改窗口布局，避免 Flutter 视口尺寸变化导致画面跳动。
-    return HarmonyChannel.setFullScreenBars(true);
-  }
+  if (OS.isHarmony) return SystemBars.sync(hidden: true);
   return SystemChrome.setEnabledSystemUIMode(.immersiveSticky);
 }
 
@@ -123,9 +116,7 @@ Future<void>? showSystemBar() {
     return null;
   }
   _showSystemBar = true;
-  if (OS.isHarmony) {
-    return HarmonyChannel.setFullScreenBars(false);
-  }
+  if (OS.isHarmony) return SystemBars.sync(hidden: false);
   return SystemChrome.setEnabledSystemUIMode(
     Platform.isAndroid && DeviceUtils.sdkInt < 29 ? .manual : .edgeToEdge,
     overlays: SystemUiOverlay.values,

@@ -21,7 +21,7 @@ import 'package:PiliPlus/common/widgets/simple_app_bar.dart';
 import 'package:PiliPlus/common/widgets/sliver/video_header.dart';
 import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart';
-import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony/window/window_facts.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
@@ -154,7 +154,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     /// 仍应按 isFullScreen 渲染全屏布局，
     /// 此处用于修复全屏时视频与页面没变
     final constrainedWindow =
-        (OS.isHarmony && HarmonyChannel.isWindowMode) || isWindowMode;
+        (OS.isHarmony && WindowFacts.isWindowMode) || isWindowMode;
     final invalidPortraitFullScreen =
         isPortrait &&
         // 仅确实由横屏旋转回竖屏时才退出全屏
@@ -211,46 +211,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   final _seasonPanelKey = GlobalKey<EpisodePanelState>();
 
   Worker? _pipModeWorker;
-  Worker? _decorDarkWorker;
-  Worker? _decorFullScreenWorker;
-
-  /// 自由多窗装饰栏按钮配色是否由本页驱动。页面被覆盖（didPushNext）或
-  /// 销毁后置 false：覆盖期间的滚动/主题变化不应再把按钮抢回来。
-  bool _decorDarkActive = false;
-
-  /// 装饰栏按钮（窗口右上角）下方那块区域当前是否为深色底。
-  ///
-  /// 深色主题下 colorScheme.surface 本身就是深色，怎么算都是深色底；
-  /// 只有浅色主题需要逐布局判断：
-  /// - 竖屏布局：顶栏是 SimpleAppBar 与其下的渐显工具条，随滚动由黑渐变到
-  ///   colorScheme.surface，判据与 SimpleAppBar 给状态栏图标用的那套一致
-  /// - 横屏布局：右上角是 MiniScaffold（surface），只有顶部那条黑色 AppBar
-  ///   有高度（窗口压住状态栏，padding.top > 0）时才盖得住按钮所在的一带
-  /// - 近方形布局：顶部整条都是播放器，恒为黑
-  bool get _topBarIsDark {
-    // 全屏：整窗都是播放器
-    if (isFullScreen) return true;
-    if (colorScheme.brightness == Brightness.dark) return true;
-    if (_usesPortraitLayout) {
-      return videoDetailController.scrollRatio.value < 0.5;
-    }
-    if (_usesLandscapeLayout) {
-      return padding.top > 0;
-    }
-    return true;
-  }
-
-  /// 按顶栏实际底色同步自由多窗装饰栏按钮配色。
-  void _syncDecorDark() {
-    if (!_decorDarkActive) return;
-    HarmonyChannel.setDecorDark(this, _topBarIsDark);
-  }
-
-  /// 交还装饰栏按钮控制权（页面被覆盖/销毁）。
-  void _releaseDecorDark() {
-    _decorDarkActive = false;
-    HarmonyChannel.releaseDecorDark(this);
-  }
 
   /// 当前应用生命周期状态
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
@@ -269,19 +229,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       hideSystemBar();
     }
 
-    // 自由多窗的装饰栏按钮跟随顶栏实际底色：顶部是黑色播放器时切浅色
-    // 风格（否则浅色模式下深色按钮不可见），顶栏随滚动渐变成 surface
-    // 后再交回系统颜色模式。滚动与全屏都会改变顶栏底色，各挂一个监听。
-    // 首次同步在 didChangeDependencies 里做（theme 此时才就绪）
-    _decorDarkActive = true;
-    _decorDarkWorker = ever(
-      videoDetailController.scrollRatio,
-      (_) => _syncDecorDark(),
-    );
-    _decorFullScreenWorker = ever(
-      videoDetailController.plPlayerController.isFullScreen,
-      (_) => _syncDecorDark(),
-    );
     // 画中画状态翻转时强制重建：PiP 结束时若窗口尺寸恰好没变（如画中画
     // 期间从智慧多窗应用栏以小窗打开 app），没有视口变化触发重建，页面
     // 会滞留在画中画布局（黑边+播控被状态栏遮挡）。
@@ -502,9 +449,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   @override
   void dispose() {
     _pipModeWorker?.dispose();
-    _decorDarkWorker?.dispose();
-    _decorFullScreenWorker?.dispose();
-    _releaseDecorDark();
     plPlayerController
       ?..removeStatusLister(playerListener)
       ..removePositionListener(positionListener);
@@ -557,7 +501,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       return;
     }
 
-    _releaseDecorDark();
     WidgetsBinding.instance.removeObserver(this);
 
     if ((Platform.isAndroid || OS.isHarmony) &&
@@ -596,8 +539,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       hideSystemBar();
     }
 
-    _decorDarkActive = true;
-    _syncDecorDark();
     WidgetsBinding.instance.addObserver(this);
 
     plPlayerController?.isLive = false;
@@ -665,7 +606,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       width: maxWidth * videoDetailController.uiScale,
       height: maxHeight * videoDetailController.uiScale,
     ) ||
-        (OS.isHarmony && HarmonyChannel.isWindowMode);
+        (OS.isHarmony && WindowFacts.isWindowMode);
     videoDetailController.plPlayerController.screenRatio = maxHeight / maxWidth;
 
     final shortestSide = size.shortestSide;
@@ -692,13 +633,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         ? ThemeUtils.darkTheme
         : Theme.of(context);
 
-    // 顶栏底色还取决于方向与主题，二者变化都只经由本方法生效
-    _syncDecorDark();
   }
 
   bool removeAppBar(bool isFullScreen) =>
       videoDetailController.removeSafeArea ||
-      (OS.isHarmony && HarmonyChannel.isWindowMode && isFullScreen) ||
+      (OS.isHarmony && WindowFacts.isWindowMode && isFullScreen) ||
       (isWindowMode && isFullScreen && !isPortrait);
 
   Widget get childWhenDisabled {
@@ -721,7 +660,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       final player = videoDetailController.plPlayerController;
       final aspectIsOrientation =
           !OS.isHarmony ||
-          (!HarmonyChannel.isMiniWindow && !HarmonyChannel.isWindowMode);
+          (!WindowFacts.isMiniWindow && !WindowFacts.isWindowMode);
       if (!isPortrait &&
           !isFullScreen &&
           aspectIsOrientation &&
@@ -1513,9 +1452,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 videoDetailCtr: videoDetailController,
                 heroTag: heroTag,
               ),
-              // 竖屏全屏时本页保留一条 padding.top 高的黑边（SimpleAppBar），
-              // 隐藏状态栏后其高度即挖孔高度，播放器整体已在挖孔之下，
-              // 顶部控件/弹幕不再额外下移。
               danmuWidget: isPipMode && pipNoDanmaku
                   ? null
                   : Obx(
@@ -1552,7 +1488,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   /// 设备状态栏高度。仅在全屏时顶部安全区应被移除（视频铺满窗口、plplayer
   /// 顶部控件/弹幕不再避让），非全屏仍按正常布局避让，故只作用于全屏路径。
   bool get _harmonyFullscreenNoSafeArea =>
-      OS.isHarmony && HarmonyChannel.isWindowMode && isFullScreen;
+      OS.isHarmony && WindowFacts.isWindowMode && isFullScreen;
 
   /// 「左视频 + 右侧栏」的横屏布局（childWhenDisabledLandscape）是否生效。
   bool get _usesLandscapeLayout =>
@@ -1561,7 +1497,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   /// 「顶部视频 + 下方 Tab」的竖屏布局（childWhenDisabled）是否生效。
   /// 两者都不成立时为近方形布局（childWhenDisabledAlmostSquare）。
-  /// 由 build 与 [_topBarIsDark] 共用，避免分支条件两处漂移。
+  /// 由 build 使用。
   bool get _usesPortraitLayout =>
       !videoDetailController.horizontalScreen ||
       (!_usesLandscapeLayout &&

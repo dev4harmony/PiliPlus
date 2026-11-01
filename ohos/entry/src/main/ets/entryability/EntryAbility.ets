@@ -8,6 +8,8 @@ import window from "@ohos.window";
 import { FlutterAbility, FlutterEngine, MethodChannel } from "@ohos/flutter_ohos";
 import { GeneratedPluginRegistrant } from "../plugins/GeneratedPluginRegistrant";
 import HarmonyChannel from "../plugins/HarmonyChannel";
+import { windowChrome } from "../window/WindowChrome";
+import { windowState } from "../window/WindowState";
 
 /// 跨设备接续数据在 want.parameters 中的键
 const CONTINUATION_KEY = "pili_continuation";
@@ -41,6 +43,7 @@ export default class EntryAbility extends FlutterAbility {
   wasWindowMode: boolean = false;
   private flutterChannel: MethodChannel | null = null;
   private envChangeListener: number | null = null;
+  private window: window.Window | null = null;
 
   configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine);
@@ -201,10 +204,17 @@ export default class EntryAbility extends FlutterAbility {
     }).catch((err: BusinessError) => {
       console.error(`setWindowSystemBarProperties failed: ${err.code} ${err.message}`);
     });
-    this.hideWindowDecorIfFloating(w);
+    // 装饰栏/标题带/最大化状态由 WindowChrome 统一维护，这里只做挂载；
+    // 窗口状态（分屏/小窗）与安全区由 WindowState 订阅并推送给 Flutter。
+    // 装饰栏的真正下发时机是内容加载完成（Index.aboutToAppear 调
+    // windowChrome.onContentLoaded），此前接口调用不生效。
+    windowChrome.attach(w);
+    windowState.attach(w, windowChrome);
+    this.window = w;
     w.on("windowStatusChange", (type) => {
-      // 原生先行隐藏，避免 Dart 侧（首帧前）下发前装饰栏先露一下
-      this.hideWindowDecorIfFloating(w, type);
+      // 窗口状态变化后重算外观状态（自由窗口/最大化/内容全屏 → 自绘标题带显隐）
+      windowChrome.sync();
+      windowState.refreshStatus();
       if (type == window.WindowStatusType.FLOATING && !this.wasFloatingWindow) {
         this.harmonyChannel.onFloatingWindowChange(true);
         this.wasFloatingWindow = true;
@@ -248,32 +258,13 @@ export default class EntryAbility extends FlutterAbility {
     }, 100)
   }
 
-  /**
-   * 自由多窗（FLOATING）/ 最大化（MAXIMIZE，2in1）下提前隐藏系统装饰栏。
-   *
-   * 策略的唯一维护者是 Dart 侧 HarmonyChannel._syncWindowDecor → 原生
-   * HarmonyChannel.setWindowDecorVisible（直接调官方 window.setWindowDecorVisible）。
-   * 这里只是在窗口创建 / 进入自由窗口的第一时间先隐藏一次，否则 Dart 首帧前
-   * 装饰栏会先出现再收回。非自由窗口不调用：手机全屏下该接口会抛 1300004。
-   */
-  private hideWindowDecorIfFloating(w: window.Window, status?: window.WindowStatusType): void {
-    if (status === undefined) {
-      try {
-        status = w.getWindowStatus();
-      } catch (err) {
-        return;
-      }
-    }
-    if (status != window.WindowStatusType.FLOATING && status != window.WindowStatusType.MAXIMIZE) {
-      return;
-    }
-    this.harmonyChannel.setWindowDecorVisible(false);
-  }
-
   onDestroy(): void {
     if (this.envChangeListener !== null) {
       this.context.getApplicationContext().off('environment', this.envChangeListener);
     }
+    this.window = null;
+    windowChrome.detach();
+    windowState.detach();
     super.onDestroy();
   }
 }

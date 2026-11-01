@@ -1,6 +1,7 @@
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
+import 'package:PiliPlus/harmony/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
 import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -70,10 +71,20 @@ abstract class HarmonyChannel {
         );
         break;
       case 'onWindowModeChange':
-        _windowMode = call.arguments['isWindowMode'] as bool? ?? false;
+        _windowMode = WindowFacts.isWindowMode =
+            call.arguments['isWindowMode'] as bool? ?? false;
         break;
       case 'onSafeAreaChange':
         _updateSafeArea(call.arguments);
+        break;
+      // 原生窗口快照（自由多窗/小窗/分屏/标题带状态的整体推送，
+      // 见 ArkTS WindowState.emitSnapshot）
+      case 'onWindowSnapshot':
+        if (call.arguments is Map) {
+          applyWindowSnapshot(
+            (call.arguments as Map).cast<Object?, Object?>(),
+          );
+        }
         break;
       // 源端 onContinue 拉取当前播放状态
       case 'getContinuationState':
@@ -336,6 +347,89 @@ abstract class HarmonyChannel {
     } catch (_) {}
   }
 
+  /// 通用窗口方法发送器：非鸿蒙直接返回 null，原生异常（含旧版本没有该
+  /// method 的 [MissingPluginException]）一律静默降级，窗口能力缺失不应让
+  /// 调用方崩溃。
+  ///
+  /// 与 [_invoke] 的区别：这里需要把原生返回值取回来（窗口快照、进入/退出
+  /// 内容全屏是否成功等），且参数名/返回类型由 ArkTS 侧契约决定。
+  static Future<T?> invokeWindowMethod<T>(
+    String method, [
+    Map<String, Object?>? args,
+  ]) async {
+    if (!OS.isHarmony) return null;
+    try {
+      return await _channel.invokeMethod<T>(method, args);
+    } on PlatformException catch (_) {
+      return null;
+    } on MissingPluginException catch (_) {
+      return null;
+    }
+  }
+
+  /// 拉取一次原生窗口快照。
+  ///
+  /// 返回的键与 ArkTS 侧 WindowSnapshot 一致：isFreeWindowMode、maximized、
+  /// contentFullScreen、titleBarVisible、titleBarHeight、isMiniWindow、
+  /// isWindowMode。原生不再持有 landscape，方向由播放器回传。
+  static Future<Map<Object?, Object?>?> getWindowSnapshot() =>
+      invokeWindowMethod<Map<Object?, Object?>>('getWindowSnapshot');
+
+  /// 系统栏（状态栏 + 导航栏）显隐同步。
+  ///
+  /// [revision] 单调递增、[epoch] 标识本次会话：原生据此丢弃乱序落地或跨会话
+  /// 残留的旧消息（快速进出全屏时异步调用可能乱序）。
+  static Future<void> setSystemBarsHidden({
+    required bool hidden,
+    required int revision,
+    required int epoch,
+  }) async {
+    await invokeWindowMethod<void>('setSystemBarsHidden', {
+      'hidden': hidden,
+      'revision': revision,
+      'epoch': epoch,
+    });
+  }
+
+  /// 进入「内容全屏」：窗口仍占满屏，只隐藏系统栏与原生自绘标题带。
+  ///
+  /// 返回 true 表示原生窗口层已接管，调用方不必再走 media_kit 旧通道。
+  static Future<bool> enterContentFullScreen() async =>
+      await invokeWindowMethod<bool>('enterContentFullScreen') ?? false;
+
+  /// 退出「内容全屏」，返回值语义同 [enterContentFullScreen]。
+  static Future<bool> exitContentFullScreen() async =>
+      await invokeWindowMethod<bool>('exitContentFullScreen') ?? false;
+
+  /// 下发原生自绘标题带底色。[color] 形如 '#RRGGBB'，原生写入 AppStorage
+  /// 供 ArkTS 标题带 @StorageLink 使用。
+  static Future<void> setTitleBarBackground(String color) async {
+    await invokeWindowMethod<void>('setTitleBarBackground', {'color': color});
+  }
+
+  /// 小窗横屏缩放开关：true 时开 enableLandscapeMultiWindow（小窗内全屏横屏），
+  /// false 时关掉。
+  static Future<void> setMiniWindowLandscape(bool landscape) async {
+    await invokeWindowMethod<void>('setMiniWindowLandscape', {
+      'landscape': landscape,
+    });
+  }
+
+  /// 系统装饰栏（带应用图标 + 标题的窗口顶栏）显隐。自由窗口形态下原生由
+  /// WindowChrome 独占，Dart 侧调用会被原生忽略。
+  static Future<void> setWindowDecorVisible({required bool visible}) async {
+    await invokeWindowMethod<void>('setWindowDecorVisible', {
+      'visible': visible,
+    });
+  }
+
+  /// 主动刷新一次安全区避让区（物理像素）。原生 getSafeArea 同时会订阅窗口
+  /// 安全区变化，之后由 onSafeAreaChange 推送。
+  static Future<void> refreshSafeArea() async {
+    final area = await invokeWindowMethod<Map<Object?, Object?>>('getSafeArea');
+    _updateSafeArea(area);
+  }
+
   /// 添加UP主卡片到桌面（仅 Harmony）：原生保存UP数据并拉起添加引导页
   static Future<void> addUpToDesktop({
     required String mid,
@@ -358,7 +452,13 @@ abstract class HarmonyChannel {
 
   /// 横屏小窗的缩放比例固定值
   static const _miniWindowLandscapeScale = 0.75;
+
+  /// 播放器是否已把当前视频切到全屏横屏。由播放器经
+  /// [onLandscapeOrMiniWindowChange] 回传，原生侧不持有。
   static bool _landscape = false;
+
+  /// 当前是否处于系统小窗/受限窗口。与 [WindowFacts.isMiniWindow] 同源，
+  /// 保留本地副本是为了兼容老的原生推送路径（onFloatingWindowChange）。
   static bool _miniWindow = false;
 
   /// 当前是否处于系统自由小窗（悬浮窗/全景多窗）。小窗内窗口宽高比不代表
@@ -380,6 +480,7 @@ abstract class HarmonyChannel {
   static bool _freeWindowMode = false;
 
   static void _onFreeWindowModeChange(bool freeWindowMode) {
+    WindowFacts.isFreeWindowMode = freeWindowMode;
     if (_freeWindowMode == freeWindowMode) return;
     _freeWindowMode = freeWindowMode;
     _applyMiniWindowLandscape();
@@ -404,24 +505,55 @@ abstract class HarmonyChannel {
     final miniWindowChanged = _miniWindow != miniWindow;
     _landscape = landscape;
     _miniWindow = miniWindow;
+    WindowFacts.landscape = landscape;
+    WindowFacts.isMiniWindow = miniWindow;
     if (miniWindowChanged) _syncWindowDecor();
     _applyMiniWindowLandscape();
   }
 
-  static void _applyMiniWindowLandscape() {
-    if (isMiniWindowLandscape) {
-      _setMiniWindowLandscape(true);
-      ScaledWidgetsFlutterBinding.instance.scaleFactor =
-          _miniWindowLandscapeScale;
-    } else {
-      ScaledWidgetsFlutterBinding.instance.scaleFactor = Pref.uiScale;
-      _setMiniWindowLandscape(false);
-    }
+  /// 应用原生窗口快照：先落 [WindowFacts]（真源），再让本地副本与之一致，
+  /// 最后只有「横屏小窗」这一组合状态发生翻转时才真正调整缩放与装饰栏——
+  /// 原生在小窗内每次状态变化都会推快照，避免重复下发缩放造成视觉抖动。
+  static void _applyWindowSnapshot(Map<Object?, Object?> snapshot) {
+    final wasMiniWindow = _miniWindow;
+    final wasMiniWindowLandscape = isMiniWindowLandscape;
+    WindowFacts.applySnapshot(snapshot);
+    _miniWindow = WindowFacts.isMiniWindow;
+    _freeWindowMode = WindowFacts.isFreeWindowMode;
+    _windowMode = WindowFacts.isWindowMode;
+    // landscape 不在原生快照内，仍由播放器回传；这里只把本地镜像同步回去，
+    // 避免原生推快照把 WindowFacts.landscape 冲成默认值。
+    WindowFacts.landscape = _landscape;
+    // 装饰栏看的是「是否小窗」本身（与方向无关），小窗进出就要重算；缩放看
+    // 的才是「横屏小窗」这一组合，避免每次推快照都重设 scaleFactor 抖动。
+    if (wasMiniWindow != _miniWindow) _syncWindowDecor();
+    if (wasMiniWindowLandscape == isMiniWindowLandscape) return;
+    _applyMiniWindowLandscape();
+    _syncWindowDecor();
   }
 
-  static void _setMiniWindowLandscape(bool landscape) {
-    _channel.invokeMethod('setMiniWindowLandscape', {'landscape': landscape});
+  static void _applyMiniWindowLandscape() {
+    final target = isMiniWindowLandscape;
+    ScaledWidgetsFlutterBinding.instance.scaleFactor = target
+        ? _miniWindowLandscapeScale
+        : Pref.uiScale;
+    setMiniWindowLandscape(target);
   }
+
+  /// 依据 [WindowFacts] 重算「横屏小窗」缩放与 enableLandscapeMultiWindow。
+  ///
+  /// 窗口事实变化后由 lib/harmony/window/window_bridge.dart 调用；缩放始终只
+  /// 在这一处落地，避免出现两个各自维护 scaleFactor 的入口。
+  static void syncMiniWindowLandscape() => _applyMiniWindowLandscape();
+
+  /// 依据 [WindowFacts] 重下发装饰栏显隐策略（自由窗口形态下装饰栏由原生
+  /// 独占，本方法不产生下发）。
+  static void syncWindowDecor() => _syncWindowDecor();
+
+  /// 应用一份原生窗口快照：更新 [WindowFacts] 与本类镜像状态，并在「横屏
+  /// 小窗」翻转时重算缩放与装饰栏。原生推送 onWindowSnapshot 时调用。
+  static void applyWindowSnapshot(Map<Object?, Object?> snapshot) =>
+      _applyWindowSnapshot(snapshot);
 
   /// 启动时（runApp 之前）主动拉取窗口初始状态：是否自由多窗 / 受限窗口模式
   /// （据此下发系统栏模式）、安全区避让区初值（见 [safeAreaInsets]）、装饰栏
@@ -437,18 +569,25 @@ abstract class HarmonyChannel {
     try {
       final state = await _channel.invokeMethod<Map>('getWindowState');
       if (state != null) {
-        _windowMode = state['isWindowMode'] as bool? ?? _windowMode;
-        _freeWindowMode = state['isFreeWindowMode'] as bool? ?? false;
+        _windowMode = WindowFacts.isWindowMode =
+            state['isWindowMode'] as bool? ?? _windowMode;
+        _freeWindowMode = WindowFacts.isFreeWindowMode =
+            state['isFreeWindowMode'] as bool? ?? false;
         await onLandscapeOrMiniWindowChange(
           null,
           state['isFloatingWindow'] as bool?,
         );
       }
     } catch (_) {}
-    try {
-      _updateSafeArea(await _channel.invokeMethod<Map>('getSafeArea'));
-    } catch (_) {}
+    await refreshSafeArea();
     _syncWindowDecor();
+  }
+
+  /// 拉取一次原生窗口快照并应用。启动时由 lib/harmony/window/window_bridge.dart
+  /// 调用；原生侧尚无 getWindowSnapshot 的旧版本返回 null，此时保留旧状态。
+  static Future<void> refreshWindowSnapshot() async {
+    final snapshot = await getWindowSnapshot();
+    if (snapshot != null) applyWindowSnapshot(snapshot);
   }
 
   /// 窗口安全区避让区，**物理像素**，窗口相对坐标，随旋转/窗口形态变化；
@@ -519,12 +658,20 @@ abstract class HarmonyChannel {
   ///
   /// 自由窗口内没有状态栏，故隐藏装饰栏不会误伤。代价：没有标题栏后不能再拖
   /// 标题栏移动窗口（边缘缩放、三键不受影响）。
+  ///
+  /// 自由窗口形态下装饰栏显隐由原生 WindowChrome 独占（系统装饰栏被隐藏、改
+  /// 由 ArkTS 自绘标题带），Dart 侧不得下发，否则会把自绘标题带顶掉。这里只
+  /// 处理平板系统小窗等非自由窗口。
   static void _syncWindowDecor() {
     if (!OS.isHarmony) return;
+    if (_freeWindowMode) {
+      _decorHidden = null;
+      return;
+    }
     final hide = _miniWindow;
     if (_decorHidden == hide) return;
     _decorHidden = hide;
-    _channel.invokeMethod('setWindowDecorVisible', {'visible': !hide});
+    setWindowDecorVisible(visible: !hide);
   }
 
   /// 自由多窗装饰栏按钮（全屏/最小化/关闭）的颜色跟随「按钮下方那条顶栏

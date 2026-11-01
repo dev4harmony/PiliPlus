@@ -5,6 +5,7 @@ import 'dart:math' show max, min;
 import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/assets.dart';
+import 'package:PiliPlus/harmony/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';
@@ -428,7 +429,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   Future<PiPStatus> enterPip({bool isAuto = false}) {
-    // 鸿蒙「横屏小窗」（系统小窗内切全屏，见 HarmonyChannel.isMiniWindowLandscape）
+    // 鸿蒙「横屏小窗」（系统小窗内切全屏，见 WindowFacts.isMiniWindowLandscape）
     // 下手动进画中画只有黑屏：此时 floating 插件走 freeform 分支，先
     // moveAbilityToBackground 再 startPiP，PiP 窗口的内容节点（customUIController，
     // 由应用侧 ArkUI 承载）在应用已退到后台之后才创建——实测日志里主窗口
@@ -437,7 +438,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     // 小窗内不切全屏时同样走 freeform 分支但画面正常，故拦截条件取横屏小窗而非小窗。
     // 这里直接拒绝，由调用方提示"当前处于系统小窗，无法进入画中画"。
     // 退后台自动进入（isAuto，走系统 auto-start，次序正常）不受影响。
-    if (!isAuto && OS.isHarmony && HarmonyChannel.isMiniWindowLandscape) {
+    if (!isAuto && OS.isHarmony && WindowFacts.isMiniWindowLandscape) {
       return Future.value(PiPStatus.unavailable);
     }
     if (videoPlayerController != null) {
@@ -748,7 +749,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     _cancelAutoExitFs();
     _autoExitFsTimer = Timer(_autoExitFsDelay, () {
       _autoExitFsTimer = null;
-      if ((OS.isHarmony && HarmonyChannel.isWindowMode) ||
+      if ((OS.isHarmony && WindowFacts.isWindowMode) ||
           _orientation != orientation ||
           !isFullScreen.value ||
           isManualFS ||
@@ -777,7 +778,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     final deviceOrientation = param.orientation;
     if (deviceOrientation == null) return;
     _orientation = deviceOrientation;
-    if (OS.isHarmony && HarmonyChannel.isWindowMode) {
+    if (OS.isHarmony && WindowFacts.isWindowMode) {
       _cancelAutoExitFs();
       return;
     }
@@ -2076,7 +2077,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             isVertical: isVertical,
             orientation: orientation,
           );
-          if (OS.isHarmony && !HarmonyChannel.isWindowMode) {
+          if (OS.isHarmony && !WindowFacts.isWindowMode) {
             // 手动进全屏的目标方向：横屏时等视口真正变横屏再置全屏布局，
             // 避免全屏先在竖屏/中间尺寸渲染，导致比例错误和动画跳变。
             final targetLandscape =
@@ -2111,7 +2112,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             onTimeout: () {},
           );
           // 退出全屏时，延迟等待方向旋转后改变组件
-          if (OS.isHarmony && !HarmonyChannel.isWindowMode) {
+          if (OS.isHarmony && !WindowFacts.isWindowMode) {
             await Future<void>.delayed(const Duration(milliseconds: 32));
           }
         } else {
