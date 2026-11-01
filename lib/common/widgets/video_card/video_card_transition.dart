@@ -28,14 +28,14 @@ const Curve _openPortraitCurve = Cubic(0.28, 0.70, 0.12, 1.0);
 Curve _openCurveFor(bool horizontal) =>
     horizontal ? _openCurve : _openPortraitCurve;
 
-const Curve _closeCurve = Cubic(0.54, 0.15, 0.68, 0.95);
+const Curve _closeCurve = Cubic(0.25, 0.65, 0.35, 1.0);
 
 /// 入场进度到此值即认为页面已就位，播放页据此开始取流（0.5 ≈ 175ms）
 const double _entryContentReadyAt = 0.5;
 
 const Duration videoPageTransitionDuration = Duration(milliseconds: 350);
 
-const Duration videoPageReverseTransitionDuration = Duration(milliseconds: 180);
+const Duration videoPageReverseTransitionDuration = Duration(milliseconds: 230);
 
 const double _paintEpsilon = 0.02;
 
@@ -497,7 +497,10 @@ class _VideoPageHeroTargetState extends State<VideoPageHeroTarget> {
   /// [fix] 弱引用持有来源卡片：原实现直接持有 RenderBox，若播放页长期驻留，
   /// 会一直拖住首页那张卡片（可能早已滚出/重建）的 RenderBox，阻止其回收。
   WeakReference<RenderBox>? _sourceBox;
+
+  /// 来源卡片在屏幕上的矩形。
   Rect? _sourceRect;
+
   bool _entryCompleted = false;
 
   /// 进入时的视口尺寸：返回时若窗口尺寸变了（旋转/折叠/分屏/小窗），放弃动画
@@ -541,13 +544,19 @@ class _VideoPageHeroTargetState extends State<VideoPageHeroTarget> {
     if (status == AnimationStatus.completed && _route?.offstage == false) {
       _entryCompleted = true;
     }
+  }
+
+  /// 是否正在把播放页收回卡片（含手势拖拽返回）
+  bool get _returning =>
+      _entryCompleted &&
+      (_routeAnimation?.status == AnimationStatus.reverse ||
+          (_route?.popGestureInProgress ?? false));
+
+  /// 返回方向的飞行终点
+  Rect get _liveSourceRect {
     final box = _sourceBox?.target;
-    if (status == AnimationStatus.reverse &&
-        box != null &&
-        box.attached &&
-        box.hasSize) {
-      _sourceRect = box.localToGlobal(Offset.zero) & box.size;
-    }
+    if (box == null || !box.attached || !box.hasSize) return _sourceRect!;
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   /// 开/关整页快照；名额用完时退化为实时绘制（本次调用直接放弃）
@@ -600,12 +609,12 @@ class _VideoPageHeroTargetState extends State<VideoPageHeroTarget> {
           animation: animation,
           child: pageContent,
           builder: (context, child) {
-            final reversing =
-                animation.status == AnimationStatus.reverse ||
-                (_route?.popGestureInProgress ?? false);
-            final returning = reversing && _entryCompleted;
-            final source = _sourceRect!.shift(-origin);
-            final horizontal = _isHorizontalFlight(_sourceRect!.size, size);
+            final returning = _returning;
+            // 终点每帧现量：返回时下层首页正在浮起，卡片每秒都在换位置，
+            // 只有现量才能让落点等于动画结束那一刻露出来的真卡片
+            final target = returning ? _liveSourceRect : _sourceRect!;
+            final source = target.shift(-origin);
+            final horizontal = _isHorizontalFlight(target.size, size);
             final openCurve = _openCurveFor(horizontal);
             final expansion = openCurve.transform(animation.value);
             final contraction = _closeCurve.transform(1 - animation.value);
