@@ -1,6 +1,6 @@
 import { curves, LengthMetrics, SymbolGlyphModifier, uiMaterial, uiObserver } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
-import { HdsAnimationMode, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
+import { HdsAnimationMode, hdsMaterial, HdsTabs, HdsNavigation, HdsTabsController, ScrollEffectType } from '@kit.UIDesignKit';
 import common from '@ohos.app.ability.common';
 import image from '@ohos.multimedia.image';
 import window from '@ohos.window';
@@ -23,7 +23,7 @@ const NAV_UNSELECTED = $r('sys.color.comp_focused_primary');
 const BOTTOM_NORMAL_AVOID_AREA_VALUE = 1;
 const BOTTOM_SPECIAL_AVOID_AREA_VALUE = 12;
 const TOP_BAR_BLUR_RADIUS = 15;
-const TOP_BAR_FRACTION_STOPS: [number, number][] = [[0, 0], [0.8, 0.2], [1, 0.4], [1, 1]];
+const TOP_BAR_FRACTION_STOPS: [number, number][] = [[0, 0], [0.92, 0.1], [1, 1]];
 const TOP_BAR_COLLAPSED_HEIGHT = 80;
 const TOP_BAR_EXPANDED_HEIGHT = 144;
 /// 顶栏收缩曲线：重减速的三次贝塞尔，起步轻、尾段长距离滑停，
@@ -567,92 +567,58 @@ struct Index {
 
   @Builder
   homeTopBar() {
-    RelativeContainer() {
-      //渐变模糊底层
-      Column() {
-      }
-      .constraintSize({ maxHeight: TOP_BAR_EXPANDED_HEIGHT })
-      .linearGradient({
-          direction: GradientDirection.Bottom, // 渐变方向
-          colors: [
-                [$r('app.color.top_bar_mask_start'), 0],
-                [$r('app.color.top_bar_mask_mid'), 0.8],
-                [$r('app.color.top_bar_mask_end'), 0.95],
-                [$r('app.color.top_bar_mask_end'), 1],
-              ],
-        })
-      .linearGradientBlur(TOP_BAR_BLUR_RADIUS, {
-        fractionStops: TOP_BAR_FRACTION_STOPS,
-        direction: GradientDirection.Top
-      })
-      .alignRules({
-        top: { anchor: 'topBarContent', align: VerticalAlign.Top },
-        bottom: { anchor: 'topBarContent', align: VerticalAlign.Bottom },
-        left: { anchor: 'topBarContent', align: HorizontalAlign.Start },
-        right: { anchor: 'topBarContent', align: HorizontalAlign.End }
-      })
-      .id('topBarBg')
-      .hitTestBehavior(HitTestMode.Transparent)
-      .align(Alignment.Top)
-
-      Column() {
-        Row({ space: 8 }) {
-          Search({ value: this.homeSearchText, placeholder: '搜索' })
-            .cancelButton({ style: CancelButtonStyle.INVISIBLE })
-            .focusable(false)
-            .enableKeyboardOnFocus(false)
-            .searchIcon(new SymbolGlyphModifier($r('sys.symbol.magnifyingglass'))
-              .fontColor([this.navSelected]).fontSize(16))
-            .placeholderColor($r('app.color.placeholder_text'))
-            .placeholderFont({ size: 16, weight: 600 })
-            .fontColor($r('app.color.placeholder_text'))
-            .textFont({ size: 16, weight: 600 })
-            .backgroundColor(Color.Transparent)
-            .borderRadius(22)
-            .layoutWeight(1)
-            .height(44)
-            .systemMaterial(topBarMaterial(true))
-            .onClick(() => {
-              this.context.eventHub.emit(EVENT_TOP_SEARCH);
-            })
-          this.msgButton()
-          this.avatarButton()
-        }
-        .width('100%')
-        .padding({
-          left: 14,
-          right: 14 + this.titleButtonInset,
-        })
-        .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
-        // .animation() 只作用于它之前、上一个 .animation() 之后的属性，
-        // 故透明度与高度可以各走一套节奏
-        .animation({
-          duration: TOP_BAR_FADE_DURATION,
-          curve: Curve.Sharp,
-          delay: this.homeHideTopBar && this.topBarCollapsed ? 0 : TOP_BAR_FADE_IN_DELAY
-        })
-        .margin({
-          top: this.homeHideTopBar && this.topBarCollapsed ? 0 : 5,
-          bottom: this.homeHideTopBar && this.topBarCollapsed ? -5 : 5
-        })
-        .height(this.homeHideTopBar && this.topBarCollapsed ? 0 : 44)
-        .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
-
-        if (this.homeTabs.length > 1) {
-          this.categoryTabs()
-        }
+    Column() {
+      Row({ space: 8 }) {
+        Search({ value: this.homeSearchText, placeholder: '搜索' })
+          .cancelButton({ style: CancelButtonStyle.INVISIBLE })
+          .focusable(false)
+          .enableKeyboardOnFocus(false)
+          .searchIcon(new SymbolGlyphModifier($r('sys.symbol.magnifyingglass'))
+            .fontColor([this.navSelected]).fontSize(16))
+          .placeholderColor($r('app.color.placeholder_text'))
+          .placeholderFont({ size: 16, weight: 600 })
+          .fontColor($r('app.color.placeholder_text'))
+          .textFont({ size: 16, weight: 600 })
+          .backgroundColor(Color.Transparent)
+          .borderRadius(22)
+          .layoutWeight(1)
+          .height(44)
+          .systemMaterial(topBarMaterial(true))
+          .onClick(() => {
+            this.context.eventHub.emit(EVENT_TOP_SEARCH);
+          })
+        this.msgButton()
+        this.avatarButton()
       }
       .width('100%')
-      .padding({ top: this.statusBarHeight})
-      // 自绘标题带压在窗口最顶部（不吃布局），顶栏内容需整体下移一个标题带高度
-      .margin({ top: this.titleBarHeight })
-      .id('topBarContent')
-      .hitTestBehavior(HitTestMode.Default)
-      .align(Alignment.Top)
+      .padding({
+        left: 14,
+        right: 14 + this.titleButtonInset,
+      })
+      .opacity(this.homeHideTopBar && this.topBarCollapsed ? 0 : 1)
+      // .animation() 只作用于它之前、上一个 .animation() 之后的属性，
+      // 故透明度与高度可以各走一套节奏
+      .animation({
+        duration: TOP_BAR_FADE_DURATION,
+        curve: Curve.Sharp,
+        delay: this.homeHideTopBar && this.topBarCollapsed ? 0 : TOP_BAR_FADE_IN_DELAY
+      })
+      .margin({
+        top: this.homeTabs.length > 1 ? 5 : 9,
+        bottom: 5
+      })
+      .height(44)
+      .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+
+      if (this.homeTabs.length > 1) {
+        this.categoryTabs()
+      }
     }
-    .height(this.topBarHeight())
-    .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
     .width('100%')
+    .padding({ top: this.statusBarHeight})
+    // 自绘标题带压在窗口最顶部（不吃布局），顶栏内容需整体下移一个标题带高度
+    .margin({ top: this.titleBarHeight })
+    .id('topBarContent')
     .hitTestBehavior(HitTestMode.Default)
     .align(Alignment.Top)
   }
@@ -671,39 +637,47 @@ struct Index {
   /// 标题栏内部的节点才能回到原地更新，沿用既有的 .animation() 写法。
   @Builder
   homeTopBarHost() {
-    Column() {
-      Navigation() {
-        // 空内容区：BarStyle.STACK 下被标题栏完全覆盖，不参与触摸测试
-        Column()
-          .width('100%')
-          .height('100%')
-          .hitTestBehavior(HitTestMode.None)
-      }
-      // 宽窗口下默认的 Auto 会分栏，强制 Stack 保持单栏标题栏布局
-      .mode(NavigationMode.Stack)
-      .hideBackButton(true)
-      .hideToolBar(true)
-      // 显式给出标题栏高度，避免自定义标题被压回默认 56vp；
-      // 不设 menus，paddingStart/paddingEnd 才能把标题栏默认左右边距清零
-      .title({ builder: this.homeTopBar, height: TOP_BAR_EXPANDED_HEIGHT }, {
-        barStyle: BarStyle.STACK,
-        paddingStart: LengthMetrics.vp(0),
-        paddingEnd: LengthMetrics.vp(0)
-      })
-      // 状态栏避让由顶栏内部的 statusBarHeight padding 负责，避免重复加一层
-      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
-      .backgroundColor(Color.Transparent)
-      .width('100%')
-      .height(TOP_BAR_EXPANDED_HEIGHT)
+    HdsNavigation() {
+      // 空内容区：BarStyle.STACK 下被标题栏完全覆盖，不参与触摸测试
+      Column()
+        .width('100%')
+        .height('100%')
+        .hitTestBehavior(HitTestMode.None)
     }
-    .width('100%')
-    // 收缩在这里做：普通容器高度，隐式动画正常生效；clip 让收起后露出的
-    // 那段标题栏既不绘制也不参与触摸测试，触摸照常落到下方 FlutterPage
-    .height(this.topBarHeight())
-    .clip(true)
+    // 宽窗口下默认的 Auto 会分栏，强制 Stack 保持单栏标题栏布局
+    .mode(NavigationMode.Stack)
+    .hideBackButton(true)
+    .hideToolBar(true)
+    .titleBar({
+      style: {
+        scrollEffectOpts: {
+          enableScrollEffect: false,
+          scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR
+        },
+        originalStyle: {
+          backgroundStyle: {
+            backgroundColor: $r('app.color.start_window_background'),
+            blurRadius: TOP_BAR_BLUR_RADIUS
+          }
+        },
+        systemMaterialEffect: {
+          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE,
+          materialType: hdsMaterial.MaterialType.IMMERSIVE
+        }
+      },
+      content: {
+        stackBuilder: (): void => this.homeTopBar(),
+      }
+    })
+    // 状态栏避让由顶栏内部的 statusBarHeight padding 负责，避免重复加一层
+    .margin({ top: this.topBarCollapsed? TOP_BAR_COLLAPSED_HEIGHT-TOP_BAR_EXPANDED_HEIGHT : 0 })
     .animation({ duration: TOP_BAR_MOTION_DURATION, curve: TOP_BAR_MOTION_CURVE })
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .width('100%')
+    .height(TOP_BAR_EXPANDED_HEIGHT)
     .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
     .align(Alignment.Top)
+    .clip(true)
   }
 
   private topBarHeight(): number {
