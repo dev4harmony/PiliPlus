@@ -89,8 +89,10 @@ struct Index {
   @StorageLink('useNativeTabs') useNativeTabs: boolean = false;
   @StorageLink('shellBarsHidden') shellBarsHidden: boolean = false;
   @StorageLink('__scrollHidden') @Watch('onScrollHiddenChanged') shellBarsScrollHidden: boolean = false;
+  /// 前景色与背景色均由 Dart 侧 AppearanceSync 统一下发，见 appearance/AppAppearance.ets。
   @StorageLink('tabSelectedColor') navSelected: string = '#3367D6';
   @StorageLink('tabSelectedSubColor') navSelectedSub: string = '#503367D6';
+  @StorageLink('appBackgroundColor') appBackgroundColor: string = '';
   @StorageLink('useNativeTopBar') useNativeTopBar: boolean = false;
   @StorageLink('topBarHidden') topBarHidden: boolean = false;
   @StorageLink('topBarCollapsed') topBarCollapsed: boolean = false;
@@ -656,7 +658,7 @@ struct Index {
         },
         originalStyle: {
           backgroundStyle: {
-            backgroundColor: $r('app.color.start_window_background'),
+            backgroundColor: this.topBarBackground(),
             blurRadius: TOP_BAR_BLUR_RADIUS
           }
         },
@@ -678,6 +680,14 @@ struct Index {
     .visibility(this.topBarHidden ? Visibility.None : Visibility.Visible)
     .align(Alignment.Top)
     .clip(true)
+  }
+
+  /// 顶栏底板底色：与自绘标题带同色，未同步时回落资源色。
+  private topBarBackground(): ResourceColor {
+    if (this.appBackgroundColor.length > 0) {
+      return this.appBackgroundColor;
+    }
+    return $r('app.color.start_window_background');
   }
 
   private topBarHeight(): number {

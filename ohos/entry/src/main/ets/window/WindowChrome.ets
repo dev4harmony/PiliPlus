@@ -6,12 +6,9 @@ import { SystemBarsController } from './SystemBars';
 /// 自绘标题带高度（vp）。合法装饰高度为 [37,112]，取 40 与系统标题栏观感一致。
 export const TITLE_BAR_HEIGHT: number = 40;
 
-/// 标题带底色不再由原生固定：改由 Dart 侧主题同步下发
-/// （`setTitleBarBackground` → AppStorage `titleBarBackground`），与 Flutter
-/// 页面背景同色，深浅模式与纯黑主题都跟着 Dart 走。原生只留资源色兜底
-/// （`app.color.title_bar_background`），供首帧 / 主题尚未同步时使用。
-/// 三键与顶栏分类页签仍用 ColoringStrategy.INVERT（前景取背景反色），
-/// 底色换色无需改动任何一处前景色。
+/// 本类只负责标题带何时出现 / 占多高 / 收不收，不持有任何颜色：底色由 Dart
+/// 侧主题统一下发到 AppStorage `appBackgroundColor`（见
+/// appearance/AppAppearance.ets）。
 
 /// 装饰栏下发失败后的重试间隔（ms）。
 const DECOR_RETRY_DELAY_MS: number = 150;
@@ -62,8 +59,6 @@ export class WindowChromeController {
   private titleBarDark: boolean = false;
   /// 系统栏是否已隐藏（Dart 侧 `SystemBars` 同步下来的状态）：标题带收起，见 [setBarsHidden]。
   private barsHidden: boolean = false;
-  /// 最近一次从 Dart 侧同步下来的标题带底色，空串表示尚未同步，见 [setTitleBarBackground]。
-  private titleBarBackground: string = '';
 
   /// 系统栏状态机：窗口级状态在 [SystemBarsController]，本类只按它的 apply 结果
   /// 收起自绘标题带（`barsHidden`）。由 WindowState 注入，本类不拥有它。
@@ -349,17 +344,6 @@ export class WindowChromeController {
     this.barsHidden = hidden;
     // 同 setTitleBarDark：此变化不在 sync() 的签名里，必须直接写 AppStorage。
     AppStorage.setOrCreate('titleBarCollapsed', hidden);
-  }
-
-  /// 标题带底色，由 Dart 侧主题同步下发（`#RRGGBB` / `#AARRGGBB`），
-  /// 使自绘标题带与 Flutter 页面背景同色。
-  setTitleBarBackground(color: string): void {
-    if (color.length === 0 || this.titleBarBackground === color) {
-      return;
-    }
-    this.titleBarBackground = color;
-    // 此变化同样不在 sync() 的签名里，直接写 AppStorage。
-    AppStorage.setOrCreate('titleBarBackground', color);
   }
 
   /// 最大化/还原。仅自由窗口形态下有意义。

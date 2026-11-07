@@ -19,6 +19,7 @@ import {
 } from "@ohos/flutter_ohos";
 
 import display from "@ohos.display";
+import { appAppearance } from "../appearance/AppAppearance";
 import { windowChrome } from "../window/WindowChrome";
 import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
 
@@ -267,12 +268,6 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(await windowChrome.exitContentFullScreen());
         break;
       }
-      case "setTitleBarBackground": {
-        const color: string = call.argument("color") ?? "";
-        windowChrome.setTitleBarBackground(color);
-        result.success(true);
-        break;
-      }
       case "setWindowDecorVisible": {
         const visible: boolean = call.argument("visible") ?? true;
         result.success(this.setWindowDecorVisible(visible));
@@ -393,15 +388,11 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(true);
         break;
       }
-      case "setTabSelectedColor": {
-        if (deviceInfo.sdkApiVersion < 23) {
-          result.success(true);
-          break;
-        }
-        const color: string = call.argument('color') ?? '#3367D6';
-        const subColor: string = '#88'+color.substring(1);
-        AppStorage.setOrCreate('tabSelectedColor', color);
-        AppStorage.setOrCreate('tabSelectedSubColor', subColor);
+      case "setThemeColors": {
+        // 前景色 + 背景色成对下发，见 appearance/AppAppearance.ets。不按 SDK 版本拦截。
+        const foreground: string = call.argument('foreground') ?? '';
+        const background: string = call.argument('background') ?? '';
+        appAppearance.setColors(foreground, background);
         result.success(true);
         break;
       }

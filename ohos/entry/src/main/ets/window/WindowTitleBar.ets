@@ -22,12 +22,10 @@ const REVEAL_DURATION_MS: number = 200;
 /// 自绘窗口标题带：左侧应用图标 + 标题，右侧「最大化 / 最小化 / 关闭」三键。
 /// 自由窗口形态下常驻（由 WindowChrome 决定），高度固定 [TITLE_BAR_HEIGHT]。
 ///
-/// 取色：底色由 Dart 侧主题同步下发（`windowChrome.setTitleBarBackground` →
-/// AppStorage `titleBarBackground`），与 Flutter 页面背景同色，深浅模式 /
-/// 纯黑主题都跟着 Dart 走；前景仍走 ColoringStrategy.INVERT（前景 = 底色
-/// 反色），底色换色时无需改动任何一处前景色。注意 INVERT 要求组件自身设置了
-/// backgroundColor，且同一节点上的 foregroundColor 只能有一个，故容器定底色、
-/// 子节点各自取反色。
+/// 取色：底色读 AppStorage `appBackgroundColor`（Dart 侧下发，见
+/// appearance/AppAppearance.ets），前景走 ColoringStrategy.INVERT（底色反色）。
+/// INVERT 要求组件自身设置 backgroundColor，且同一节点只能有一个
+/// foregroundColor，故容器定底色、子节点各自取反色。
 ///
 /// 收起：Dart 同步「系统栏隐藏」状态（播放器等进入沉浸）时，
 /// `windowChrome` 只写 AppStorage `titleBarCollapsed`，**不动**
@@ -43,9 +41,8 @@ export struct WindowTitleBar {
   /// 系统栏已隐藏（Dart 侧 `syncSystemBars(hidden:true)` 同步下来），标题带收起。
   @StorageLink('titleBarCollapsed') @Watch('onCollapsedChanged') collapsed: boolean = false;
 
-  /// Dart 侧同步下来的页面背景色（`#RRGGBB`）。空串表示尚未同步，
-  /// 回落到资源色（随深浅色切换）。
-  @StorageLink('titleBarBackground') backgroundHex: string = '';
+  /// Dart 侧下发的页面背景色（'#RRGGBB'），空串表示尚未同步。
+  @StorageLink('appBackgroundColor') backgroundHex: string = '';
 
   /// 收起态下是否已「临时放下」。仅收起态有意义：常驻态永远显示。
   @State revealed: boolean = false;
@@ -62,12 +59,12 @@ export struct WindowTitleBar {
     return this.collapsed && !this.revealed;
   }
 
-  /// 底色：优先 Dart 同步值，未同步时用资源色兜底。
+  /// 底色：未同步时回落资源色，须与 Index.ets 的 topBarBackground 同色。
   private titleBarColor(): ResourceColor {
     if (this.backgroundHex.length > 0) {
       return this.backgroundHex;
     }
-    return $r('app.color.title_bar_background');
+    return $r('app.color.start_window_background');
   }
 
   private clearTimers(): void {

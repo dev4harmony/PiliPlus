@@ -8,7 +8,7 @@ import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
 import 'package:PiliPlus/harmony_adapt/window/system_bars.dart';
-import 'package:PiliPlus/harmony_adapt/window/title_bar_color.dart';
+import 'package:PiliPlus/harmony_adapt/appearance/appearance_sync.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_bridge.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/harmony_adapt/shell_bars_observer.dart';
@@ -262,8 +262,8 @@ void main() async {
       HarmonyChannel.loadDisplayHdrFormats();
       // 将当前主题颜色模式同步给原生层（Rx 初始值相同不触发监听，需显式同步）
       ThemeUtils.syncColorModeToNative();
-      // 把主题背景色下发给原生自绘标题带，并跟随主题/系统深浅色变化重发
-      TitleBarColor.attach();
+      // 统一把前景色与背景色下发给原生，并跟随主题 / 系统深浅色变化重发
+      AppearanceSync.attach();
       // 首帧后对账一次系统栏期望：engine 重建 / 热重启后原生侧可能还停在上一
       // 个会话的「已隐藏」，Dart 侧状态已归零，需主动下发一次让两边收敛
       SystemBars.resync(hidden: !showSystemBar_);

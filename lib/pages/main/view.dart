@@ -8,7 +8,6 @@ import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/flutter/tabs.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
-import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/main.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/pages/home/view.dart';
@@ -72,10 +71,8 @@ class _MainAppState extends PopScopeState<MainApp>
       MyApp.shellBarsObserver.onOrientationChanged(
         _mainController.useBottomNav,
       );
-      _syncPrimaryColor();
     });
-    // 仅启用沉浸光感顶栏（未启用底栏）时，也要补发主题色：
-    // 顶栏的分类高亮、图标颜色均读取 tabSelectedColor。
+    // 主题色由 appearance_sync.dart 统一监听下发，这里不再补发。
     _nativeTopBarWorker = ever(_mainController.useNativeTopBar, (useNativeTopBar) {
       if (!mounted || !useNativeTopBar) return;
       // 同样补发首帧时因 useNativeTopBar 未就绪而跳过的顶栏显隐同步：
@@ -83,7 +80,6 @@ class _MainAppState extends PopScopeState<MainApp>
       MyApp.shellBarsObserver.onOrientationChanged(
         _mainController.useBottomNav,
       );
-      _syncPrimaryColor();
     });
     if (Platform.isMacOS) {
       HardwareKeyboard.instance.addHandler(_handleKeyEvent);
@@ -129,9 +125,6 @@ class _MainAppState extends PopScopeState<MainApp>
         _mainController.useBottomNav,
       );
     }
-    // 总是同步主题色到 ArkTS（底栏/顶栏共用 tabSelectedColor），
-    // 不依赖 useNativeTabs：仅启用顶栏时也需加载主题色。
-    _syncPrimaryColor();
   }
 
   @override
@@ -158,14 +151,6 @@ class _MainAppState extends PopScopeState<MainApp>
         ..checkDefaultSearch(true)
         ..checkUnread(_mainController.useBottomNav);
     }
-  }
-
-  /// 将当前主题主色同步到 ArkTS（底栏选中色/顶栏高亮色共用）
-  void _syncPrimaryColor() {
-    final primary = theme.colorScheme.primary;
-    HarmonyChannel.setTabSelectedColor(
-      '#${primary.value.toRadixString(16).padLeft(8, '0').substring(2)}',
-    );
   }
 
   @override

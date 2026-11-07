@@ -225,9 +225,16 @@ abstract class HarmonyChannel {
   static Future<void> setTabMaterialLevel(HdsMaterialLevel level) =>
       _invoke('setTabMaterialLevel', {'level': level.value});
 
-  /// 同步主题色到 ArkTS HdsTabs 底栏
-  static Future<void> setTabSelectedColor(String hexColor) =>
-      _invoke('setTabSelectedColor', {'color': hexColor});
+  /// 下发 Flutter 主题色（均 '#RRGGBB'）：[foreground] 供原生顶栏与 HDS 底栏
+  /// 选中态，[background] 供自绘标题带与顶栏底板。两色必须同一条消息成对下发，
+  /// 否则原生会出现底色已换、前景还是旧主题色的中间帧。
+  static Future<void> setThemeColors({
+    required String foreground,
+    required String background,
+  }) => _invoke('setThemeColors', {
+    'foreground': foreground,
+    'background': background,
+  });
 
   /// 向原生发送顶栏配置（Flutter 侧计算后通知 ArkTS）
   static Future<void> setShellTopBar({required bool useNativeTopBar}) =>
@@ -425,12 +432,6 @@ abstract class HarmonyChannel {
   /// 退出「内容全屏」，返回值语义同 [enterContentFullScreen]。
   static Future<bool> exitContentFullScreen() async =>
       await invokeWindowMethod<bool>('exitContentFullScreen') ?? false;
-
-  /// 下发原生自绘标题带底色。[color] 形如 '#RRGGBB'，原生写入 AppStorage
-  /// 供 ArkTS 标题带 @StorageLink 使用。
-  static Future<void> setTitleBarBackground(String color) async {
-    await invokeWindowMethod<void>('setTitleBarBackground', {'color': color});
-  }
 
   /// 小窗横屏缩放开关：true 时开 enableLandscapeMultiWindow（小窗内全屏横屏），
   /// false 时关掉。
