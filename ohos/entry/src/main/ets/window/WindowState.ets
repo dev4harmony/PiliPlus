@@ -468,12 +468,15 @@ export class WindowState {
       // 旋转/窗口尺寸变化后兜底重读一次：部分机型旋转时不会单独推送
       // TYPE_CUTOUT 的 avoidAreaChange。
       w.on('windowSizeChange', this.safeAreaChangeCallback);
+      // 画中画进入/退出等
+      w.on('windowStatusChange', this.safeAreaChangeCallback);
     } catch (err) {
       console.error("WindowState", `safe area listener failed: ${err}`);
       // 任一失败就保持未监听，下次拉取时重装，避免半装状态
       try {
         w.off('avoidAreaChange', this.safeAreaChangeCallback);
         w.off('windowSizeChange', this.safeAreaChangeCallback);
+        w.off('windowStatusChange', this.safeAreaChangeCallback);
       } catch (offErr) {
         console.error("WindowState", `safe area listener rollback failed: ${offErr}`);
       }
@@ -484,7 +487,16 @@ export class WindowState {
 
   private safeAreaChangeCallback = (): void => {
     this.emitSafeArea();
+    // 状态栏/画中画切换中系统可能更新避让区不及时，需要幂等延时重读
+    if (this.safeAreaDelayedTimer !== -1) {
+      clearTimeout(this.safeAreaDelayedTimer);
+    }
+    this.safeAreaDelayedTimer = setTimeout(() => {
+      this.safeAreaDelayedTimer = -1;
+      this.emitSafeArea();
+    }, 60);
   };
+  private safeAreaDelayedTimer: number = -1;
 
   private stopSafeAreaListener(): void {
     if (!this.safeAreaListening) {
@@ -494,6 +506,11 @@ export class WindowState {
     try {
       this.win?.off('avoidAreaChange', this.safeAreaChangeCallback);
       this.win?.off('windowSizeChange', this.safeAreaChangeCallback);
+      this.win?.off('windowStatusChange', this.safeAreaChangeCallback);
+      if (this.safeAreaDelayedTimer !== -1) {
+        clearTimeout(this.safeAreaDelayedTimer);
+        this.safeAreaDelayedTimer = -1;
+      }
     } catch (err) {
       console.error("WindowState", `safe area listener off failed: ${err}`);
     }
