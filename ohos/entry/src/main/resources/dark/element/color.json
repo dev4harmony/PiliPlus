@@ -5,6 +5,10 @@
       "value": "#000000"
     },
     {
+      "name": "foreground_text",
+      "value": "#000000"
+    },
+    {
       "name": "placeholder_text",
       "value": "#50FFFFFF"
     },

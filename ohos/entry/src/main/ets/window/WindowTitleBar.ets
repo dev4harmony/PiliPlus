@@ -121,23 +121,26 @@ export struct WindowTitleBar {
         SymbolGlyph($r(this.maximized
           ? 'sys.symbol.exit_full_screen'
           : 'sys.symbol.full_screen'))
-          .fontSize(14)
+          .fontSize(15)
+          .fontColor([$r('app.color.foreground_text')])
           .align(Alignment.Center)
            
       } else if (key === 'min') {
         SymbolGlyph($r('sys.symbol.minus'))
-          .fontSize(14)
+          .fontSize(15)
+          .fontColor([$r('app.color.foreground_text')])
           .align(Alignment.Center)
            
       } else {
         SymbolGlyph($r('sys.symbol.xmark'))
-          .fontSize(14)
+          .fontSize(15)
+          .fontColor([$r('app.color.foreground_text')])
           .align(Alignment.Center)
            
       }
     }
-    .width(28)
-    .height(28)
+    .width(30)
+    .height(30)
     .onClick(() => {
       if (key === 'max') {
         windowChrome.toggleMaximize();
@@ -160,7 +163,7 @@ export struct WindowTitleBar {
           .objectFit(ImageFit.Contain)
           .draggable(false)
         Text($r('app.string.EntryAbility_label'))
-          .fontSize(14)
+          .fontSize(15)
           .fontWeight(FontWeight.Medium)
            
           .maxLines(1)
@@ -179,13 +182,13 @@ export struct WindowTitleBar {
         windowChrome.toggleMaximize();
       }))
 
-      Row({ space: 4 }) {
+      Row({ space: 6 }) {
         this.captionButton('max')
         this.captionButton('min')
         this.captionButton('close')
       }
       .height('100%')
-      .padding({ right: 18 })
+      .padding({ right: 20 })
     }
     .width('100%')
     .height(TITLE_BAR_HEIGHT)
