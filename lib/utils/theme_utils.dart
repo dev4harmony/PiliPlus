@@ -1,34 +1,19 @@
 import 'package:PiliPlus/common/style.dart';
-import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/font_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoThemeData;
 import 'package:flutter/foundation.dart' show PlatformDispatcher;
-import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:os_type/os_type.dart';
 
 abstract final class ThemeUtils {
   static late ThemeData lightTheme;
 
   static late ThemeData darkTheme;
 
-  static final Rx<ThemeMode> _themeMode = Pref.themeMode.obs;
+  static late ThemeMode themeMode;
 
-  /// 手动将当前主题模式通知给原生层（应用内切换主题模式的开关处调用）
-  static void syncColorModeToNative() {
-    if (!OS.isHarmony) return;
-    HarmonyChannel.setSystemColorMode(themeModeMap[_themeMode.value] ?? '');
-  }
-
-  static ThemeMode get themeMode => _themeMode.value;
-
-  static set themeMode(ThemeMode value) => _themeMode.value = value;
-
-  static Rx<ThemeMode> get themeModeRx => _themeMode;
-
-  static Map<ThemeMode, String> themeModeMap = {
+  static const Map<ThemeMode, String> themeModeMap = {
     ThemeMode.light: "light",
     ThemeMode.dark: "dark",
     ThemeMode.system: "system",
@@ -65,19 +50,14 @@ abstract final class ThemeUtils {
       fontWeight = FontWeight.values[appFontWeight];
     }
 
-    // 上游 4ca037345 起支持用户自选字体族，db77169b4 起改为 FontUtils.fontFamily
-    //（含自定义导入字体）。鸿蒙没有枚举系统字体的通道，用户不导入字体时它为
-    // null，回落到鸿蒙一贯的 HarmonyOS Sans；在本仓库的安卓 / Windows / Linux
-    // 构建上则由用户的选择覆盖。
-    late final fontFamily =
-        FontUtils.fontFamily ?? "HarmonyOS Sans";
-    late final textStyle = TextStyle(
+    final fontFamily = FontUtils.fontFamily;
+    final textStyle = TextStyle(
       fontWeight: fontWeight,
       fontFamily: fontFamily,
     );
-    ThemeData theme = ThemeData(
-      colorScheme: colorScheme,
+    final theme = ThemeData(
       useMaterial3: true,
+      colorScheme: colorScheme,
       fontFamily: fontFamily,
       textTheme: TextTheme(
         displayLarge: textStyle,

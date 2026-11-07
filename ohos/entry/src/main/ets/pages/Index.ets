@@ -658,7 +658,7 @@ struct Index {
         },
         originalStyle: {
           backgroundStyle: {
-            backgroundColor: this.topBarBackground(),
+            backgroundColor: this.getBackgroundColor(),
             blurRadius: TOP_BAR_BLUR_RADIUS
           }
         },
@@ -682,8 +682,8 @@ struct Index {
     .clip(true)
   }
 
-  /// 顶栏底板底色：与自绘标题带同色，未同步时回落资源色。
-  private topBarBackground(): ResourceColor {
+  /// Dart侧背景色，未同步时回落资源色。
+  private getBackgroundColor(): ResourceColor {
     if (this.appBackgroundColor.length > 0) {
       return this.appBackgroundColor;
     }
@@ -939,6 +939,7 @@ struct Index {
     .barFloatingStyle({
       barBottomMargin: this.bottomAvoidAreaHeight,
       adaptToHandedness: true,
+      gradientMask: { maskColor: this.getBackgroundColor() },
       systemMaterialEffect: {
         materialType: hdsMaterial.MaterialType.IMMERSIVE,
         materialLevel: this.resolveMaterialLevel()

@@ -225,13 +225,15 @@ abstract class HarmonyChannel {
   static Future<void> setTabMaterialLevel(HdsMaterialLevel level) =>
       _invoke('setTabMaterialLevel', {'level': level.value});
 
-  /// 下发 Flutter 主题色（均 '#RRGGBB'）：[foreground] 供原生顶栏与 HDS 底栏
-  /// 选中态，[background] 供自绘标题带与顶栏底板。两色必须同一条消息成对下发，
-  /// 否则原生会出现底色已换、前景还是旧主题色的中间帧。
-  static Future<void> setThemeColors({
+  /// 下发原生外观：[colorMode] 为 light / dark / system，[foreground] 供原生
+  /// 顶栏与 HDS 底栏选中态，[background] 供自绘标题带与顶栏底板（均 '#RRGGBB'）。
+  /// 三者必须同一条消息，否则原生会出现模式已换、颜色还是旧主题的中间帧。
+  static Future<void> setAppearance({
+    required String colorMode,
     required String foreground,
     required String background,
-  }) => _invoke('setThemeColors', {
+  }) => _invoke('setAppearance', {
+    'colorMode': colorMode,
     'foreground': foreground,
     'background': background,
   });
@@ -471,10 +473,6 @@ abstract class HarmonyChannel {
       'topPhoto': topPhoto,
     });
   }
-
-  /// 将应用内设定的主题颜色传递给原生层，用于原生层的深浅色模式感知
-  static Future<void> setSystemColorMode(String colorMode) =>
-      _invoke('setSystemColorMode', {'colorMode': colorMode});
 
   /// 横屏小窗的缩放比例固定值
   static const _miniWindowLandscapeScale = 0.75;

@@ -818,7 +818,6 @@ void _setThemeType(ThemeType value, VoidCallback setState) {
   } catch (_) {}
   GStorage.setting.put(SettingBoxKey.themeMode, value.index);
   Get.changeThemeMode(ThemeUtils.themeMode = value.toThemeMode);
-  ThemeUtils.syncColorModeToNative();
   setState();
 }
 

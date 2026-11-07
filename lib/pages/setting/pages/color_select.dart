@@ -101,7 +101,6 @@ class _ColorSelectPageState extends State<ColorSelectPage> {
                 ctr.themeType.value = result;
                 GStorage.setting.put(SettingBoxKey.themeMode, result.index);
                 Get.changeThemeMode(ThemeUtils.themeMode = result.toThemeMode);
-                ThemeUtils.syncColorModeToNative();
               }
             },
             leading: const Icon(Icons.flashlight_on_outlined),

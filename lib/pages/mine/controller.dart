@@ -275,7 +275,6 @@ class MineController extends CommonDataController<FavFolderData, FavFolderData>
     themeType.value = newVal;
     GStorage.setting.put(SettingBoxKey.themeMode, newVal.index);
     Get.changeThemeMode(ThemeUtils.themeMode = newVal.toThemeMode);
-    ThemeUtils.syncColorModeToNative();
   }
 
   void push(String name) {

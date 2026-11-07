@@ -23,12 +23,6 @@ import { appAppearance } from "../appearance/AppAppearance";
 import { windowChrome } from "../window/WindowChrome";
 import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
 
-const colorModeMap: Record<string, ConfigurationConstant.ColorMode> = {
-  "light": ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT,
-  "dark": ConfigurationConstant.ColorMode.COLOR_MODE_DARK,
-  "system": ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET,
-};
-
 export default class HarmonyChannel implements FlutterPlugin {
   private channel: MethodChannel | null = null;
   private lastWindow: window.Window | null = null;
@@ -388,11 +382,12 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(true);
         break;
       }
-      case "setThemeColors": {
-        // 前景色 + 背景色成对下发，见 appearance/AppAppearance.ets。不按 SDK 版本拦截。
+      case "setAppearance": {
+        // 深浅色模式 + 前景色 + 背景色一并下发，见 appearance/AppAppearance.ets。
+        const colorMode: string = call.argument('colorMode') ?? '';
         const foreground: string = call.argument('foreground') ?? '';
         const background: string = call.argument('background') ?? '';
-        appAppearance.setColors(foreground, background);
+        appAppearance.setAppearance(colorMode, foreground, background);
         result.success(true);
         break;
       }
@@ -453,12 +448,6 @@ export default class HarmonyChannel implements FlutterPlugin {
         result.success(true);
         break;
       }
-      case "setSystemColorMode": {
-        const colorMode: string = call.argument('colorMode') ?? '';
-        this.setColorMode(colorMode);
-        result.success(true);
-        break;
-      }
       // case 'setWindowLayoutFullScreen': {
       //   this.lastWindow ??= await window.getLastWindow(getContext())
       //   this.lastWindow.setWindowLayoutFullScreen(call.argument('fullScreen'));
@@ -473,17 +462,6 @@ export default class HarmonyChannel implements FlutterPlugin {
       default:
         result.notImplemented();
         break;
-    }
-  }
-
-  // 设置应用上下文的深浅色模式。
-  private setColorMode(colorMode: string): void {
-    try {
-      const context = getContext() as common.ApplicationContext;
-      context.setColorMode(colorModeMap[colorMode]);
-      console.log('HarmonyChannel', `set color mode: ${colorMode}`);
-    } catch (err) {
-      console.error("HarmonyChannel", `get application context failed: ${err}`);
     }
   }
 

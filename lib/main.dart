@@ -260,9 +260,7 @@ void main() async {
       // 查询面板支持的 HDR 类型：一个都不支持时 HDR 片源按 SDR 输出，
       // 不支持 HDR Vivid 时只发 HDR10 静态元数据
       HarmonyChannel.loadDisplayHdrFormats();
-      // 将当前主题颜色模式同步给原生层（Rx 初始值相同不触发监听，需显式同步）
-      ThemeUtils.syncColorModeToNative();
-      // 统一把前景色与背景色下发给原生，并跟随主题 / 系统深浅色变化重发
+      // 统一把深浅色模式与前景/背景色下发给原生，并跟随主题变化重发
       AppearanceSync.attach();
       // 首帧后对账一次系统栏期望：engine 重建 / 热重启后原生侧可能还停在上一
       // 个会话的「已隐藏」，Dart 侧状态已归零，需主动下发一次让两边收敛
