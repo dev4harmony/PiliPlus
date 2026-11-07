@@ -250,6 +250,8 @@ void main() async {
     runApp(const MyApp());
   }
 
+  // 显式设定 Flutter 图片缓存上限（默认 100MB 对 4K 截图偏大）
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 64 << 20; // 64 MB
   ImageMemoryCleaner.instance.register();
 
   if (OS.isHarmony) {

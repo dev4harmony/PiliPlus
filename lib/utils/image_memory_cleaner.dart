@@ -22,6 +22,13 @@ class ImageMemoryCleaner with WidgetsBindingObserver {
     }
   }
 
+  /// 系统内存压力
+  @override
+  void didHaveMemoryPressure() {
+    debugPrint('ImageMemoryCleaner: clear image cache on memoryPressure');
+    clearImageCache();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
