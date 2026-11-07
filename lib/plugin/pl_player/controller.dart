@@ -5,8 +5,8 @@ import 'dart:math' show max, min;
 import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/assets.dart';
-import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -44,8 +44,8 @@ import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/box_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
-import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
+import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/ios/pip_helper.dart';
@@ -2070,7 +2070,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     this.isManualFS = isManualFS;
     try {
       if (status) {
-        if (PlatformUtils.isMobile) {
+        if (PlatformUtils.isMobile && !WindowFacts.isFreeWindowMode) {
           hideSystemBar();
           await changeOrientation(
             isVertical: isVertical,
@@ -2096,7 +2096,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           await enterDesktopFullScreen(inAppFullScreen: inAppFullScreen);
         }
       } else {
-        if (PlatformUtils.isMobile) {
+        if (PlatformUtils.isMobile && !WindowFacts.isFreeWindowMode) {
           if (!removeSafeArea) {
             showSystemBar();
           }
