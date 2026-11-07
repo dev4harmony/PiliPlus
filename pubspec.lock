@@ -1197,8 +1197,8 @@ packages:
     dependency: "direct main"
     description:
       path: media_kit
-      ref: feat-ohos-hdr
-      resolved-ref: e1d14a00ffe861f6b4c51c94e9d0a5e674e2a003
+      ref: feat-simple-video
+      resolved-ref: b76b94bb4dc9f41800c20819eadf753a18d55116
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.2.3"
@@ -1242,18 +1242,18 @@ packages:
     dependency: "direct overridden"
     description:
       path: "libs/ohos/media_kit_libs_ohos"
-      ref: feat-ohos-hdr
-      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
-      url: "https://github.com/p1nbored/media-kit.git"
+      ref: feat-simple-video
+      resolved-ref: b76b94bb4dc9f41800c20819eadf753a18d55116
+      url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.0.0"
   media_kit_libs_video:
     dependency: "direct main"
     description:
       path: "libs/universal/media_kit_libs_video"
-      ref: feat-ohos-hdr
-      resolved-ref: eb1b563ff7c46ba4b048953f73e4616ad2fff3bc
-      url: "https://github.com/p1nbored/media-kit.git"
+      ref: feat-simple-video
+      resolved-ref: b76b94bb4dc9f41800c20819eadf753a18d55116
+      url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.0.7"
   media_kit_libs_windows_video:
@@ -1279,7 +1279,7 @@ packages:
     description:
       path: media_kit_video
       ref: feat-simple-video
-      resolved-ref: "8babdf4f456142fc8027f475838c5006da4656dd"
+      resolved-ref: b76b94bb4dc9f41800c20819eadf753a18d55116
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "2.0.1"

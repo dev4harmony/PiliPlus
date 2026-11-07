@@ -17,7 +17,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 # update when release
-version: 2.1.6+6344
+version: 2.1.6+6347
 
 environment:
   sdk: ">=3.12.2"
@@ -133,8 +133,8 @@ dependencies:
       path: ./media_kit_video
   media_kit_libs_video:
     git:
-      url: https://github.com/p1nbored/media-kit.git
-      ref: feat-ohos-hdr
+      url: https://github.com/HelloZeroNick/media-kit.git
+      ref: feat-simple-video
       path: ./libs/universal/media_kit_libs_video
 
   # 媒体通知
@@ -341,7 +341,7 @@ dependency_overrides:
   media_kit:
     git:
       url: https://github.com/HelloZeroNick/media-kit.git
-      ref: feat-ohos-hdr
+      ref: feat-simple-video
       path: ./media_kit
   media_kit_libs_linux:
     git:
@@ -360,8 +360,8 @@ dependency_overrides:
       path: ./libs/macos/media_kit_libs_macos_video
   media_kit_libs_ohos:
     git:
-      url: https://github.com/p1nbored/media-kit.git
-      ref: feat-ohos-hdr
+      url: https://github.com/HelloZeroNick/media-kit.git
+      ref: feat-simple-video
       path: ./libs/ohos/media_kit_libs_ohos
   # media_kit_libs_android_video:
   #   git:
