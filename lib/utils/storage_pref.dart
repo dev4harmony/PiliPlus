@@ -821,7 +821,7 @@ abstract final class Pref {
   /// 匹配视频亮度：HDR 输出保持片源自身的峰值亮度，由系统按元数据适配屏幕；
   /// 关闭时比 [hdrPeakNits] 亮的片源按它色调映射，更暗的保持原亮度
   static bool get hdrMatchVideoPeak =>
-      _setting.get(SettingBoxKey.hdrMatchVideoPeak, defaultValue: true);
+      _setting.get(SettingBoxKey.hdrMatchVideoPeak, defaultValue: false);
 
   static Set<int> get danmakuBlockType => Set<int>.from(
     _setting.get(SettingBoxKey.danmakuBlockType, defaultValue: const <int>{}),
