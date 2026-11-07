@@ -1989,7 +1989,7 @@ class HeaderControlState extends State<HeaderControl>
                       tooltip: '画中画',
                       style: btnStyle,
                       onPressed: () async {
-                        if (PlatformUtils.isDesktop) {
+                        if (PlatformUtils.isDesktop && !OS.isHarmony) {
                           plPlayerController.toggleDesktopPip();
                           return;
                         }
