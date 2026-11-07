@@ -55,8 +55,6 @@ export class WindowChromeController {
   /// 装饰栏下发重试计数。形态切换（自由窗口 ↔ 全屏/最大化）瞬间系统可能
   /// 尚未就绪，setWindowTitleButtonVisible 会以 801 拒绝，稍后重试即可。
   private decorRetryTimer: number = -1;
-  /// 标题带是否为深色内容，见 [setTitleBarDark]。
-  private titleBarDark: boolean = false;
   /// 系统栏是否已隐藏（Dart 侧 `SystemBars` 同步下来的状态）：标题带收起，见 [setBarsHidden]。
   private barsHidden: boolean = false;
 
@@ -206,7 +204,6 @@ export class WindowChromeController {
     AppStorage.setOrCreate('titleBarHeight', state.titleBarHeight);
     AppStorage.setOrCreate('windowMaximized', state.maximized);
     AppStorage.setOrCreate('windowFreeMode', state.isFreeWindowMode);
-    AppStorage.setOrCreate('titleBarDark', this.titleBarDark);
     this.listeners.forEach((listener: WindowChromeListener) => {
       listener(state);
     });
@@ -318,18 +315,6 @@ export class WindowChromeController {
     }
   }
 
-  /// 标题带是否为深色内容。自绘标题带已改为固定底色 + ColoringStrategy.INVERT
-  /// 自动反色取色，不再需要外部按内容底色切换主题，此方法仅保留为兼容
-  /// Dart 侧既有的 setDecorButtonDark 通道（同时把状态写入 AppStorage）。
-  setTitleBarDark(dark: boolean): void {
-    if (this.titleBarDark === dark) {
-      return;
-    }
-    this.titleBarDark = dark;
-    // 直接写 AppStorage 而不能依赖 sync()：sync 按签名去重，此变化不在签名里。
-    AppStorage.setOrCreate('titleBarDark', dark);
-  }
-
   /// 系统栏显隐（Dart 侧 `SystemBars` 同步下来的状态）：隐藏时标题带**收起**。
   ///
   /// 这里只写 AppStorage `titleBarCollapsed`，交给 UI 做图形位移；**不**改
@@ -342,7 +327,7 @@ export class WindowChromeController {
       return;
     }
     this.barsHidden = hidden;
-    // 同 setTitleBarDark：此变化不在 sync() 的签名里，必须直接写 AppStorage。
+    // 此变化不在 sync() 的签名里，必须直接写 AppStorage。
     AppStorage.setOrCreate('titleBarCollapsed', hidden);
   }
 

@@ -6,7 +6,6 @@ import { fileIo } from "@kit.CoreFileKit";
 import { formProvider } from "@kit.FormKit";
 import AbilityConstant from "@ohos.app.ability.AbilityConstant";
 import Want from "@ohos.app.ability.Want";
-import ConfigurationConstant from "@ohos.app.ability.ConfigurationConstant";
 import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
 import window from "@ohos.window";
 import {
@@ -203,12 +202,6 @@ export default class HarmonyChannel implements FlutterPlugin {
         await this.setMiniWindowLandscape(landscape);
         result.success(true);
         break;
-      case "setDecorButtonDark": {
-        const dark: boolean = call.argument("dark") ?? false;
-        await this.setDecorButtonDark(dark);
-        result.success(true);
-        break;
-      }
       case "getWindowState": {
         // 启动时供 Dart 拉取窗口初始状态：是否自由多窗（FLOATING）、是否受限
         // 窗口模式（分屏/自由多窗）。见 Dart 侧 HarmonyChannel.initWindowState。
@@ -752,25 +745,5 @@ export default class HarmonyChannel implements FlutterPlugin {
       return false;
     }
     return windowState.setDecorVisible(visible);
-  }
-
-  /**
-   * 自由多窗装饰栏按钮颜色：dark=true 时按深色模式渲染（浅色按钮，适配
-   * 深色内容顶部），false 恢复跟随系统颜色模式。仅装饰栏可见（自由窗口）
-   * 时有视觉效果，其余窗口形态下为无害空操作。
-   */
-  private async setDecorButtonDark(dark: boolean) {
-    // 自绘标题带跟随同一信号（AppStorage titleBarDark），系统装饰栏仍按原样设置。
-    windowChrome.setTitleBarDark(dark);
-    this.lastWindow ??= await window.getLastWindow(getContext());
-    try {
-      this.lastWindow.setDecorButtonStyle({
-        colorMode: dark
-          ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK
-          : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET,
-      });
-    } catch (err) {
-      console.error("HarmonyChannel", `setDecorButtonStyle failed: ${err}`);
-    }
   }
 }
