@@ -1,4 +1,4 @@
-import 'package:PiliPlus/harmony/window/window_facts.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 
 /// 鸿蒙窗口形态 → Flutter 侧表现的桥接层。

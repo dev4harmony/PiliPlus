@@ -1,7 +1,7 @@
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
-import 'package:PiliPlus/harmony/window/window_facts.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
 import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -567,7 +567,7 @@ abstract class HarmonyChannel {
 
   /// 依据 [WindowFacts] 重算「横屏小窗」缩放与 enableLandscapeMultiWindow。
   ///
-  /// 窗口事实变化后由 lib/harmony/window/window_bridge.dart 调用；缩放始终只
+  /// 窗口事实变化后由 lib/harmony_adapt/window/window_bridge.dart 调用；缩放始终只
   /// 在这一处落地，避免出现两个各自维护 scaleFactor 的入口。
   static void syncMiniWindowLandscape() => _applyMiniWindowLandscape();
 
@@ -608,7 +608,7 @@ abstract class HarmonyChannel {
     _syncWindowDecor();
   }
 
-  /// 拉取一次原生窗口快照并应用。启动时由 lib/harmony/window/window_bridge.dart
+  /// 拉取一次原生窗口快照并应用。启动时由 lib/harmony_adapt/window/window_bridge.dart
   /// 调用；原生侧尚无 getWindowSnapshot 的旧版本返回 null，此时保留旧状态。
   static Future<void> refreshWindowSnapshot() async {
     final snapshot = await getWindowSnapshot();

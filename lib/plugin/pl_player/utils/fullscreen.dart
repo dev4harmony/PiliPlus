@@ -1,8 +1,8 @@
 import 'dart:io' show Platform;
 
-import 'package:PiliPlus/harmony/window/content_fullscreen.dart';
-import 'package:PiliPlus/harmony/window/system_bars.dart';
-import 'package:PiliPlus/harmony/window/window_facts.dart';
+import 'package:PiliPlus/harmony_adapt/window/content_fullscreen.dart';
+import 'package:PiliPlus/harmony_adapt/window/system_bars.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:flutter/services.dart'

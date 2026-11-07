@@ -5,7 +5,7 @@ import 'dart:math' show max, min;
 import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/assets.dart';
-import 'package:PiliPlus/harmony/window/window_facts.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';

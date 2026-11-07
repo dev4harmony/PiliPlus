@@ -21,7 +21,7 @@ import 'package:PiliPlus/common/widgets/simple_app_bar.dart';
 import 'package:PiliPlus/common/widgets/sliver/video_header.dart';
 import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart';
-import 'package:PiliPlus/harmony/window/window_facts.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
