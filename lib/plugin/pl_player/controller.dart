@@ -1,4 +1,4 @@
-import 'dart:async' show StreamSubscription, Timer, unawaited;
+import 'dart:async' show StreamSubscription, Timer, TimeoutException, unawaited;
 import 'dart:convert' show ascii;
 import 'dart:io' show Platform;
 import 'dart:math' show max, min;
@@ -2361,7 +2361,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (pending != null) {
       try {
         await pending.timeout(const Duration(seconds: 3));
-      } catch (_) {}
+      } on TimeoutException {
+        debugPrint(
+          '[PlPlayer] dispose: pending task still running after 3s, forcing teardown',
+        );
+      }
     }
     await _disposePlayerSafely(_videoPlayerController);
     _videoPlayerController = null;
