@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/image/route_cover_gate.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
@@ -71,7 +72,7 @@ class NetworkImgLayer extends StatelessWidget {
       memCacheHeight = height.cacheSize(context);
     }
 
-    return CachedNetworkImage(
+    final image = CachedNetworkImage(
       gaplessPlayback: true,
       imageUrl: (isEmote)
           ? ImageUtils.thumbnailUrl(src, quality)
@@ -97,6 +98,16 @@ class NetworkImgLayer extends StatelessWidget {
           _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
       colorBlendMode: reduce ? BlendMode.modulate : null,
       color: reduce ? reduceLuxColor : null,
+    );
+    
+    if (isEmote || isAvatar) {
+      return image;
+    }
+    // 鸿蒙下优化内存：被顶层路由覆盖时释放解码后的图片，见 [RouteCoverGate]
+    return RouteCoverGate(
+      placeholder: getPlaceHolder?.call() ??
+          _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
+      child: image,
     );
   }
 
