@@ -5,7 +5,7 @@
 import 'package:PiliPlus/common/widgets/flutter/page/scrollable.dart';
 import 'package:flutter/gestures.dart'
     show DragStartBehavior, HorizontalDragGestureRecognizer;
-import 'package:flutter/material.dart'
+import 'package:material_ui/material_ui.dart'
     hide PageView, Scrollable, ScrollableState;
 import 'package:flutter/rendering.dart';
 

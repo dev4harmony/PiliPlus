@@ -10,6 +10,29 @@
 library;
 
 export 'package:flutter/material.dart'
-    hide TranslateAnimationSource, SelectionArea, SelectionAreaState;
+    hide
+        TranslateAnimationSource,
+        SelectionArea,
+        SelectionAreaState,
+        // 这三个类改由 src/selection_widgets.dart 提供同名实现，构造签名与 SDK
+        // 一致但不改 SDK 就让鸿蒙用上「杆 + 球」手柄。
+        SelectableText,
+        TextField,
+        TextFormField;
 
 export 'src/selection_area.dart';
+
+// 越界拖拽的兜底（把选区边夹回手指所在那一行），供测试与调试单独引用。
+export 'src/selection_edge_clamp.dart';
+
+// 选中菜单的分享/打开/站内搜索按钮，以及鸿蒙「杆 + 球」手柄；app 侧启动时用
+// `SelectionMenuConfig` 注入实际动作（见 lib/utils/selection_menu_wiring.dart）。
+export 'src/selection_menu.dart';
+export 'src/selection_handle.dart';
+
+// 平台判断（用 toString() 比较，兼容没有 TargetPlatform.ohos 的官方 SDK）。
+export 'src/selection_platform.dart';
+
+// SelectableText / TextField / TextFormField 的同名包装：把鸿蒙「杆 + 球」手柄与
+// 自定义菜单作为默认值注入（详见该文件顶部说明）。
+export 'src/selection_widgets.dart';

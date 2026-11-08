@@ -22,7 +22,7 @@ import 'package:PiliPlus/common/widgets/flutter/text_field/spell_check.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/spell_check_suggestions_toolbar.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/system_context_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/text_selection.dart';
-import 'package:flutter/cupertino.dart'
+import 'package:cupertino_ui/cupertino_ui.dart'
     hide
         EditableText,
         EditableTextState,
@@ -36,7 +36,7 @@ import 'package:flutter/cupertino.dart'
         TextSelectionGestureDetectorBuilderDelegate;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart'
+import 'package:material_ui/material_ui.dart'
     hide
         EditableText,
         EditableTextState,
@@ -1849,7 +1849,10 @@ class RichTextFieldState extends State<RichTextField>
       case TargetPlatform.fuchsia:
       default:
         forcePressEnabled = false;
-        textSelectionControls ??= materialTextSelectionHandleControls;
+        // 鸿蒙用「杆 + 球」手柄（shim 的 material_ui 提供），其它平台保持 SDK 默认。
+        textSelectionControls ??= isOhosPlatform
+            ? ohosTextSelectionHandleControls
+            : materialTextSelectionHandleControls;
         paintCursorAboveText = false;
         cursorOpacityAnimates ??= false;
         cursorColor = _hasError

@@ -5,7 +5,7 @@ Widget dynTextMenuBuilder(
   String text,
   ModuleDynamicModel? moduleDynamic,
 ) {
-  final buttonItems = ensureExtraButtons(
+  final buttonItems = ensureSelectionMenuButtons(
     state.contextMenuButtonItems,
     selectedTextOf: () {
       final value = state.textEditingValue;

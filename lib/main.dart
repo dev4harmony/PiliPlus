@@ -34,6 +34,7 @@ import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
+import 'package:PiliPlus/utils/selection_menu_wiring.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -162,6 +163,9 @@ void main() async {
   Request();
   Request.setCookie();
   RequestUtils.syncHistoryStatus();
+
+  // 选区菜单（分享/打开/站内搜索）的动作注入；必须早于任何页面渲染。
+  configureSelectionMenu();
 
   SmartDialog.config.toast = SmartConfigToast(displayType: .onlyRefresh);
 

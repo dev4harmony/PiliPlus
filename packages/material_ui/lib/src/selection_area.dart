@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart' as flutter;
-import 'package:flutter/rendering.dart' show RenderBox, SelectedContent;
+import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/widgets.dart';
+import 'package:material_ui/src/selection_edge_clamp.dart';
+import 'package:material_ui/src/selection_handle.dart';
+import 'package:material_ui/src/selection_menu.dart';
+import 'package:material_ui/src/selection_platform.dart';
 
 /// 空断言兜底的 [SelectionArea]：行为与 SDK 版本一致，只替换默认的上下文菜单构造器。
 ///
@@ -20,7 +24,11 @@ import 'package:flutter/widgets.dart';
 ///
 /// 这里不碰 SDK、也不改业务调用点：`SelectableRegionState.selectionEndpoints` 内部
 /// 已自带兜底，`SelectionOverlay.lineHeightAtStart/End` 也是同一个 `??` 兜底值，
-/// 用它们重建与 `contextMenuAnchors` 等价的锚点即可。
+/// 用它们重建与 `contextMenuAnchors` 等价的锚点即可（见
+/// `src/selection_menu.dart` 的 `nullSafeContextMenuAnchors`）。
+///
+/// 菜单项本身也换成了本包自己的实现：鸿蒙上 framework 不给分享项、且它走
+/// `Share.invoke` 通道（引擎没有），改由 app 注入的 [SelectionMenuConfig] 提供。
 ///
 /// 注意：如果哪天把本包退回成纯 `export 'package:flutter/material.dart'`，这个兜底
 /// 就没了，长文阅读页会重新 `Null check operator used on a null value`。
@@ -58,62 +66,25 @@ class SelectionArea extends StatelessWidget {
   Widget build(BuildContext context) {
     return flutter.SelectionArea(
       focusNode: focusNode,
-      selectionControls: selectionControls,
+      // 鸿蒙用「杆 + 球」手柄（见 src/selection_handle.dart）；其它平台保持
+      // SDK 按平台自选的结果，不传就用 SDK 的默认值。
+      selectionControls: selectionControls ??
+          (isOhosPlatform ? ohosTextSelectionHandleControls : null),
       contextMenuBuilder: contextMenuBuilder ?? _nullSafeContextMenuBuilder,
       magnifierConfiguration: magnifierConfiguration,
       onSelectionChanged: onSelectionChanged,
-      child: child,
+      // 手柄拖出文字左右边界时，SDK 会把端点吸附到整段的首/尾（见
+      // selection_edge_clamp.dart 的说明）。这层容器在事件下发到叶子前把坐标夹回
+      // 手指所在那一行，让“整段被选中”变回“选到手指那一行”。
+      child: EdgeClampingSelectionScope(child: child),
     );
   }
 }
 
-/// 与 `SelectionArea._defaultContextMenuBuilder` 等价，但锚点不再走会崩的
-/// `SelectableRegionState.contextMenuAnchors`。
+/// 默认菜单：本包自己的实现（null 安全锚点 + 分享/打开/站内搜索按钮）。
 Widget _nullSafeContextMenuBuilder(
   BuildContext context,
   SelectableRegionState selectableRegionState,
 ) {
-  return flutter.AdaptiveTextSelectionToolbar.buttonItems(
-    // 菜单项与 SDK 默认完全一致（复制/全选等），只是换了锚点来源。
-    buttonItems: selectableRegionState.contextMenuButtonItems,
-    anchors: _contextMenuAnchors(selectableRegionState),
-  );
-}
-
-/// `SelectableRegionState.contextMenuAnchors` 的 null 安全版本。
-///
-/// 差异只有一处：右击（secondary tap）时 SDK 用落点定位菜单，而那个落点是私有
-/// 字段、应用层拿不到，这里统一按选区几何定位。长按选择的场景与 SDK 完全一致。
-TextSelectionToolbarAnchors _contextMenuAnchors(
-  SelectableRegionState selectableRegionState,
-) {
-  final RenderObject? renderObject =
-      selectableRegionState.context.findRenderObject();
-  if (renderObject is! RenderBox || !renderObject.hasSize) {
-    return const TextSelectionToolbarAnchors(primaryAnchor: Offset.zero);
-  }
-
-  // `selectionOverlay` 标了 @visibleForTesting，但它是 read-only 的公开 getter，
-  // 且是两个行高唯一的应用层入口（那两行高本身就是 SDK 里的 `??` 兜底结果）。
-  // ignore: invalid_use_of_visible_for_testing_member
-  final SelectionOverlay? overlay = selectableRegionState.selectionOverlay;
-  final List<TextSelectionPoint> selectionEndpoints;
-  try {
-    selectionEndpoints = selectableRegionState.selectionEndpoints;
-  } on Object {
-    // 首尾端点同时为 null（整段选区都在视口外）。SDK 在这一步也会崩，
-    // 没有可参照的位置，退化成选区区域左上角。
-    return TextSelectionToolbarAnchors(
-      primaryAnchor: renderObject.localToGlobal(Offset.zero),
-    );
-  }
-
-  // 两个行高在 SelectionOverlay 里始终是 `start?.lineHeight ?? end!.lineHeight`
-  // 的结果，不会为空；overlay 尚未挂上时给 0，退化为按基线定位。
-  return TextSelectionToolbarAnchors.fromSelection(
-    renderBox: renderObject,
-    startGlyphHeight: overlay?.lineHeightAtStart ?? 0,
-    endGlyphHeight: overlay?.lineHeightAtEnd ?? 0,
-    selectionEndpoints: selectionEndpoints,
-  );
+  return buildSelectionContextMenu(context, selectableRegionState);
 }

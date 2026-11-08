@@ -4,7 +4,17 @@ Widget scMenuBuilder(
   BuildContext context,
   EditableTextState editableTextState,
 ) {
-  final buttonItems = editableTextState.contextMenuButtonItems;
+  final buttonItems = ensureSelectionMenuButtons(
+    editableTextState.contextMenuButtonItems,
+    selectedTextOf: () =>
+        editableTextState.textEditingValue.selection.isValid &&
+            !editableTextState.textEditingValue.selection.isCollapsed
+        ? editableTextState.textEditingValue.selection.textInside(
+            editableTextState.textEditingValue.text,
+          )
+        : null,
+    hideToolbar: editableTextState.hideToolbar,
+  );
   final selection = editableTextState.textEditingValue.selection;
   final String? text = selection.isValid && !selection.isCollapsed
       ? selection.textInside(editableTextState.textEditingValue.text)

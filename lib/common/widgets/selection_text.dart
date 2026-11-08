@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/widgets/text_selection_toolbar.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 可选择文本的统一封装。
@@ -41,7 +40,10 @@ class SelectionText extends StatelessWidget {
       ),
       style: style,
       textAlign: textAlign,
-      contextMenuBuilder: contextMenuBuilder ?? selectableTextContextMenuBuilder,
+      // 分享/打开/站内搜索等按钮由 shim 统一加工（见 material_ui 的 selection_menu.dart），
+      // 鸿蒙上 framework 自带的分享项走 Share.invoke 通道、点了没反应，所以自己插。
+      contextMenuBuilder:
+          contextMenuBuilder ?? buildEditableTextSelectionMenu,
     );
   }
 }

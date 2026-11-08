@@ -6,7 +6,7 @@ import 'dart:ui' show SemanticsRole;
 
 import 'package:flutter/foundation.dart' show clampDouble;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:flutter/material.dart' hide TabBarView;
+import 'package:material_ui/material_ui.dart' hide TabBarView;
 
 /// A page view that displays the widget which corresponds to the currently
 /// selected tab.

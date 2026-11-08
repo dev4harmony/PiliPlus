@@ -1,6 +1,6 @@
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/pages/setting/models/experimental_settings.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ExperimentalPage extends StatefulWidget {
   const ExperimentalPage({super.key, this.showAppBar = true});

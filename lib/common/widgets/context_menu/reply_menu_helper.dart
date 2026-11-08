@@ -45,7 +45,7 @@ void showReplyCopyDialog(
               return selection.textInside(value.text);
             }
 
-            final items = ensureExtraButtons(
+            final items = ensureSelectionMenuButtons(
               state.contextMenuButtonItems,
               selectedTextOf: selectedText,
               hideToolbar: state.hideToolbar,

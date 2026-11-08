@@ -1,7 +1,7 @@
 import 'package:PiliPlus/common/widgets/image_viewer/hero_dialog_route.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 监听全局路由变化，自动控制 ArkTS HDS 底栏的显隐。
 /// 路由栈深度 > 1 时（有页面覆盖在主页之上）隐藏底栏，回到栈底时恢复。

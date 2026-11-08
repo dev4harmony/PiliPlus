@@ -10,7 +10,7 @@ import 'dart:math' as math;
 import 'package:PiliPlus/common/widgets/flutter/page/scrollable_helpers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart'
+import 'package:material_ui/material_ui.dart'
     hide Scrollable, ScrollableState, EdgeDraggingAutoScroller;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
