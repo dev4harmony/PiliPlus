@@ -7,7 +7,7 @@ import 'dart:async' show Completer;
 import 'package:PiliPlus/common/widgets/refresh_layout.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
-    show ArkuiScrollPhysics, BouncingScrollPhysicsExt, ClampingBoundaryMixin;
+    show BouncingScrollPhysicsExt, ClampingBoundaryMixin;
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:extended_nested_scroll_view/refresh.dart';
@@ -673,8 +673,9 @@ class RefreshScrollPhysicsIOS extends BouncingScrollPhysicsExt
   }
 }
 
-/// 鸿蒙上的刷新嵌套列表：惯性与回弹都走 ArkUI（[ArkuiScrollPhysics]），
-/// 下拉拦截仍由 [RefreshScrollPhysicsMixin] 负责。
+/// 鸿蒙上的刷新嵌套列表：惯性与回弹都走 ArkUI（[ArkuiScrollPhysics]，实现在
+/// `packages/material_ui/lib/src/arkui_scroll_physics.dart`），下拉拦截仍由
+/// [RefreshScrollPhysicsMixin] 负责。
 ///
 /// 这类列表是被嵌在外层滚动容器里的（`isClampingScrollPhysics`），所以边界
 /// 沿用原来的贴边行为（`ClampingBoundaryMixin` + `bounce: false`），只换手感
