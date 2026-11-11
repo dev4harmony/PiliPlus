@@ -926,9 +926,44 @@ class RichTextField extends StatefulWidget {
         editableTextState: editableTextState,
       );
     }
-    return AdaptiveTextSelectionToolbar.editableText(
-      editableTextState: editableTextState,
+    final List<ContextMenuButtonItem> buttonItems =
+        editableTextState.contextMenuButtonItems;
+    // [PiliPlus] 鸿蒙：换成原生样式的工具栏（发布动态/发布评论的输入框走这里）。
+    // 这套 `EditableTextState` / `RenderEditable` 都是仓库里的改造副本、与 SDK 不同型，
+    // 所以用 shim 里「渲染盒 + 端点」的低层入口；拿不到几何时退回 Material。
+    final Widget? ohosMenu = _buildOhosMenu(editableTextState, buttonItems);
+    if (ohosMenu != null) {
+      return ohosMenu;
+    }
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      buttonItems: buttonItems,
+      anchors: editableTextState.contextMenuAnchors,
     );
+  }
+
+  // [PiliPlus] 见 [_defaultContextMenuBuilder]。
+  static Widget? _buildOhosMenu(
+    EditableTextState editableTextState,
+    List<ContextMenuButtonItem> buttonItems,
+  ) {
+    final TextSelection selection = editableTextState.textEditingValue.selection;
+    if (!selection.isValid) {
+      return null;
+    }
+    try {
+      // 这里是仓库副本的 RenderEditable（与 SDK 的那个不同型），所以不写类型注解，
+      // 让推断拿到副本的类，再用 `RenderBox` 形参接过去。
+      final renderEditable = editableTextState.renderEditable;
+      return buildOhosTextSelectionToolbar(
+        renderBox: renderEditable,
+        endpoints: renderEditable.getEndpointsForSelection(selection),
+        lineHeight: renderEditable.preferredLineHeight,
+        buttonItems: buttonItems,
+      );
+    } on Object {
+      // 首帧还没 layout（`renderEditable` 是 late final）。
+      return null;
+    }
   }
 
   /// {@macro flutter.widgets.EditableText.spellCheckConfiguration}

@@ -108,10 +108,9 @@ void showReplyCopyDialog(
                 ),
               );
             }
-            return AdaptiveTextSelectionToolbar.buttonItems(
-              buttonItems: items,
-              anchors: state.contextMenuAnchors,
-            );
+            // 鸿蒙上用原生样式的工具栏（项多时会折行，不会裁边）；
+            // 其它平台仍是 Material 菜单。动态/直播那两处保持上游不变。
+            return buildEditableTextSelectionMenuWithItems(state, items);
             },
           ),
         ),

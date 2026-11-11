@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/widgets.dart';
 import 'package:material_ui/src/selection_edge_clamp.dart';
 import 'package:material_ui/src/selection_handle.dart';
+import 'package:material_ui/src/selection_magnifier.dart';
 import 'package:material_ui/src/selection_menu.dart';
 import 'package:material_ui/src/selection_platform.dart';
 
@@ -71,7 +72,11 @@ class SelectionArea extends StatelessWidget {
       selectionControls: selectionControls ??
           (isOhosPlatform ? ohosTextSelectionHandleControls : null),
       contextMenuBuilder: contextMenuBuilder ?? _nullSafeContextMenuBuilder,
-      magnifierConfiguration: magnifierConfiguration,
+      // 鸿蒙用 112×72 的胶囊镜片（见 src/selection_magnifier.dart）；不传时 SDK 会回落到
+      // Material 的 77×38。其它平台保持 null，让 SDK 自己按平台挑。
+      magnifierConfiguration:
+          magnifierConfiguration ??
+          (isOhosPlatform ? ohosTextMagnifierConfiguration : null),
       onSelectionChanged: onSelectionChanged,
       // 手柄拖出文字左右边界时，SDK 会把端点吸附到整段的首/尾（见
       // selection_edge_clamp.dart 的说明）。这层容器在事件下发到叶子前把坐标夹回

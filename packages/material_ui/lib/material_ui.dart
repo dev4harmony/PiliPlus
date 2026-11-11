@@ -30,6 +30,16 @@ export 'src/selection_edge_clamp.dart';
 export 'src/selection_menu.dart';
 export 'src/selection_handle.dart';
 
+// 鸿蒙文本选择体系的真实主题值（手柄/光标/选中高亮/工具栏/放大镜），
+// 取自 openharmony/global_system_resources 的主题 json，来源见文件头注释。
+export 'src/ohos_selection_theme.dart';
+
+// 鸿蒙样式放大镜（112×72 胶囊、1.4 倍）与工具栏（40vp 胶囊 + 原生对齐规则）。
+// 放大镜需要 app 启动时调一次 `installOhosTextMagnifier()` 才覆盖
+// SelectableText / TextField 的默认配置。
+export 'src/selection_magnifier.dart';
+export 'src/selection_toolbar.dart';
+
 // 平台判断（用 toString() 比较，兼容没有 TargetPlatform.ohos 的官方 SDK）。
 export 'src/selection_platform.dart';
 
