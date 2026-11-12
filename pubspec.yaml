@@ -17,7 +17,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 # update when release
-version: 2.1.6+6359
+version: 2.1.6+6365
 
 environment:
   sdk: ">=3.12.2"
@@ -310,12 +310,16 @@ dependency_overrides:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
       path: "flutter_inappwebview"
-      ref: "b596ae059e388cbc8f710a6c26c5370a0527a03a"
+      # br_v6.1.5_ohos_dev 最新（含 PR #325「inappwebview 接入hcpp」）
+      ref: "eb931a01a060f80bad6175d8238300f7b855ea7e"
   flutter_inappwebview_platform_interface:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_inappwebview.git"
       path: "flutter_inappwebview_platform_interface"
       ref: "br_v6.1.5_ohos_dev"
+  # 新版 flutter_inappwebview 的 pubspec 把 windows 实现也指到了 git；
+  # 本项目不构建 windows，压回 hosted 版本即可解开版本约束。
+  flutter_inappwebview_windows: ^0.6.0
   video_player: # 视频播放器.鸿蒙适配
     git:
       url: https://gitcode.com/openharmony-tpc/flutter_packages.git
