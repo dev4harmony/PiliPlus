@@ -20,8 +20,17 @@ export interface WindowChromeState {
   status: window.WindowStatusType;
   maximized: boolean;
   contentFullScreen: boolean;
+  /// 标题带是否需要渲染。自由窗口形态下恒为 true（全屏时要靠它留出顶部热区），
+  /// 非自由窗口（手机等）为 false。
   titleBarVisible: boolean;
-  /// 标题带占用的顶部高度（vp），0 表示不占位。
+  /// 标题带自动收起：「内容全屏」且窗口占满显示器（最大化/全屏）时为 true。
+  /// 此时标题带默认滑出窗口，只保留顶部热区，鼠标悬停时再临时放下。
+  /// 窗口一旦被还原成浮动窗口，或没有全屏播放，标题带都保持常驻。
+  titleBarAutoHide: boolean;
+  /// 标题带当前是否被鼠标唤出（仅自动收起态有意义）。唤出期间会把标题带高度
+  /// 并进顶部安全区，让播放器顶部那排按钮整体下移避让。
+  titleBarRevealed: boolean;
+  /// 标题带占用的顶部高度（vp），0 表示不占位（不渲染或自动收起时）。
   titleBarHeight: number;
 }
 
@@ -57,6 +66,11 @@ export class WindowChromeController {
   private decorRetryTimer: number = -1;
   /// 系统栏是否已隐藏（Dart 侧 `SystemBars` 同步下来的状态）：标题带收起，见 [setBarsHidden]。
   private barsHidden: boolean = false;
+  /// 已下发给 AppStorage 的 `titleBarCollapsed`（系统栏隐藏 与 全屏自动收起 的合并值）。
+  /// null = 尚未下发过，下次 sync 强制写一次，避免热重启后停在旧状态。
+  private lastCollapsed: boolean | null = null;
+  /// 标题带当前是否被鼠标唤出（仅自动收起态有意义，见 [setTitleBarRevealed]）。
+  private titleBarRevealed: boolean = false;
 
   /// 系统栏状态机：窗口级状态在 [SystemBarsController]，本类只按它的 apply 结果
   /// 收起自绘标题带（`barsHidden`）。由 WindowState 注入，本类不拥有它。
@@ -143,6 +157,12 @@ export class WindowChromeController {
     this.decorRetryTimer = -1;
     this.decorAppliedForFree = null;
     this.lastSignature = '';
+    // 引擎 detach（热重启 / 插件卸载）后 Dart 侧的播放器状态已不存在，内容全屏
+    // 必须复位，否则标题带永远停在自动收起、还原键也被藏掉。折叠状态一并置空，
+    // 让下一次 sync 强制重写 AppStorage（避免新引擎继承上一次的折叠值）。
+    this.contentFullScreen = false;
+    this.lastCollapsed = null;
+    this.titleBarRevealed = false;
   }
 
   /// 注入窗口级系统栏状态机（WindowState 持有）。本类只消费它的 apply 结果
@@ -166,17 +186,26 @@ export class WindowChromeController {
 
   getState(): WindowChromeState {
     const status = this.readStatus();
-    const isFree = this.readFreeWindowMode();
-    // 内容全屏与 FULL_SCREEN 下都不画标题带：前者是应用主动隐藏，后者是窗口铺满全屏。
-    // 是否最大化只影响三键图标形态，不影响标题带显隐——最大化后仍然自绘。
-    const visible = isFree && !this.contentFullScreen && status !== window.WindowStatusType.FULL_SCREEN;
+    // 内容全屏期间个别版本在沉浸式全屏下不再上报自由窗口形态，这里兜一层：
+    // 标题带必须继续存在，否则顶部热区没了，悬停也就唤不出标题带。
+    const isFree = this.readFreeWindowMode() || this.contentFullScreen;
+    // 自动收起要同时满足：内容全屏（播放器全屏）且窗口确实占满显示器。
+    // 只要窗口被还原成浮动窗口（不管是点还原键、双击标题带还是系统操作），
+    // 标题带就恢复常驻；单纯最大化窗口（没有全屏播放）也不会自动收起。
+    const autoHide =
+      isFree && this.contentFullScreen && this.isMaximizedStatus(status);
+    // 自由窗口形态下始终渲染（自动收起时它只剩热区职责）；非自由窗口（手机）
+    // 不渲染，也就没有热区，手机上的行为与改动前完全一致。
+    const visible = isFree;
     return {
       isFreeWindowMode: isFree,
       status: status,
       maximized: this.isMaximizedStatus(status),
       contentFullScreen: this.contentFullScreen,
       titleBarVisible: visible,
-      titleBarHeight: visible ? TITLE_BAR_HEIGHT : 0,
+      titleBarAutoHide: autoHide,
+      titleBarRevealed: autoHide && this.titleBarRevealed,
+      titleBarHeight: visible && !autoHide ? TITLE_BAR_HEIGHT : 0,
     };
   }
 
@@ -195,7 +224,11 @@ export class WindowChromeController {
     }
     const state = this.getState();
     this.applyDecor(state.isFreeWindowMode);
-    const signature = `${state.isFreeWindowMode}|${state.status}|${state.titleBarVisible}|${state.contentFullScreen}`;
+    // 折叠状态要先算：它由「系统栏隐藏」与「全屏自动收起」共同决定，且要在
+    // 下面的去重之前落地（签名不变时也可能只翻转了其中一项）。
+    this.applyCollapsed(state.titleBarAutoHide);
+    const signature = `${state.isFreeWindowMode}|${state.status}|${state.titleBarVisible}|` +
+      `${state.titleBarAutoHide}|${state.titleBarRevealed}|${state.contentFullScreen}`;
     if (signature === this.lastSignature) {
       return;
     }
@@ -204,9 +237,38 @@ export class WindowChromeController {
     AppStorage.setOrCreate('titleBarHeight', state.titleBarHeight);
     AppStorage.setOrCreate('windowMaximized', state.maximized);
     AppStorage.setOrCreate('windowFreeMode', state.isFreeWindowMode);
+    // 标题带据此区分「全屏自动收起」与「系统栏隐藏的图形收起」：前者只响应
+    // 鼠标悬停，不响应触屏点击（见 WindowTitleBar）。
+    AppStorage.setOrCreate('titleBarAutoHide', state.titleBarAutoHide);
     this.listeners.forEach((listener: WindowChromeListener) => {
       listener(state);
     });
+  }
+
+  /// 自绘标题带被鼠标唤出 / 收回（由 WindowTitleBar 上报）。
+  ///
+  /// 仅自动收起态有意义。唤出期间 [getState] 会把它并进顶部安全区（见
+  /// WindowState.readSafeArea），让播放器顶部那排按钮整体下移，避免被标题带
+  /// 盖住点不到；收回后恢复原位。
+  setTitleBarRevealed(revealed: boolean): void {
+    if (this.titleBarRevealed === revealed) {
+      return;
+    }
+    this.titleBarRevealed = revealed;
+    this.sync();
+  }
+
+  /// 下发标题带折叠状态：系统栏隐藏（沉浸页面）或窗口占满显示器（自动收起）。
+  ///
+  /// 两个来源合并成一个 AppStorage 值，[WindowTitleBar] 只认这一个，避免两处
+  /// 各写各的互相覆盖。
+  private applyCollapsed(autoHide: boolean): void {
+    const collapsed = this.barsHidden || autoHide;
+    if (this.lastCollapsed === collapsed) {
+      return;
+    }
+    this.lastCollapsed = collapsed;
+    AppStorage.setOrCreate('titleBarCollapsed', collapsed);
   }
 
   /// 自由窗口形态下隐藏系统装饰栏与系统三键，由自绘标题带接管；形态退出时交还系统。
@@ -327,16 +389,19 @@ export class WindowChromeController {
       return;
     }
     this.barsHidden = hidden;
-    // 此变化不在 sync() 的签名里，必须直接写 AppStorage。
-    AppStorage.setOrCreate('titleBarCollapsed', hidden);
+    // 此变化不在 sync() 的签名里，这里按最新窗口形态重算一次合并后的折叠状态。
+    this.applyCollapsed(this.getState().titleBarAutoHide);
   }
 
   /// 最大化/还原。仅自由窗口形态下有意义。
   ///
   /// 进入用 EXIT_IMMERSIVE（铺满屏幕但保留 dock 与状态栏，窗口状态落在
   /// MAXIMIZE），还原用 recover()（回到 FLOATING 并恢复原尺寸位置）。
-  /// 不能用无参 maximize()：那会进入沉浸式全屏（状态 FULL_SCREEN），
-  /// 而标题带在 FULL_SCREEN 下是隐藏的，用户就再也点不到还原按钮。
+  /// 不用无参 maximize()：那会直接进入沉浸式全屏并隐藏 dock/状态栏，
+  /// 最大化不该顺带改变系统栏形态。
+  ///
+  /// 这里只做**窗口**操作，不碰播放器全屏状态：全屏播放中把窗口还原成浮动
+  /// 窗口时，视频继续铺满窗口、标题带恢复常驻（与系统/华为视频一致）。
   async toggleMaximize(): Promise<void> {
     const status = this.readStatus();
     if (status === window.WindowStatusType.FLOATING) {
@@ -350,6 +415,14 @@ export class WindowChromeController {
       // FULL_SCREEN 也当最大化处理：targetAPIVersion < 14 时最大化后的
       // 窗口状态就报 FULL_SCREEN，两者在自由窗口形态下语义等价。
       await this.recoverSafe();
+    }
+    // 内容全屏期间用户手动改了窗口形态：把新形态记为「退出全屏时要还原到的
+    // 状态」，否则退出全屏会把窗口弹回进入全屏前的旧形态，覆盖用户的操作。
+    // 用切换前的状态推导（避免 await 后读取状态时机不稳）。
+    if (this.contentFullScreen) {
+      this.statusBeforeFullScreen = this.isMaximizedStatus(status)
+        ? window.WindowStatusType.FLOATING
+        : window.WindowStatusType.MAXIMIZE;
     }
   }
 
