@@ -64,9 +64,6 @@ export struct WindowTitleBar {
   /// Dart 侧下发的页面背景色（'#RRGGBB'），空串表示尚未同步。
   @StorageLink('appBackgroundColor') backgroundHex: string = '';
 
-  /// Dart 侧下发的前景色（'#RRGGBB'）。背景色未同步时用它反推深浅。
-  @StorageLink('tabSelectedColor') foregroundHex: string = '';
-
   /// 收起态下是否已「临时放下」。仅收起态有意义：常驻态永远显示。
   @State revealed: boolean = false;
 
@@ -106,36 +103,16 @@ export struct WindowTitleBar {
     return $r('app.color.start_window_background');
   }
 
-  /// 三键的悬停底色：亮色标题带上压一层淡黑、深色标题带上压一层淡白。
+  /// 三键的悬停底色：同色系透明叠加，不引入新色相。
   ///
-  /// 只做同色系透明叠加、不引入新色相，所以深浅两套标题带配色都成立
-  /// （浅色底 + 8% 黑、深色底 + 12% 白），与系统标题栏的 hover 反馈观感一致。
-  private hoverColor(): string {
-    if (this.backgroundHex.length > 0) {
-      return this.isLightColor(this.backgroundHex)
-        ? '#1F000000'
-        : '#1FFFFFFF';
-    }
-    // 背景色还没同步时用前景色反推：前景偏亮说明标题带是深色。
-    if (this.foregroundHex.length > 0 && this.isLightColor(this.foregroundHex)) {
-      return '#1FFFFFFF';
-    }
-    return '#1F000000';
-  }
-
-  /// 颜色是否偏亮（ITU-R BT.601 感知亮度 > 0.6），支持 '#RRGGBB' / '#AARRGGBB'。
-  private isLightColor(color: string): boolean {
-    let value = color.startsWith('#') ? color.substring(1) : color;
-    if (value.length === 8) {
-      value = value.substring(2);
-    }
-    if (value.length < 6) {
-      return true;
-    }
-    const r = Number.parseInt(value.substring(0, 2), 16);
-    const g = Number.parseInt(value.substring(2, 4), 16);
-    const b = Number.parseInt(value.substring(4, 6), 16);
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+  /// 深浅两套值分别写在 base / dark 的 color.json 里，由 color mode 解析：
+  /// 浅色标题带压 8% 黑、深色标题带压 12% 白，与系统标题栏的 hover 反馈观感一致。
+  /// 不用运行时按底色算亮度——原生资源系统本来就在做同一件事，而且
+  /// AppAppearance.setColorMode 已把 App 主题同步给 ability，两者同源。
+  private buttonBackground(key: string): ResourceColor {
+    return this.hoveredKey === key
+      ? $r('app.color.title_button_hover')
+      : Color.Transparent;
   }
 
   private clearTimers(): void {
@@ -214,10 +191,10 @@ export struct WindowTitleBar {
     }
     .width(30)
     .height(30)
-    // 悬停反馈：图标下面垫一块同色系半透明色块，深浅两种标题带都能看清，
+    // 悬停反馈：图标下面垫一块同色系半透明色块（深浅两套值在资源里），
     // 用户能立刻知道自己指在哪个键上。
     .borderRadius(6)
-    .backgroundColor(this.hoveredKey === key ? this.hoverColor() : Color.Transparent)
+    .backgroundColor(this.buttonBackground(key))
     .onHover((isHover: boolean) => {
       if (isHover) {
         this.hoveredKey = key;
