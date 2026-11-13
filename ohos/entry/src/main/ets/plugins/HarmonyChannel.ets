@@ -19,6 +19,7 @@ import {
 
 import display from "@ohos.display";
 import { appAppearance } from "../appearance/AppAppearance";
+import { deviceFormState } from "../window/DeviceForm";
 import { windowChrome } from "../window/WindowChrome";
 import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
 
@@ -65,6 +66,13 @@ export default class HarmonyChannel implements FlutterPlugin {
     windowState.setSafeAreaListener((insets: SafeAreaInsets): void => {
       this.channel?.invokeMethod("onSafeAreaChange", insets);
     });
+    // 设备形态（细长竖屏 / 跟随系统）变化：折叠、展开后重新判定并推给 Dart，
+    // 由 Dart 按「形态 + 页面类型 + 是否全屏」重算方向策略。
+    deviceFormState.attach((portraitForm: boolean): void => {
+      this.channel?.invokeMethod("onDeviceFormChange", {
+        'portraitForm': portraitForm,
+      });
+    });
     // // 监听画面方向
     // display.on('change', () => {
     //   // 获取当前旋转角度
@@ -77,6 +85,7 @@ export default class HarmonyChannel implements FlutterPlugin {
     this.channel?.setMethodCallHandler(null);
     windowState.setSnapshotListener(null);
     windowState.setSafeAreaListener(null);
+    deviceFormState.detach();
     this.stopFreeWindowModeListener();
   }
 
@@ -146,8 +155,8 @@ export default class HarmonyChannel implements FlutterPlugin {
     windowState.notifySafeArea();
   }
 
-  async setWindowOrientation(orientation: number) {
-    await windowState.setWindowOrientation(orientation);
+  async setWindowOrientation(policy: string) {
+    await windowState.setWindowOrientation(policy);
   }
 
   async onMethodCall(call: MethodCall, result: MethodResult): Promise<void> {
@@ -192,9 +201,17 @@ export default class HarmonyChannel implements FlutterPlugin {
         break;
       }
       case "setWindowOrientation": {
-        const orientation: number = call.argument("orientation") ?? 0;
-        await this.setWindowOrientation(orientation);
+        const policy: string = call.argument("policy") ?? 'follow';
+        await this.setWindowOrientation(policy);
         result.success(true);
+        break;
+      }
+      case "getDeviceForm": {
+        // 启动时给 Dart 一个初值：是否「细长竖屏」形态（直板机 / 大折叠外屏）。
+        const form: Record<string, boolean> = {
+          'portraitForm': deviceFormState.isPortraitForm(),
+        };
+        result.success(form);
         break;
       }
       case "setMiniWindowLandscape":

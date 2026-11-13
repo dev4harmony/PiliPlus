@@ -32,7 +32,10 @@
           }
         ],
         backgroundModes: ["audioPlayback", "dataTransfer"],
-        orientation: "auto_rotation_unspecified",
+        // 方向交给系统：auto_rotation_restricted = 跟随重力/智感旋转，并遵守
+        // 控制中心的旋转锁定开关；不支持智感的设备由系统自动回落。
+        // 不用 unspecified：它在直板机上等价于固定竖屏，转手机不会有反应。
+        orientation: "auto_rotation_restricted",
         preferMultiWindowOrientation: "landscape_auto",
         skills: [
           {

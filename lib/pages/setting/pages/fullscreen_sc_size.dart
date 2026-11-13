@@ -12,6 +12,7 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:os_type/os_type.dart';
 
 const kFullScreenSCWidth = 255.0;
 
@@ -40,7 +41,8 @@ class _FullScreenScSizeState extends State<FullScreenScSize> {
 
   @override
   void dispose() {
-    if (PlatformUtils.isMobile) {
+    // 鸿蒙：方向交给系统，预览页退出时不再恢复/锁定方向。
+    if (PlatformUtils.isMobile && !OS.isHarmony) {
       if (Pref.horizontalScreen) {
         fullMode();
       } else {

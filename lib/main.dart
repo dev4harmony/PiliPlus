@@ -11,6 +11,7 @@ import 'package:PiliPlus/harmony_adapt/window/system_bars.dart';
 import 'package:PiliPlus/harmony_adapt/appearance/appearance_sync.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_bridge.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony_adapt/orientation/orientation_policy.dart';
 import 'package:PiliPlus/harmony_adapt/shell_bars_observer.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/models/common/theme/theme_color_type.dart';
@@ -137,7 +138,11 @@ void main() async {
   if (PlatformUtils.isMobile) {
     if (Platform.isAndroid) MaxScreenSize.init();
     await Future.wait([
-      if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
+      // 鸿蒙：方向交给系统（module.json5 为 auto_rotation_unspecified），启动时
+      // 不再锁定方向——直板机系统默认竖屏，平板/折叠/2in1 由系统按形态决定，
+      // 智感旋转由系统自动接管。其余平台保持原有的启动方向设置。
+      if (!OS.isHarmony)
+        ?(Pref.horizontalScreen ? fullMode() : portraitUpMode()),
       setupServiceLocator(),
       if (Platform.isIOS) IOSPipHelper.init(),
     ]);
@@ -180,6 +185,9 @@ void main() async {
     // 放在 isMobile 判断之外：2in1 设备 isPCOS 为 true、isMobile 为 false，
     // 但窗口形态（自由多窗/分屏）同样存在，不能跳过。
     await WindowBridge.init();
+    // 方向策略（首帧前）：拉设备形态并定下首帧策略——细长竖屏形态（直板机 /
+    // 大折叠外屏）先竖屏，其余跟随系统。之后由路由 / 全屏 / 折叠事件重算。
+    await OrientationPolicy.init();
   }
 
   if (PlatformUtils.isMobile) {

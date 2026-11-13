@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony_adapt/orientation/orientation_policy.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';
@@ -272,6 +273,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   set isVertical(bool value) {
     _isVertical = value;
+    // 竖屏视频（含竖屏直播流）：同步给方向策略，在竖屏形态设备的播放页整页
+    // 锁竖向（非全屏与全屏一致），避免转动设备时窗口先转再被拉回。
+    if (OS.isHarmony) OrientationPolicy.setVideoVertical(value);
   }
 
   /// 弹幕开关
@@ -827,7 +831,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   // 添加一个私有构造函数
   PlPlayerController._() {
-    if (PlatformUtils.isMobile) {
+    // 鸿蒙：屏幕方向由系统决定（含智感旋转），应用不再消费传感器方向做任何
+    // 决策——不再设方向、不再按倾斜自动进/退全屏。这里只给 Android/iOS 保留。
+    if (PlatformUtils.isMobile && !OS.isHarmony) {
       _orientationListener = NativeDeviceOrientationCommunicator()
           .onOrientationChanged(
             checkIsAutoRotate: checkIsAutoRotate,
@@ -1994,6 +2000,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     updateSubtitleStyle();
     if (!OS.isHarmony) return;
 
+    // 全屏状态同步给方向策略：它是「是否全屏」的唯一来源，路由叠加/回退时
+    // 也能据此恢复正确策略。
+    unawaited(OrientationPolicy.setFullScreen(val));
     if (!val) {
       HarmonyChannel.onLandscapeOrMiniWindowChange(false, null); // 非横屏
     } else if (!isVertical) {
@@ -2024,6 +2033,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     required bool isVertical,
     DeviceOrientation? orientation,
   }) {
+    // 鸿蒙的方向不在这里决策，见 OrientationPolicy（形态 + 页面 + 全屏）。
     if (orientation == null && (mode == .none || mode == .gravity)) {
       return null;
     }
@@ -2072,25 +2082,21 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       if (status) {
         if (PlatformUtils.isMobile && !WindowFacts.isFreeWindowMode) {
           hideSystemBar();
-          await changeOrientation(
-            isVertical: isVertical,
-            orientation: orientation,
-          );
-          if (OS.isHarmony && !WindowFacts.isWindowMode) {
-            // 手动进全屏的目标方向：横屏时等视口真正变横屏再置全屏布局，
-            // 避免全屏先在竖屏/中间尺寸渲染，导致比例错误和动画跳变。
-            final targetLandscape =
-                orientation != null ||
-                switch (mode) {
-                  .vertical => false,
-                  .horizontal => true,
-                  .auto => !isVertical,
-                  .ratio => !isVertical && screenRatio >= kScreenRatio,
-                  _ => false,
-                };
-            if (targetLandscape) {
+          if (OS.isHarmony) {
+            // 鸿蒙：方向由 OrientationPolicy 唯一决策——细长竖屏形态下横屏视频
+            // 全屏临时转横屏（锁关时转回竖屏会跟回竖屏并自动退出全屏），
+            // 竖屏视频全屏保持竖向；其它形态保持跟随系统。
+            await OrientationPolicy.setFullScreen(true);
+            // 横屏视频等视口真正变横屏再置全屏布局，避免全屏先在竖屏/中间
+            // 尺寸渲染导致比例错误和动画跳变。
+            if (!WindowFacts.isWindowMode && !isVertical) {
               await _waitForLandscapeViewport();
             }
+          } else {
+            await changeOrientation(
+              isVertical: isVertical,
+              orientation: orientation,
+            );
           }
         } else {
           await enterDesktopFullScreen(inAppFullScreen: inAppFullScreen);
@@ -2100,19 +2106,22 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           if (!removeSafeArea) {
             showSystemBar();
           }
-          if (orientation == null && mode == .none) {
-            return;
-          }
-          _lastFsExitAt = DateTime.now();
-          // 鸿蒙mate80开启旋转锁定时，原生setPreferredOrientation可能长时间
-          // 不返回。加超时保证退出
-          await resetScreenRotation()?.timeout(
-            const Duration(milliseconds: 500),
-            onTimeout: () {},
-          );
-          // 退出全屏时，延迟等待方向旋转后改变组件
-          if (OS.isHarmony && !WindowFacts.isWindowMode) {
-            await Future<void>.delayed(const Duration(milliseconds: 32));
+          if (OS.isHarmony) {
+            // 退出全屏时人仍在播放页：把「是否全屏」置 false，策略重算为
+            // followSystem；portraitOnly 由离开播放页的路由事件触发。
+            _lastFsExitAt = DateTime.now();
+            await OrientationPolicy.setFullScreen(false);
+          } else {
+            if (orientation == null && mode == .none) {
+              return;
+            }
+            _lastFsExitAt = DateTime.now();
+            // 鸿蒙mate80开启旋转锁定时，原生setPreferredOrientation可能长时间
+            // 不返回。加超时保证退出
+            await resetScreenRotation()?.timeout(
+              const Duration(milliseconds: 500),
+              onTimeout: () {},
+            );
           }
         } else {
           await exitDesktopFullScreen();
@@ -2275,18 +2284,19 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   // isCloseAll 由外部页面直接置位（新 ohos 提交的写法），故为公开字段
   bool isCloseAll = false;
 
-  /// 播放器销毁时恢复应用级方向：开着横屏适配跟随系统，否则锁回竖屏
+  /// 播放器销毁时恢复方向。
+  ///
+  /// 鸿蒙上方向策略由 `OrientationPolicy` 统一决策（形态 + 页面 + 全屏）：
+  /// 离开播放页由路由观察器把策略切到该页面应有的值，销毁时不再单独设方向，
+  /// 避免两处写策略互相覆盖。
   Future<void>? resetScreenRotation() {
+    if (OS.isHarmony) {
+      return null;
+    }
     if (horizontalScreen) {
       return fullMode();
-    } else {
-      // 鸿蒙：部分机型开启系统旋转锁定时 setPreferredOrientations 无法把窗口
-      // 从横屏转回竖屏，用不受锁控制的原生接口强制转回，避免退出全屏卡横屏。
-      if (OS.isHarmony) {
-        return harmonyForcePortrait();
-      }
-      return portraitUpMode();
     }
+    return portraitUpMode();
   }
 
   void onCloseAll() {

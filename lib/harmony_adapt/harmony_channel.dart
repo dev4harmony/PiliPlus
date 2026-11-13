@@ -102,6 +102,12 @@ abstract class HarmonyChannel {
       case 'onSafeAreaChange':
         _updateSafeArea(call.arguments);
         break;
+      // 设备形态变化（折叠/展开）：细长竖屏 ↔ 跟随系统，交给方向策略重算。
+      case 'onDeviceFormChange':
+        onDeviceFormChange?.call(
+          call.arguments['portraitForm'] as bool? ?? false,
+        );
+        break;
       // 原生窗口快照（自由多窗/小窗/分屏/标题带状态的整体推送，
       // 见 ArkTS WindowState.emitSnapshot）
       case 'onWindowSnapshot':
@@ -371,15 +377,36 @@ abstract class HarmonyChannel {
   static Future<void> setFullScreenBars(bool fullscreen) =>
       _invoke('setFullScreenBars', {'fullscreen': fullscreen});
 
-  /// 鸿蒙部分机型（Mate80）开启系统旋转锁定后无法强制窗口转回竖屏，这里走原生接口。
-  static Future<void> setWindowOrientation(int orientation) async {
+  /// 设置窗口方向策略，取值见 `HarmonyOrientationPolicy`：
+  /// `follow`（跟随系统）/ `portraitOnly`（仅竖屏）/ `landscapeOnly`（仅横屏）。
+  ///
+  /// 应用侧只声明「这个状态允许哪些方向」，不写固定方向，也不读系统旋转锁。
+  static Future<void> setWindowOrientation(String policy) async {
     if (!OS.isHarmony) return;
     try {
       await _channel.invokeMethod('setWindowOrientation', {
-        'orientation': orientation,
+        'policy': policy,
       });
     } catch (_) {}
   }
+
+  /// 设备形态：是否「细长竖屏」（直板机 / 大折叠外屏）。
+  ///
+  /// 原生侧按 `deviceType === 'phone'` 且当前屏幕长边/短边 ≥ 1.9 判定，
+  /// 折叠/展开后由 [onDeviceFormChange] 推送更新。通道异常返回 null，调用方
+  /// 据此保留原生首帧策略，而不是擅自当成「跟随系统」。
+  static Future<bool?> getDeviceForm() async {
+    if (!OS.isHarmony) return false;
+    try {
+      final result = await _channel.invokeMethod<Map>('getDeviceForm');
+      return result?['portraitForm'] == true;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 原生推送：设备形态变化（折叠/展开）。
+  static void Function(bool portraitForm)? onDeviceFormChange;
 
   /// 通用窗口方法发送器：非鸿蒙直接返回 null，原生异常（含旧版本没有该
   /// method 的 [MissingPluginException]）一律静默降级，窗口能力缺失不应让

@@ -164,8 +164,35 @@ export class WindowState {
     await this.win.setSpecificSystemBarEnabled("navigationIndicator", !hidden, false);
   }
 
-  async setWindowOrientation(orientation: number): Promise<void> {
+  /// 应用窗口方向策略（四种，由 Dart 侧按「设备形态 + 页面类型 + 是否全屏」决定）：
+  /// - `portraitOnly`：AUTO_ROTATION_PORTRAIT —— 仅竖向，不受旋转锁定控制，
+  ///   用于细长竖屏形态设备的非播放页 / 竖屏视频全屏。
+  /// - `userLandscape`：USER_ROTATION_LANDSCAPE —— 临时旋转到横屏，之后跟随
+  ///   传感器（受旋转锁定控制）：锁关时转竖屏会跟回竖屏（用于自动退出全屏），
+  ///   锁开时保持横屏。用于细长竖屏形态设备的横屏视频全屏。
+  /// - `landscapeOnly`：AUTO_ROTATION_LANDSCAPE —— 仅横向，不受旋转锁定控制
+  ///   （保留备选，当前未使用）。
+  /// - `follow`：AUTO_ROTATION_RESTRICTED —— 四方向跟随重力/智感，受旋转锁定
+  ///   控制，用于播放页以及平板/2in1/阔折叠等跟随系统的形态。
+  ///
+  /// 应用不再下发固定方向（PORTRAIT/LANDSCAPE），也不读取系统旋转锁。
+  async setWindowOrientation(policy: string): Promise<void> {
     this.win ??= await window.getLastWindow(getContext());
+    let orientation: window.Orientation;
+    switch (policy) {
+      case 'portraitOnly':
+        orientation = window.Orientation.AUTO_ROTATION_PORTRAIT;
+        break;
+      case 'userLandscape':
+        orientation = window.Orientation.USER_ROTATION_LANDSCAPE;
+        break;
+      case 'landscapeOnly':
+        orientation = window.Orientation.AUTO_ROTATION_LANDSCAPE;
+        break;
+      default:
+        orientation = window.Orientation.AUTO_ROTATION_RESTRICTED;
+        break;
+    }
     await this.win.setPreferredOrientation(orientation);
   }
 

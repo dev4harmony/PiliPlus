@@ -39,6 +39,7 @@ import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:os_type/os_type.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart' hide StatefulBuilder;
 import 'package:path/path.dart' as path;
@@ -63,11 +64,16 @@ List<SettingsModel> get styleSettings => [
   if (Platform.isLinux) _useSSDModel(),
   SwitchModel(
     title: '横屏适配',
-    subtitle: '启用横屏布局与逻辑，平板、折叠屏等可开启；建议全屏方向设为【不改变当前方向】',
+    // 鸿蒙上方向已交给系统，本项只决定布局形态（手机布局 / 平板横屏布局）。
+    subtitle: OS.isHarmony
+        ? '启用平板/横屏布局，方向仍由系统控制'
+        : '启用横屏布局与逻辑，平板、折叠屏等可开启；建议全屏方向设为【不改变当前方向】',
     leading: const Icon(Icons.phonelink_outlined),
     setKey: SettingBoxKey.horizontalScreen,
     defaultVal: Pref.horizontalScreen,
     onChanged: (value) {
+      // 方向只在非鸿蒙平台跟着这个开关走；鸿蒙由系统接管，不在这里设方向。
+      if (OS.isHarmony) return;
       if (value) {
         fullMode();
       } else {
