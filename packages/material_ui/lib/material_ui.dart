@@ -34,9 +34,9 @@ export 'src/selection_handle.dart';
 // 取自 openharmony/global_system_resources 的主题 json，来源见文件头注释。
 export 'src/ohos_selection_theme.dart';
 
-// 鸿蒙样式放大镜（112×72 胶囊、1.4 倍）与工具栏（40vp 胶囊 + 原生对齐规则）。
-// 放大镜需要 app 启动时调一次 `installOhosTextMagnifier()` 才覆盖
-// SelectableText / TextField 的默认配置。
+// 鸿蒙样式放大镜（104×68 胶囊、1.4 倍）与工具栏（37vp 胶囊 + 原生对齐规则 +
+// 右侧溢出收起二级菜单）。放大镜需要 app 启动时调一次 `installOhosTextMagnifier()`
+// 才覆盖 SelectableText / TextField 的默认配置。
 export 'src/selection_magnifier.dart';
 export 'src/selection_toolbar.dart';
 
