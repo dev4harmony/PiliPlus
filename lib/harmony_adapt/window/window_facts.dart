@@ -29,6 +29,12 @@ abstract final class WindowFacts {
   /// 原生自绘标题带是否可见（仅自由窗口形态有意义）。
   static bool titleBarVisible = false;
 
+  /// 原生自绘标题带是否被鼠标唤出（仅「全屏自动收起」态可能为 true）。
+  ///
+  /// 唤出期间原生会把标题带高度并进顶部安全区，播放器的顶部那排按钮据此
+  /// 整体下移，避免被呼出的标题带盖住。
+  static bool titleBarRevealed = false;
+
   /// 原生自绘标题带高度（vp，原生 TITLE_BAR_HEIGHT）。
   static double titleBarHeight = 0;
 
@@ -58,6 +64,7 @@ abstract final class WindowFacts {
     isMiniWindow = readBool('isMiniWindow') ?? isMiniWindow;
     isWindowMode = readBool('isWindowMode') ?? isWindowMode;
     titleBarVisible = readBool('titleBarVisible') ?? titleBarVisible;
+    titleBarRevealed = readBool('titleBarRevealed') ?? false;
     isContentFullScreen = readBool('contentFullScreen') ?? isContentFullScreen;
     titleBarHeight =
         (snapshot['titleBarHeight'] as num?)?.toDouble() ?? titleBarHeight;
