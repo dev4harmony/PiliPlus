@@ -18,6 +18,8 @@ const EVENT_TOP_SEARCH = 'EVENT_TOP_SEARCH';
 const EVENT_TOP_MSG = 'EVENT_TOP_MSG';
 const EVENT_TOP_MINE = 'EVENT_TOP_MINE';
 const EVENT_HOME_TAB_CHANGE = 'EVENT_HOME_TAB_CHANGE';
+/// 底栏由「隐藏」翻回「显示」时通知 Flutter 幂等对齐页签（见 EntryAbility）
+const EVENT_SHELL_BARS_SHOWN = 'EVENT_SHELL_BARS_SHOWN';
 
 const NAV_UNSELECTED = $r('sys.color.comp_focused_primary');
 const BOTTOM_NORMAL_AVOID_AREA_VALUE = 1;
@@ -87,7 +89,7 @@ struct Index {
   private context = getContext(this) as common.UIAbilityContext;
   @LocalStorageLink('viewId') viewId: string = "";
   @StorageLink('useNativeTabs') useNativeTabs: boolean = false;
-  @StorageLink('shellBarsHidden') shellBarsHidden: boolean = false;
+  @StorageLink('shellBarsHidden') @Watch('onShellBarsHiddenChanged') shellBarsHidden: boolean = false;
   @StorageLink('__scrollHidden') @Watch('onScrollHiddenChanged') shellBarsScrollHidden: boolean = false;
   /// 前景色与背景色均由 Dart 侧 AppearanceSync 统一下发，见 appearance/AppAppearance.ets。
   @StorageLink('tabSelectedColor') navSelected: string = '#3367D6';
@@ -151,6 +153,10 @@ struct Index {
   /// 背景色
   private isBlackBg: boolean = false;
 
+  /// 上一帧的底栏隐藏状态，用于识别「隐藏 → 显示」这一次翻转。
+  /// 与 @Watch 回调里的 shellBarsHidden（已是新值）配对使用。
+  private shellBarsHiddenPrev: boolean = false;
+
   onHomeTabIndexChanged(): void {
     if (this.homeActiveTabIndex >= 0 && this.homeActiveTabIndex < this.homeTabs.length) {
       this.categoryCurrentIndex = this.homeActiveTabIndex;
@@ -160,6 +166,31 @@ struct Index {
 
   private isTopBarCollapsed(): boolean {
     return this.homeHideTopBar && this.topBarCollapsed;
+  }
+
+  /// 底栏由隐藏翻回显示：通知 Flutter 幂等对齐一次页签（首页/动态/我的）。
+  ///
+  /// Flutter 侧比对后一致即彻底 no-op，只在真的不一致时才静默切页，故这里
+  /// 不会引起界面刷新。只在底栏真的启用（useNativeTabs）且确实从「隐藏」
+  /// 翻到「显示」时发一次：冷启动首次可见（未经隐藏）、滚动隐藏
+  /// （__scrollHidden）、未启用原生底栏时 currentNavIndex 都不可信，一律不发。
+  ///
+  /// 带上页签类型（navTabs[index]，即 NavigationBarType 序号）：自定义 Navbar
+  /// 排序下位置序号与类型序号不一致，Flutter 按类型对齐才不会切错页。
+  onShellBarsHiddenChanged(): void {
+    const wasHidden = this.shellBarsHiddenPrev;
+    this.shellBarsHiddenPrev = this.shellBarsHidden;
+    if (this.shellBarsHidden || !wasHidden) {
+      return;
+    }
+    if (!this.useNativeTabs || this.navTabs.length <= 1) {
+      return;
+    }
+    const index = this.currentNavIndex;
+    if (index < 0 || index >= this.navTabs.length) {
+      return;
+    }
+    this.context.eventHub.emit(EVENT_SHELL_BARS_SHOWN, index, this.navTabs[index]);
   }
 
   onScrollHiddenChanged(): void {
@@ -259,6 +290,9 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    // @Watch 只在「值变化」时触发，创建时已为隐藏态不会补发，
+    // 故先记下当前值作为基线，避免漏掉或多算一次翻转
+    this.shellBarsHiddenPrev = this.shellBarsHidden;
     this.context.eventHub.on(EVENT_CHANGE_TAB, (index: number) => {
       this.currentNavIndex = index;
       this.controller.changeIndex(index);
