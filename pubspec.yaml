@@ -17,7 +17,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 # update when release
-version: 2.1.6+6359
+version: 2.1.6+6361
 
 environment:
   sdk: ">=3.12.2"
@@ -227,7 +227,10 @@ dependencies:
   brotli: ^0.6.0
   expandable: ^5.0.1
   flex_seed_scheme: ^4.0.1
-  live_photo_maker: ^0.0.6
+  live_photo_maker:
+    git:
+      url: https://gitcode.com/hxa-flutter/live_photo_maker.git
+      ref: main
   fl_chart: ^1.0.0
   synchronized: ^3.4.0+1
   # document_file_save_plus: ^2.0.0

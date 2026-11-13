@@ -106,7 +106,7 @@ abstract final class ImageUtils {
       final res = await Request().downloadFile(liveUrl.http2https, videoPath);
       if (res.statusCode != 200) throw '${res.statusCode}';
 
-      if (Platform.isIOS) {
+      if (Platform.isIOS || OS.isHarmony) {
         final imageFile = await CacheManager.manager.getSingleFile(
           url.http2https,
         );

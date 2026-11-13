@@ -1132,10 +1132,11 @@ packages:
   live_photo_maker:
     dependency: "direct main"
     description:
-      name: live_photo_maker
-      sha256: "9af3965bd9d2ab55b0d4d0a1e4041fdcc9ef6c6c44543c8412667541a054f58b"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "."
+      ref: main
+      resolved-ref: bbb539a2b2cb226c9a3ab85caa30bfb5bb3bdfa8
+      url: "https://gitcode.com/hxa-flutter/live_photo_maker.git"
+    source: git
     version: "0.0.6"
   logger:
     dependency: "direct main"
