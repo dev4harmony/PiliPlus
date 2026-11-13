@@ -23,18 +23,10 @@ class ImageMemoryCleaner with WidgetsBindingObserver {
   }
 
   /// 系统内存压力
+  /// 进后台也会给应用发内存压力通知
   @override
   void didHaveMemoryPressure() {
     debugPrint('ImageMemoryCleaner: clear image cache on memoryPressure');
     clearImageCache();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      debugPrint('ImageMemoryCleaner: clear image cache in background');
-      clearImageCache();
-    }
   }
 }

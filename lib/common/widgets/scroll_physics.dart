@@ -91,11 +91,23 @@ class ReloadScrollPhysics extends AlwaysScrollableScrollPhysics {
   }
 }
 
-final platformClampingPhysics = PlatformUtils.isDarwin || OS.isHarmony
+// 鸿蒙的 [ArkuiScrollPhysics]（ArkUI fling 曲线 + EdgeEffect.Spring 的复刻，
+// 参数与推导见该文件顶部注释）由 material_ui shim 提供：
+// packages/material_ui/lib/src/arkui_scroll_physics.dart
+final platformClampingPhysics = OS.isHarmony
+    ? const ArkuiScrollPhysics(bounce: false, parent: ClampingScrollPhysics())
+    : PlatformUtils.isDarwin
     ? const BouncingScrollPhysicsExt()
     : const ClampingScrollPhysics();
 
-final platformAlwaysClampingPhysics = PlatformUtils.isDarwin || OS.isHarmony
+final platformAlwaysClampingPhysics = OS.isHarmony
+    ? const AlwaysScrollableScrollPhysics(
+        parent: ArkuiScrollPhysics(
+          bounce: false,
+          parent: ClampingScrollPhysics(),
+        ),
+      )
+    : PlatformUtils.isDarwin
     ? const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysicsExt())
     : const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics());
 

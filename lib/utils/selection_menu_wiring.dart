@@ -24,4 +24,8 @@ void configureSelectionMenu() {
     // 直接 off 掉，避免搜索结果压在浮层上面。
     off: Get.routing.route is! PageRoute,
   );
+  // 放大镜：SelectableText / TextField 的默认值来自 SDK 的
+  // `TextMagnifier.adaptiveMagnifierConfiguration`（Material 77×38），
+  // 在鸿蒙上换成原生 112×72 胶囊镜片；非鸿蒙平台此调用无副作用。
+  installOhosTextMagnifier();
 }

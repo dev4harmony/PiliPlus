@@ -7,7 +7,7 @@ import 'dart:async' show Completer;
 import 'package:PiliPlus/common/widgets/refresh_layout.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
-    show BouncingScrollPhysicsExt;
+    show BouncingScrollPhysicsExt, ClampingBoundaryMixin;
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:extended_nested_scroll_view/refresh.dart';
@@ -545,15 +545,20 @@ class RefreshIndicatorState extends State<RefreshIndicator>
             ),
     );
 
-    // 鸿蒙与iOS保持一致的下拉动画
+    // 下拉动画：iOS 走 Bouncing，鸿蒙走 ArkUI 的摩擦 + 弹簧
     if (PlatformUtils.isDarwin || OS.isHarmony) {
       if (widget.isClampingScrollPhysics) {
         return ScrollConfiguration(
           behavior: RefreshScrollBehavior(
-            scrollPhysics: RefreshScrollPhysicsIOS(
-              parent: const RangeMaintainingScrollPhysics(),
-              onDrag: _onDrag,
-            ),
+            scrollPhysics: OS.isHarmony
+                ? RefreshScrollPhysicsArkui(
+                    parent: const RangeMaintainingScrollPhysics(),
+                    onDrag: _onDrag,
+                  )
+                : RefreshScrollPhysicsIOS(
+                    parent: const RangeMaintainingScrollPhysics(),
+                    onDrag: _onDrag,
+                  ),
           ),
           child: child,
         );
@@ -662,6 +667,32 @@ class RefreshScrollPhysicsIOS extends BouncingScrollPhysicsExt
   @override
   RefreshScrollPhysicsIOS applyTo(ScrollPhysics? ancestor) {
     return RefreshScrollPhysicsIOS(
+      parent: buildParent(ancestor),
+      onDrag: onDrag,
+    );
+  }
+}
+
+/// 鸿蒙上的刷新嵌套列表：惯性与回弹都走 ArkUI（[ArkuiScrollPhysics]，实现在
+/// `packages/material_ui/lib/src/arkui_scroll_physics.dart`），下拉拦截仍由
+/// [RefreshScrollPhysicsMixin] 负责。
+///
+/// 这类列表是被嵌在外层滚动容器里的（`isClampingScrollPhysics`），所以边界
+/// 沿用原来的贴边行为（`ClampingBoundaryMixin` + `bounce: false`），只换手感
+/// 不换越界策略，避免和外层容器的滚动打架。
+class RefreshScrollPhysicsArkui extends ArkuiScrollPhysics
+    with ClampingBoundaryMixin, RefreshScrollPhysicsMixin {
+  const RefreshScrollPhysicsArkui({
+    ScrollPhysics? parent,
+    required this.onDrag,
+  }) : super(parent: parent, bounce: false);
+
+  @override
+  final OnDrag onDrag;
+
+  @override
+  RefreshScrollPhysicsArkui applyTo(ScrollPhysics? ancestor) {
+    return RefreshScrollPhysicsArkui(
       parent: buildParent(ancestor),
       onDrag: onDrag,
     );

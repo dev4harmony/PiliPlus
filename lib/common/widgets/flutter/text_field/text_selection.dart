@@ -868,16 +868,35 @@ class TextSelectionGestureDetectorBuilder {
     _longPressStartedWithoutFocus = false;
     _dragStartViewportOffset = 0.0;
     _dragStartScrollOffset = 0.0;
-    if (_isEditableTextMounted &&
-        defaultTargetPlatform == TargetPlatform.iOS &&
-        delegate.selectionEnabled &&
-        editableText.textEditingValue.selection.isCollapsed) {
-      // Update the floating cursor.
-      final cursorPoint = RawFloatingCursorPoint(
-        state: FloatingCursorDragState.End,
-      );
-      editableText.updateFloatingCursor(cursorPoint);
+    if (!_isEditableTextMounted || !delegate.selectionEnabled) {
+      return;
     }
+    // ↓↓↓ 适配flutter 3.32.4-ohos-0.0.1
+    // `onSingleLongTapStart` 的 default 分支（ohos 走这里）会启动浮动光标
+    // （`FloatingCursorDragState.Start`，移动时 Update），但上游只在这里为 iOS
+    // 发送 `End` —— 结果 ohos 长按松手后浮动光标一直不结束，真正的光标被冻在
+    // 旧位置、不再跟随选区（真机表现：长按后光标停在原处不归位）。
+    // 这里让「启动过浮动光标的分支」成对结束。
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        // 这两个平台在 onSingleLongTapStart 里走的是 selectWord 分支，没有浮动光标。
+        break;
+      case TargetPlatform.iOS:
+        if (editableText.textEditingValue.selection.isCollapsed) {
+          _endFloatingCursor();
+        }
+      default:
+        _endFloatingCursor();
+    }
+    // ↑↑↑ 适配flutter 3.32.4-ohos-0.0.1
+  }
+
+  /// 结束浮动光标，让它带动画回到真正的光标位置。
+  void _endFloatingCursor() {
+    editableText.updateFloatingCursor(
+      RawFloatingCursorPoint(state: FloatingCursorDragState.End),
+    );
   }
 
   // Selects the set of paragraphs in a document that intersect a given range of
