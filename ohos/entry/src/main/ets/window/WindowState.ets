@@ -507,7 +507,7 @@ export class WindowState {
     this.safeAreaDelayedTimer = setTimeout(() => {
       this.safeAreaDelayedTimer = -1;
       this.emitSafeArea();
-    }, 60);
+    }, 32);
   };
   private safeAreaDelayedTimer: number = -1;
 
