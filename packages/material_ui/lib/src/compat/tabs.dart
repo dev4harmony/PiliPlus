@@ -40,7 +40,7 @@ class TabBarView extends StatefulWidget {
     this.clipBehavior = Clip.hardEdge,
     this.scrollDirection = Axis.horizontal,
     this.hitTestBehavior = HitTestBehavior.opaque,
-    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
+    this.horizontalDragGestureRecognizer,
   });
 
   /// tabs.patch hunk of scrollable_gesture.patch.
@@ -50,7 +50,7 @@ class TabBarView extends StatefulWidget {
   final HitTestBehavior hitTestBehavior;
 
   // tabs.patch hunk of scrollable_gesture.patch.
-  final ValueGetter<HorizontalDragGestureRecognizer> horizontalDragGestureRecognizer;
+  final ValueGetter<HorizontalDragGestureRecognizer>? horizontalDragGestureRecognizer;
 
   /// This widget's selection and animation state.
   ///

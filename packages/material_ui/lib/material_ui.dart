@@ -73,7 +73,13 @@ export 'src/arkui_scroll_physics.dart';
 // SDK 补丁的等价实现（lib/scripts/*.patch），文件结构与上游 lib/scripts 对应。
 export 'src/compat/navigation_drawer.dart';
 export 'src/compat/page_view.dart';
-export 'src/compat/scrollable.dart';
+export 'src/compat/scrollable.dart'
+    hide
+        ViewportBuilder,
+        TwoDimensionalViewportBuilder,
+        DiagonalDragBehavior,
+        TwoDimensionalScrollable,
+        TwoDimensionalScrollableState;
 export 'src/compat/scrollable_helpers.dart';
 export 'src/compat/tabs.dart';
 export 'src/compat/draggable_scrollable_sheet.dart' hide DraggableScrollableController;

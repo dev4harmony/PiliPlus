@@ -5,6 +5,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart'
     hide Scrollable, ScrollableState, PageView, EdgeDraggingAutoScroller;
+import 'package:flutter/material.dart' as sdk;
 import 'package:flutter/rendering.dart';
 
 import 'scrollable.dart';
@@ -103,11 +104,11 @@ class PageView extends StatefulWidget {
     this.hitTestBehavior = HitTestBehavior.opaque,
     this.scrollBehavior,
     this.padEnds = true,
-    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
+    this.horizontalDragGestureRecognizer,
   }) : childrenDelegate = SliverChildListDelegate(children);
 
   // scrollable_gesture.patch: optional recognizer factory with upstream default.
-  final ValueGetter<HorizontalDragGestureRecognizer> horizontalDragGestureRecognizer;
+  final ValueGetter<HorizontalDragGestureRecognizer>? horizontalDragGestureRecognizer;
 
   /// Creates a scrollable list that works page by page using widgets that are
   /// created on demand.
@@ -152,7 +153,7 @@ class PageView extends StatefulWidget {
     this.hitTestBehavior = HitTestBehavior.opaque,
     this.scrollBehavior,
     this.padEnds = true,
-    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
+    this.horizontalDragGestureRecognizer,
   }) : childrenDelegate = SliverChildBuilderDelegate(
          itemBuilder,
          findChildIndexCallback: findChildIndexCallback,
@@ -186,7 +187,7 @@ class PageView extends StatefulWidget {
     this.hitTestBehavior = HitTestBehavior.opaque,
     this.scrollBehavior,
     this.padEnds = true,
-    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
+    this.horizontalDragGestureRecognizer,
   });
 
   /// Controls whether the widget's pages will respond to
@@ -379,36 +380,64 @@ class _PageViewState extends State<PageView> {
         }
         return false;
       },
-      child: Scrollable(
-        dragStartBehavior: widget.dragStartBehavior,
-        axisDirection: axisDirection,
-        controller: _controller,
-        physics: physics,
-        restorationId: widget.restorationId,
-        hitTestBehavior: widget.hitTestBehavior,
-        scrollBehavior:
-            widget.scrollBehavior ??
-            ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        viewportBuilder: (BuildContext context, ViewportOffset position) {
-          return Viewport(
-            // TODO(dnfield): we should provide a way to set cacheExtent
-            // independent of implicit scrolling:
-            // https://github.com/flutter/flutter/issues/45632
-            cacheExtent: widget.allowImplicitScrolling ? 1.0 : 0.0,
-            axisDirection: axisDirection,
-            offset: position,
-            clipBehavior: widget.clipBehavior,
-            slivers: <Widget>[
-              SliverFillViewport(
-                viewportFraction: _controller.viewportFraction,
-                delegate: widget.childrenDelegate,
-                padEnds: widget.padEnds,
+      // SDK Scrollable 无 horizontalDragGestureRecognizer 参数；传入了
+      // 自定义识别器的调用点由外挂 RawGestureDetector 注入（同
+      // scroll_physics.tabBarView 手法）。
+      child: widget.horizontalDragGestureRecognizer == null
+          ? sdk.Scrollable(
+              dragStartBehavior: widget.dragStartBehavior,
+              axisDirection: axisDirection,
+              controller: _controller,
+              physics: physics,
+              restorationId: widget.restorationId,
+              hitTestBehavior: widget.hitTestBehavior,
+              scrollBehavior:
+                  widget.scrollBehavior ??
+                  ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              viewportBuilder: _buildViewport,
+            )
+          : RawGestureDetector(
+              behavior: widget.hitTestBehavior,
+              gestures: <Type, GestureRecognizerFactory>{
+                HorizontalDragGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<
+                      HorizontalDragGestureRecognizer
+                    >(widget.horizontalDragGestureRecognizer!, (_) {}),
+              },
+              child: sdk.Scrollable(
+                dragStartBehavior: widget.dragStartBehavior,
+                axisDirection: axisDirection,
+                controller: _controller,
+                physics: physics,
+                restorationId: widget.restorationId,
+                hitTestBehavior: widget.hitTestBehavior,
+                scrollBehavior:
+                    widget.scrollBehavior ??
+                    ScrollConfiguration.of(context).copyWith(
+                      scrollbars: false,
+                    ),
+                viewportBuilder: _buildViewport,
               ),
-            ],
-          );
-        },
-        horizontalDragGestureRecognizer: widget.horizontalDragGestureRecognizer,
-      ),
+            ),
+    );
+  }
+
+  Widget _buildViewport(BuildContext context, ViewportOffset position) {
+    return Viewport(
+      // TODO(dnfield): we should provide a way to set cacheExtent
+      // independent of implicit scrolling:
+      // https://github.com/flutter/flutter/issues/45632
+      cacheExtent: widget.allowImplicitScrolling ? 1.0 : 0.0,
+      axisDirection: _getDirection(context),
+      offset: position,
+      clipBehavior: widget.clipBehavior,
+      slivers: <Widget>[
+        SliverFillViewport(
+          viewportFraction: _controller.viewportFraction,
+          delegate: widget.childrenDelegate,
+          padEnds: widget.padEnds,
+        ),
+      ],
     );
   }
 
