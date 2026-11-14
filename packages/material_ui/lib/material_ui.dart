@@ -21,7 +21,11 @@ export 'package:flutter/material.dart'
         TextFormField,
         // 以下改由 src/compat/ 提供同名实现，对应 lib/scripts/*.patch：
         // navigation_drawer（flex + 水波纹）、scrollable_gesture（识别器/方向参数）。
+        // NavigationDrawerDestination 必须与 compat NavigationDrawer 同源，
+        // 否则它内部的 _NavigationDrawerDestinationInfo.of 会因类型错配返回
+        // null（平板侧栏崩溃）。
         NavigationDrawer,
+        NavigationDrawerDestination,
         PageView,
         Scrollable,
         ScrollableState,
@@ -67,7 +71,7 @@ export 'src/selection_widgets.dart';
 export 'src/arkui_scroll_physics.dart';
 
 // SDK 补丁的等价实现（lib/scripts/*.patch），文件结构与上游 lib/scripts 对应。
-export 'src/compat/navigation_drawer.dart' hide NavigationDrawerDestination;
+export 'src/compat/navigation_drawer.dart';
 export 'src/compat/page_view.dart';
 export 'src/compat/scrollable.dart';
 export 'src/compat/scrollable_helpers.dart';
