@@ -440,38 +440,42 @@ class _MainAppState extends PopScopeState<MainApp>
                     SizedBox(
                       height: MediaQuery.paddingOf(context).top + 25,
                     ),
-                    Obx(
-                      // apply `lib/scripts/navigation_drawer.patch`
-                      () => SizedBox(
-                        width: 130,
-                        child: NavigationDrawer(
-                          flex: 5,
-                          backgroundColor: Colors.transparent,
-                          tilePadding: const .symmetric(
-                            vertical: 5,
-                            horizontal: 12,
-                          ),
-                          indicatorShape: const RoundedRectangleBorder(
-                            borderRadius: .all(.circular(16)),
-                          ),
-                          onDestinationSelected: _mainController.setIndex,
-                          selectedIndex: _mainController.selectedIndex.value,
-                          header: Expanded(
-                            flex: 2,
-                            child: userAndSearchVertical(theme),
-                          ),
-                          children: _mainController.navigationBars
-                              .map(
-                                (e) => NavigationDrawerDestination(
-                                  label: Text(e.label),
-                                  icon: _buildIcon(type: e),
-                                  selectedIcon: _buildIcon(
-                                    type: e,
-                                    selected: true,
+                    userAndSearchVertical(theme),
+                    const Spacer(flex: 2),
+                    // apply `lib/scripts/navigation_drawer.patch`
+                    Expanded(
+                      flex: 5,
+                      child: Obx(
+                        // Drawer 内部是 ConstrainedBox.expand：高度无约束时
+                        // 子级 Column 的 Expanded 会拿到无限高度（布局断言、
+                        // 侧栏空白），必须由 Expanded 提供有界高度。
+                        () => SizedBox(
+                          width: 130,
+                          child: NavigationDrawer(
+                            flex: 5,
+                            backgroundColor: Colors.transparent,
+                            tilePadding: const .symmetric(
+                              vertical: 5,
+                              horizontal: 12,
+                            ),
+                            indicatorShape: const RoundedRectangleBorder(
+                              borderRadius: .all(.circular(16)),
+                            ),
+                            onDestinationSelected: _mainController.setIndex,
+                            selectedIndex: _mainController.selectedIndex.value,
+                            children: _mainController.navigationBars
+                                .map(
+                                  (e) => NavigationDrawerDestination(
+                                    label: Text(e.label),
+                                    icon: _buildIcon(type: e),
+                                    selectedIcon: _buildIcon(
+                                      type: e,
+                                      selected: true,
+                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(),
+                                )
+                                .toList(),
+                          ),
                         ),
                       ),
                     ),
