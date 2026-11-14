@@ -1,5 +1,6 @@
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/harmony_adapt/orientation/harmony_orientation.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:os_type/os_type.dart';
 
@@ -15,8 +16,9 @@ import 'package:os_type/os_type.dart';
 /// | 细长竖屏（直板机 / 大折叠外屏） | 非播放页 | - | - | [portraitOnly] |
 /// | 细长竖屏 | 播放页（视频/直播） | 竖屏视频/竖屏直播流 | 任意 | [portraitOnly] |
 /// | 细长竖屏 | 播放页 | 横屏视频 | 否 | [userPortrait] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 是（窗口已是横屏） | [followSystem] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 是（窗口是竖屏） | [userLandscape] |
+/// | 细长竖屏 | 播放页 | 横屏视频 | 是（锁关，窗口已是横屏） | [followSystem] |
+/// | 细长竖屏 | 播放页 | 横屏视频 | 是（锁关，窗口是竖屏） | [userLandscape] |
+/// | 细长竖屏 | 播放页 | 横屏视频 | 是（锁开） | [landscapeOnly] |
 /// | 其它（平板/2in1/阔折叠/阔直板/折叠内屏） | 任意 | 任意 | 任意 | [followSystem] |
 ///
 /// 竖屏视频锁竖向对齐 B 站：不论旋转锁定与设备方向，非全屏与全屏都保持竖向。
@@ -27,6 +29,11 @@ import 'package:os_type/os_type.dart';
 /// 退出全屏时向系统发一次「临时转回竖屏」，之后恢复跟随传感器（锁开则不再
 /// 跟随）。因此横置手机进入播放页会先正常落到竖屏非全屏；退出全屏也会先转回
 /// 竖屏，不会被「窗口横屏自动进全屏」再拉回全屏。
+///
+/// 横屏视频全屏会读一次系统「自动旋转」开关（= 旋转锁定是否关闭）来选择策略：
+/// 锁关时 USER_ROTATION_LANDSCAPE 的四方向跟随同时支持 180° 翻转和转竖屏
+/// 自动退全屏；锁开时它不再跟随传感器，180° 翻转会失效，因此改用
+/// AUTO_ROTATION_LANDSCAPE（仅横向两方向、不受锁控制）。
 ///
 /// 退出全屏只是把「是否全屏」置 false，重算结果自然是当前页面应有的策略；
 /// `portraitOnly` 由离开播放页的路由事件触发，不存在「退出全屏该回哪个策略」
@@ -44,6 +51,14 @@ abstract final class OrientationPolicy {
   /// 当前播放的视频/直播流是否为竖屏（由播放器解析尺寸后同步）。
   static bool _videoVertical = false;
 
+  /// 系统「自动旋转」开关是否开启（旋转锁定关闭）。
+  ///
+  /// 只影响「横屏视频全屏」用哪条策略：锁关用 [userLandscape]（临时转横后
+  /// 四方向跟随，180° 翻转、转竖屏自动退全屏都正常）；锁开用
+  /// [landscapeOnly]（仅横向两方向、不受锁控制，180° 翻转可用，但窗口不会
+  /// 转竖屏退出）。初始化与进入全屏时刷新。
+  static bool _autoRotateEnabled = true;
+
   static HarmonyOrientationPolicy? _applied;
   static bool _initialized = false;
 
@@ -58,10 +73,19 @@ abstract final class OrientationPolicy {
     // 横置手机进入播放页因此会先正常落到竖屏非全屏；退出全屏也会先转回竖屏，
     // 避免窗口保持横屏后被「窗口横屏自动进全屏」重新拉回全屏。
     if (!_fullScreen) return .userPortrait;
-    // 横屏视频全屏：窗口已经是横屏时（例如用户转动设备后自动进全屏）不再
-    // 重新请求旋转，避免系统重选横屏方向造成「先左转再 180°」；否则临时
-    // 转到横屏，之后跟随传感器——旋转锁关闭时转回竖屏会连窗口一起转回竖屏
-    // 并触发自动退出全屏，旋转锁打开时保持横屏、只能点按钮退出。
+    // 横屏视频全屏：
+    // - 旋转锁定关闭：临时转横后恢复四方向跟随（180° 翻转、转回竖屏自动退全屏）
+    // - 旋转锁定打开：仅横向两方向跟随（180° 翻转可用，但不会转竖屏退出，
+    //   只能点按钮退出）
+    // 受限窗口（分屏/悬浮窗/自由多窗）里系统忽略方向策略，保持原逻辑，不按
+    // 旋转锁定状态切换，避免留下不同的待生效策略。
+    if (!WindowFacts.isWindowMode &&
+        !WindowFacts.isFreeWindowMode &&
+        !_autoRotateEnabled) {
+      return .landscapeOnly;
+    }
+    // 窗口已经是横屏时（例如用户转动设备后自动进全屏）不再重新请求旋转，
+    // 避免系统重选横屏方向造成「先左转再 180°」；否则临时转到横屏。
     return _windowIsLandscape ? .followSystem : .userLandscape;
   }
 
@@ -87,6 +111,14 @@ abstract final class OrientationPolicy {
     // 拿不到（通道暂不可用）则不覆盖原生决策，等后续路由/形态事件再算。
     if (form != null) {
       _portraitForm = form;
+    }
+    // 旋转锁定状态只影响「竖屏形态设备的横屏视频全屏」，其它形态不读，避免
+    // 多一次通道往返。
+    if (_portraitForm) {
+      final autoRotate = await HarmonyChannel.getAutoRotateEnabled();
+      if (autoRotate != null) {
+        _autoRotateEnabled = autoRotate;
+      }
     }
     _initialized = true;
     if (form != null) {
@@ -123,10 +155,23 @@ abstract final class OrientationPolicy {
   }
 
   /// 播放器进出全屏；返回策略下发完成的 Future，供进入全屏后等待转向。
-  static Future<void> setFullScreen(bool value) {
-    if (_fullScreen == value) return Future.value();
+  static Future<void> setFullScreen(bool value) async {
+    if (_fullScreen == value) return;
     _fullScreen = value;
-    return _sync();
+    // 只有「竖屏形态设备 + 横屏视频全屏 + 非受限窗口」需要按旋转锁定状态选
+    // 策略；其它情况（平板/2in1/阔折叠、竖屏视频、分屏/悬浮窗/自由多窗）
+    // 保持原策略，不做额外读取。
+    if (value &&
+        _portraitForm &&
+        !_videoVertical &&
+        !WindowFacts.isWindowMode &&
+        !WindowFacts.isFreeWindowMode) {
+      final autoRotate = await HarmonyChannel.getAutoRotateEnabled();
+      if (autoRotate != null) {
+        _autoRotateEnabled = autoRotate;
+      }
+    }
+    await _sync();
   }
 
   static Future<void> _sync({bool force = false}) async {

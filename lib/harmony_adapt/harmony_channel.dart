@@ -408,6 +408,22 @@ abstract class HarmonyChannel {
   /// 原生推送：设备形态变化（折叠/展开）。
   static void Function(bool portraitForm)? onDeviceFormChange;
 
+  /// 系统「自动旋转」开关是否开启（即旋转锁定是否关闭）。
+  ///
+  /// 仅用于横屏视频全屏时选择方向策略：锁关用 `USER_ROTATION_LANDSCAPE`
+  /// （临时转横后四方向跟随，转竖屏可自动退全屏），锁开用
+  /// `AUTO_ROTATION_LANDSCAPE`（仅横向两方向、不受锁控制，可 180° 翻转）。
+  /// 读不到返回 null，调用方保持默认（按开启处理）。
+  static Future<bool?> getAutoRotateEnabled() async {
+    if (!OS.isHarmony) return null;
+    try {
+      final result = await _channel.invokeMethod<Map>('getAutoRotateEnabled');
+      return result?['enabled'] as bool?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 通用窗口方法发送器：非鸿蒙直接返回 null，原生异常（含旧版本没有该
   /// method 的 [MissingPluginException]）一律静默降级，窗口能力缺失不应让
   /// 调用方崩溃。

@@ -18,6 +18,7 @@ import {
 } from "@ohos/flutter_ohos";
 
 import display from "@ohos.display";
+import settings from "@ohos.settings";
 import { appAppearance } from "../appearance/AppAppearance";
 import { deviceFormState } from "../window/DeviceForm";
 import { windowChrome } from "../window/WindowChrome";
@@ -159,6 +160,25 @@ export default class HarmonyChannel implements FlutterPlugin {
     await windowState.setWindowOrientation(policy);
   }
 
+  /// 系统「自动旋转」开关是否开启（即旋转锁定是否关闭）。读取失败按开启处理。
+  ///
+  /// 仅用于横屏视频全屏时选择方向策略：锁关用 USER_ROTATION_LANDSCAPE
+  /// （临时转横后四方向跟随，转竖屏可自动退全屏），锁开用
+  /// AUTO_ROTATION_LANDSCAPE（仅横向两方向、不受锁控制，可 180° 翻转）。
+  private readAutoRotateEnabled(): boolean {
+    try {
+      const value: string = settings.getValueSync(
+        getContext(),
+        settings.general.ACCELEROMETER_ROTATION_STATUS,
+        '1',
+      );
+      return value === '1';
+    } catch (err) {
+      console.warn('HarmonyChannel', `read ACCELEROMETER_ROTATION_STATUS failed: ${err}`);
+      return true;
+    }
+  }
+
   async onMethodCall(call: MethodCall, result: MethodResult): Promise<void> {
     switch (call.method) {
       case "getDisplayHdrFormats": {
@@ -212,6 +232,14 @@ export default class HarmonyChannel implements FlutterPlugin {
           'portraitForm': deviceFormState.isPortraitForm(),
         };
         result.success(form);
+        break;
+      }
+      case "getAutoRotateEnabled": {
+        // 旋转锁定是否关闭（系统「自动旋转」开关），供横屏视频全屏选策略。
+        const state: Record<string, boolean> = {
+          'enabled': this.readAutoRotateEnabled(),
+        };
+        result.success(state);
         break;
       }
       case "setMiniWindowLandscape":

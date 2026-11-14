@@ -175,8 +175,9 @@ export class WindowState {
   /// - `userLandscape`：USER_ROTATION_LANDSCAPE —— 临时旋转到横屏，之后跟随
   ///   传感器（受旋转锁定控制）：锁关时转竖屏会跟回竖屏（用于自动退出全屏），
   ///   锁开时保持横屏。用于细长竖屏形态设备的横屏视频全屏。
-  /// - `landscapeOnly`：AUTO_ROTATION_LANDSCAPE —— 仅横向，不受旋转锁定控制
-  ///   （保留备选，当前未使用）。
+  /// - `landscapeOnly`：AUTO_ROTATION_LANDSCAPE —— 仅横向两方向、不受旋转
+  ///   锁定控制，用于旋转锁定打开时的横屏视频全屏（180° 翻转可用，但窗口
+  ///   不会转竖屏退出，只能点按钮）。
   /// - `follow`：AUTO_ROTATION_RESTRICTED —— 四方向跟随重力/智感，受旋转锁定
   ///   控制，用于平板/2in1/阔折叠等跟随系统的形态，以及全屏中窗口已是横屏
   ///   的状态（不再重复请求旋转）。

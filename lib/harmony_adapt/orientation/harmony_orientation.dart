@@ -21,8 +21,9 @@ enum HarmonyOrientationPolicy {
   /// 形态设备（直板机 / 大折叠外屏）的非播放页。
   portraitOnly('portraitOnly'),
 
-  /// `AUTO_ROTATION_LANDSCAPE`（7）：仅横向，不受旋转锁定控制。用于需要
-  /// 「不管怎么拿都保持横屏」的场景（当前没有状态使用）。
+  /// `AUTO_ROTATION_LANDSCAPE`（7）：仅横向两方向，不受旋转锁定控制。用于
+  /// 旋转锁定打开时的横屏视频全屏：180° 翻转跟手，但窗口不会转竖屏退出
+  /// （只能点按钮退出）。
   landscapeOnly('landscapeOnly'),
 
   /// `USER_ROTATION_LANDSCAPE`（14）：**临时**旋转到横屏，之后跟随传感器
