@@ -26,7 +26,12 @@ class ImageMemoryCleaner with WidgetsBindingObserver {
   /// 进后台也会给应用发内存压力通知
   @override
   void didHaveMemoryPressure() {
-    debugPrint('ImageMemoryCleaner: clear image cache on memoryPressure');
+    // 打时间戳便于在 hilog 里确认这条通道（引擎 RequestBackgroundImageCacheCleanup）
+    // 是否真的送达；目前没有任何日志证明它被调用过。
+    debugPrint(
+      'ImageMemoryCleaner: clear image cache on memoryPressure '
+      '@${DateTime.now().toIso8601String()}',
+    );
     clearImageCache();
   }
 }

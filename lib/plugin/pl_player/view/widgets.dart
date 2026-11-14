@@ -107,6 +107,8 @@ Widget buildSeekPreviewWidget(
                   imgYSize: imgYSize,
                   height: height,
                   imageCache: plPlayerController.previewCache,
+                  onCacheImage: plPlayerController.cachePreviewImage,
+                  onTouchImage: plPlayerController.touchPreviewImage,
                   onSetSize: (xSize, ySize) => data
                     ..imgXSize = imgXSize = xSize
                     ..imgYSize = imgYSize = ySize,
@@ -134,6 +136,8 @@ class VideoShotImage extends StatefulWidget {
     required this.imgXSize,
     required this.imgYSize,
     required this.height,
+    required this.onCacheImage,
+    required this.onTouchImage,
     required this.onSetSize,
     required this.isMounted,
   });
@@ -145,6 +149,14 @@ class VideoShotImage extends StatefulWidget {
   final double imgXSize;
   final double imgYSize;
   final double height;
+
+  /// 写入走 PlPlayerController 的 LRU（带上限与淘汰 dispose），而不是直接
+  /// `imageCache[url] = image`。
+  final void Function(String key, ui.Image image) onCacheImage;
+
+  /// 命中时刷新 LRU 顺序。
+  final void Function(String key) onTouchImage;
+
   final Function(double imgXSize, double imgYSize) onSetSize;
   final ValueGetter<bool> isMounted;
 
@@ -236,18 +248,22 @@ class _VideoShotImageState extends State<VideoShotImage> {
     final url = widget.url;
     _image = widget.imageCache[url];
     if (_image != null) {
+      widget.onTouchImage(url);
       _initSizeIfNeeded();
     } else if (!widget.imageCache.containsKey(url)) {
       widget.imageCache[url] = null;
       _getImg(url).then((image) {
         if (image != null) {
           if (widget.isMounted()) {
-            widget.imageCache[url] = image;
-          }
-          if (mounted) {
-            _image = image;
-            _initSizeIfNeeded();
-            setState(() {});
+            widget.onCacheImage(url, image);
+            if (mounted) {
+              _image = image;
+              _initSizeIfNeeded();
+              setState(() {});
+            }
+          } else {
+            // 页面已销毁：图片进不了缓存，也就再无人负责回收，就地 dispose。
+            image.dispose();
           }
         } else {
           widget.imageCache.remove(url);

@@ -2377,17 +2377,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     HarmonyChannel.releaseContinuation(this);
   }
 
-  /// 销毁底层 Player 前给 OhosVideoController 的在途回调留收尾时间。
+  /// 销毁底层 Player。
   ///
-  /// 该控制器的 videoParams 回调链会异步回到 Player（SetSurfaceSize 走一次
-  /// 平台通道，随后 setProperty），而它的退订挂在 `Player.platform.release` 上、
-  /// 由 `Player.dispose()` 内部才执行；销毁瞬间若有回调在途，就会命中
-  /// "[Player] has been disposed"（原生侧还可能出现悬空 handle）。
+  /// 不再预留固定延迟：media_kit 的销毁已是同步握手（`Initializer.dispose` 等
+  /// isolate 确认退出后再 `mpv_terminate_destroy`），控制器的在途回调由
+  /// `Player.platform.release` 在 `Player.dispose()` 内部收尾。
   Future<void> _disposePlayerSafely(Player? player) async {
     if (player == null) return;
-    if (videoController != null) {
-      await Future.delayed(const Duration(milliseconds: 150));
-    }
     await player.dispose();
   }
 
@@ -2416,7 +2412,43 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     );
   }
 
+  /// 进度条预览缩略图缓存，每个 value 都是一张 GPU 纹理。
+  ///
+  /// Flutter 的 `ImageCache`（含内存压力回调）不会管这个自建 map，所以必须自己
+  /// 设上限，否则拖拽进度条会把整段视频的缩略图一直留住。按数量做 LRU 淘汰
+  /// （缩略图尺寸小而均匀），淘汰时显式 dispose。
+  static const int _kPreviewCacheLimit = 40;
+
   late final Map<String, ui.Image?> previewCache = {};
+  final List<String> _previewCacheOrder = [];
+
+  /// 写入缩略图并维持 LRU 上限。由 VideoShotImage 取图成功后调用。
+  void cachePreviewImage(String key, ui.Image image) {
+    final old = previewCache[key];
+    if (old != null && !identical(old, image)) old.dispose();
+    previewCache[key] = image;
+
+    _previewCacheOrder
+      ..remove(key)
+      ..add(key);
+
+    while (_previewCacheOrder.length > _kPreviewCacheLimit) {
+      final evicted = _previewCacheOrder.removeAt(0);
+      previewCache.remove(evicted)?.dispose();
+    }
+
+    // 加载中的占位项（value 为 null）不进 LRU 队列，顺带清理，避免 key 无界增长。
+    if (previewCache.length > _kPreviewCacheLimit * 2) {
+      final tracked = _previewCacheOrder.toSet();
+      previewCache.removeWhere((k, v) => v == null && !tracked.contains(k));
+    }
+  }
+
+  /// 命中时刷新 LRU 顺序。
+  void touchPreviewImage(String key) {
+    if (_previewCacheOrder.remove(key)) _previewCacheOrder.add(key);
+  }
+
   LoadingState<VideoShotData>? videoShot;
   late final RxBool showPreview = false.obs;
   late final showSeekPreview = Pref.showSeekPreview;
@@ -2441,10 +2473,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     showPreview.value = false;
     previewIndex.value = null;
     videoShot = null;
+    final seen = <ui.Image>{};
     for (final i in previewCache.values) {
-      i?.dispose();
+      // 同一张图可能被多个 key 引用，重复 dispose 会触发
+      // "Cannot dispose image twice"，按对象身份去重。
+      if (i != null && seen.add(i)) i.dispose();
     }
     previewCache.clear();
+    _previewCacheOrder.clear();
   }
 
   Future<void> getVideoShot() async {
@@ -2455,74 +2491,82 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Future<void> takeScreenshot() async {
     if (_screenshotState > 0) return;
     _screenshotState = 1;
-    SmartDialog.showToast('截图中');
-    // 鸿蒙 media_kit fork 的 screenshot 返回 Uint8List（上游 fork 返回 ui.Image）
-    final bytes = await videoPlayerController?.screenshot(format: 'image/png');
-    if (bytes == null) {
-      SmartDialog.showToast('截图失败');
-      _screenshotState = 0;
-      return;
-    }
-    final time = DurationUtils.formatDuration(
-      positionInMilliseconds / 1000,
-    ).replaceAll(':', '-');
-    SmartDialog.showToast('点击弹窗或按 Enter 保存截图');
-    await showDialog(
-      context: Get.context!,
-      requestFocus: true,
-      builder: (context) {
-        void save() {
-          if (_screenshotState > 1) return;
-          _screenshotState = 2;
-          Get.back();
-          ImageUtils.saveByteImg(
-            bytes: bytes,
-            fileName: 'screenshot_${cid}_$time',
-          );
-        }
+    try {
+      SmartDialog.showToast('截图中');
+      // 鸿蒙 media_kit fork 的 screenshot 返回 Uint8List（上游 fork 返回 ui.Image）
+      final bytes = await videoPlayerController?.screenshot(
+        format: 'image/png',
+      );
+      if (bytes == null) {
+        SmartDialog.showToast('截图失败');
+        return;
+      }
+      final time = DurationUtils.formatDuration(
+        positionInMilliseconds / 1000,
+      ).replaceAll(':', '-');
+      SmartDialog.showToast('点击弹窗或按 Enter 保存截图');
+      await showDialog(
+        context: Get.context!,
+        requestFocus: true,
+        builder: (context) {
+          void save() {
+            if (_screenshotState > 1) return;
+            _screenshotState = 2;
+            Get.back();
+            ImageUtils.saveByteImg(
+              bytes: bytes,
+              fileName: 'screenshot_${cid}_$time',
+            );
+          }
 
-        return Focus(
-          autofocus: true,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) {
-              final key = event.logicalKey;
-              if (key == .keyS || key == .enter || key == .numpadEnter) {
-                save();
-                return .handled;
+          return Focus(
+            autofocus: true,
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent) {
+                final key = event.logicalKey;
+                if (key == .keyS || key == .enter || key == .numpadEnter) {
+                  save();
+                  return .handled;
+                }
               }
-            }
-            return .ignored;
-          },
-          child: GestureDetector(
-            onTap: save,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: min(MediaQuery.widthOf(context) / 3, 350),
-                  ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        width: 5,
-                        color: ColorScheme.of(context).surface,
-                      ),
+              return .ignored;
+            },
+            child: GestureDetector(
+              onTap: save,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: min(MediaQuery.widthOf(context) / 3, 350),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(5),
-                      child: Image.memory(bytes),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          width: 5,
+                          color: ColorScheme.of(context).surface,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(5),
+                        child: Image.memory(bytes),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
-    _screenshotState = 0;
+          );
+        },
+      );
+    } catch (e, s) {
+      debugPrint('[takeScreenshot] failed: $e\n$s');
+      SmartDialog.showToast('截图失败');
+    } finally {
+      // 中途任何异常都必须复位，否则此后所有截图都会被开头的守卫静默丢弃。
+      _screenshotState = 0;
+    }
   }
 
   void onPopInvokedWithResult(bool didPop, Object? result) {
