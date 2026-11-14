@@ -1,7 +1,5 @@
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:flutter/scheduler.dart'
-    show Ticker, TickerCallback, TickerProvider;
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/rendering.dart'
     show
         BoxParentData,
@@ -11,6 +9,9 @@ import 'package:flutter/rendering.dart'
         RenderMetaData,
         RenderPadding,
         RenderProxyBox;
+import 'package:flutter/scheduler.dart'
+    show Ticker, TickerCallback, TickerProvider;
+import 'package:material_ui/material_ui.dart';
 
 part 'side_fab_layout.dart';
 
@@ -78,6 +79,11 @@ class _SimpleScaffoldState extends State<SimpleScaffold>
 
   @override
   Widget build(BuildContext context) {
+    // 判定是否为横屏状态，禁用智感握姿
+    final view = View.of(context);
+    FabSideController.instance.recheck(
+      landscape: view.physicalSize.width > view.physicalSize.height,
+    );
     return Material(
       color: widget.backgroundColor,
       child: ScaffoldLayout(
