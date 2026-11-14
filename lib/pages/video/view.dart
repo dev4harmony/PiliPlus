@@ -685,11 +685,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           // 重力），竖着拿设备全屏横屏视频时竖屏窗口不代表转回竖屏，
           // 不应自动退出，否则横屏视频全屏会刚进就退。
           // 自动进全屏（倾斜手机触发）仍保留退出行为，对齐安卓。
-          (!player.isManualFS ||
-              (OS.isHarmony &&
-                  player.mode != FullScreenMode.none &&
-                  player.mode != FullScreenMode.vertical &&
-                  player.mode != FullScreenMode.gravity)) &&
+          // 鸿蒙：方向由系统接管，FullScreenMode 已不再生效——窗口转回竖屏
+          // 就允许自动退出全屏；其它平台仍按原设置决定。
+          (!player.isManualFS || OS.isHarmony) &&
           !player.controlsLock.value &&
           // 竖屏视频自动进全屏后跟随设备方向：转回竖屏时保持竖屏全屏，
           // 不退出（对齐上游安卓效果）；非竖屏视频仍按原逻辑转回竖屏即退出

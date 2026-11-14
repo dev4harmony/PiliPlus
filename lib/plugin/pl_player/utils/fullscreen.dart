@@ -79,33 +79,33 @@ Future<void>? _setPreferredOrientations(List<DeviceOrientation> orientations) {
   return SystemChrome.setPreferredOrientations(orientations);
 }
 
+/// 方向策略在鸿蒙上统一由 `OrientationPolicy` 决策（形态 + 页面 + 全屏），
+/// 这里不再直接下发方向，避免两处写策略互相覆盖。
 Future<void>? portraitUpMode() {
+  if (OS.isHarmony) return null;
   return _setPreferredOrientations(const [.portraitUp]);
 }
 
 Future<void>? portraitDownMode() {
+  if (OS.isHarmony) return null;
   return _setPreferredOrientations(const [.portraitDown]);
 }
 
 Future<void>? landscapeLeftMode() {
+  if (OS.isHarmony) return null;
   return _setPreferredOrientations(const [.landscapeLeft]);
 }
 
 Future<void>? landscapeRightMode() {
+  if (OS.isHarmony) return null;
   return _setPreferredOrientations(const [.landscapeRight]);
 }
 
 Future<void>? fullMode() {
+  if (OS.isHarmony) return null;
   return _setPreferredOrientations(
     const [.portraitUp, .portraitDown, .landscapeLeft, .landscapeRight],
   );
-}
-
-/// 鸿蒙强制窗口转回竖屏（修mate80 横屏无法退出全屏bug）
-Future<void>? harmonyForcePortrait() {
-  if (!OS.isHarmony) return null;
-  _lastOrientation = null;
-  return setWindowOrientation(1);
 }
 
 bool _showSystemBar = true;

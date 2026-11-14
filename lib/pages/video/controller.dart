@@ -12,6 +12,7 @@ import 'package:PiliPlus/common/widgets/video_card/video_card_transition.dart'
 import 'package:PiliPlus/grpc/bilibili/app/listener/v1.pbenum.dart'
     show PlaylistSource;
 import 'package:PiliPlus/grpc/dm.dart';
+import 'package:PiliPlus/harmony_adapt/orientation/orientation_policy.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/init.dart';
@@ -427,6 +428,12 @@ class VideoDetailController extends GetxController
     heroTag = args['heroTag'];
     cover = RxString(args['cover'] ?? '');
     isVertical = RxBool(args['isVertical'] ?? false);
+    // 竖屏视频在竖屏形态设备的播放页整页锁竖向：路由参数通常已带方向初值，
+    // 尽早同步给方向策略，缩短「方向未知」的窗口（真正的方向在播放器解析
+    // 尺寸后会由 PlPlayerController.isVertical 再纠正一次）。
+    if (OS.isHarmony) {
+      OrientationPolicy.setVideoVertical(isVertical.value);
+    }
 
     // 跨设备接续等场景显式指定初始播放/听视频状态，优先于本机设置
     if (args['autoPlay'] case final bool autoPlay) {

@@ -46,7 +46,8 @@ List<SettingsModel> get playSettings => [
     title: '倍速设置',
     subtitle: '设置视频播放速度',
   ),
-  if (Platform.isAndroid || OS.isHarmony)
+  // 鸿蒙：方向由系统/智感决定，不再读取传感器方向，该阈值仅 Android 需要。
+  if (Platform.isAndroid)
     NormalModel(
       onTap: _showAngleDegreesDialog,
       leading: const Icon(MdiIcons.angleAcute),
@@ -262,12 +263,15 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.enableOnlineTotal,
     defaultVal: false,
   ),
-  NormalModel(
-    title: '默认全屏方向',
-    leading: const Icon(Icons.open_with_outlined),
-    getSubtitle: () => '当前全屏方向：${Pref.fullScreenMode.desc}',
-    onTap: _showFullScreenModeDialog,
-  ),
+  // 鸿蒙：全屏方向不再是用户可选项——进全屏按视频方向做一次性旋转，
+  // 其余交给系统（含智感），固该项只在其它平台展示。
+  if (!OS.isHarmony)
+    NormalModel(
+      title: '默认全屏方向',
+      leading: const Icon(Icons.open_with_outlined),
+      getSubtitle: () => '当前全屏方向：${Pref.fullScreenMode.desc}',
+      onTap: _showFullScreenModeDialog,
+    ),
   PopupModel(
     title: '底部进度条展示',
     leading: const Icon(Icons.border_bottom_outlined),
