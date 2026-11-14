@@ -432,3 +432,64 @@ git diff --numstat up-2.1.6.2 -- lib | awk '{a+=$1;d+=$2;n++} END {print "files=
 
 - `docs/_analysis_core_patches.md` — 17 个非 Material 补丁的逐条分析（含 file:line 证据）
 - `docs/_analysis_material_patches.md` — 12 项 Material/Cupertino 补丁的逐条分析 + 搬运阻塞清单
+
+---
+
+## 附 2：shim 包内容速览（2026-11-14 迁移后现状）
+
+### `packages/cupertino_ui`（纯映射，1 个文件）
+
+仅 `lib/cupertino_ui.dart`：`export 'package:flutter/cupertino.dart' hide TranslateAnimationSource;`。
+`TranslateAnimationSource` 在 SDK 标了 `@internal`，转导出会触发
+invalid_export_of_internal_element。无任何自有实现。
+
+### `packages/material_ui`（映射 + 鸿蒙选择体系 + 补丁等价实现）
+
+barrel `lib/material_ui.dart` 的导出分三组，共约 3300 + 9500 行：
+
+**① 映射基座**：`export 'package:flutter/material.dart' hide ...`，隐藏两类名字——
+被本包同名实现替换的（`SelectionArea`/`SelectableText`/`TextField`/`TextFormField`/
+`NavigationDrawer`/`PageView`/`Scrollable`/`ScrollableState`/`EdgeDraggingAutoScroller`/
+`TabBarView`/`DraggableScrollableSheet`/`RichText`/`RenderParagraph`/`BottomSheet`/
+`PersistentBottomSheetController`），以及 SDK 标 `@internal` 的
+`TranslateAnimationSource`。
+
+**② 鸿蒙文本选择体系**（`src/selection_*.dart` + 两个支撑文件，10 个文件 ≈3300 行）：
+
+| 文件 | 行数 | 作用 |
+|---|---|---|
+| `selection_area.dart` | 95 | `SelectionArea` 同名替换：SDK 在选区端点滚出视口时 `contextMenuAnchors` 空断言崩溃，这里用内部已兜底的端点重建锚点；另替换默认菜单构造器 |
+| `selection_edge_clamp.dart` | 171 | 越界拖拽时把选区边夹回手指所在行（复刻 `selectable_region.patch` 的夹取语义） |
+| `selection_handle.dart` | 401 | 鸿蒙「杆 + 球」选择手柄（替代 Material 水滴），几何取自系统主题 |
+| `selection_magnifier.dart` | 272 | 鸿蒙 104×68 胶囊放大镜（替代 Material 77×38 方块），横向跟手、纵向固定偏移 |
+| `selection_toolbar.dart` | 918 | 鸿蒙 37vp 胶囊工具栏：单行纯文字按钮、右侧溢出收二级菜单、原生对齐算法 |
+| `selection_menu.dart` | 424 | 「分享/打开/站内搜索」三项动作 + null 安全兜底；动作由 app 启动时经 `SelectionMenuConfig` 注入（`lib/utils/selection_menu_wiring.dart`），包不反向依赖 app |
+| `selection_widgets.dart` | 377 | `SelectableText`/`TextField`/`TextFormField` 同名包装：默认注入鸿蒙手柄与菜单；含 `selectAllOnFocus = false`（material/text_field.patch） |
+| `selection_platform.dart` | 8 | `isOhosPlatform`，用 `toString()` 比较以兼容没有该枚举的官方 SDK |
+| `ohos_selection_theme.dart` | 331 | 手柄/光标/高亮/工具栏/放大镜的真实主题值，取自 openharmony/global_system_resources |
+| `arkui_scroll_physics.dart` | 276 | ArkUI 列表手感复刻：惯性摩擦、抬手速度整形、边缘弹簧回弹 |
+
+**③ 补丁等价实现**（`src/compat/`，10 个文件 ≈9500 行，2026-11-14 迁入）：
+
+| 文件 | 对应上游补丁 | 内容 |
+|---|---|---|
+| `navigation_drawer.dart` | `navigation_drawer.patch` | SDK 源整份复制 + `flex` 参数 + 目的地 `Material(transparency)` 水波纹 |
+| `tabs.dart` | `scrollable_gesture.patch`（tabs hunk） | `TabBarView` 去泛型，`scrollDirection`/`hitTestBehavior`/`horizontalDragGestureRecognizer` 可选默认 |
+| `page_view.dart` / `scrollable.dart` / `scrollable_helpers.dart` | `scrollable_gesture.patch` + `scrollable.patch` | `PageView`/`Scrollable` 去泛型 + 识别器注入 + `shouldIgnorePointer` getter |
+| `draggable_scrollable_sheet.dart` | `draggable_scrollable_sheet.patch` | `initialScrollOffset` 参数 + 公开 `State`/`ScrollController`/`ScrollPosition` |
+| `paragraph.dart` / `rich_text.dart` | `text.patch` | `RenderParagraph.textPainter` getter；副本带鸿蒙文本选择扩展（`primary`/`onShowMore`） |
+| `bottom_sheet.dart` | `material/scaffold.patch`（bottom_sheet hunk） | SDK 源复制 + 公开 `BottomSheetState`/`childKey`/`handleDrag*`/`BottomSheetDefaultsM3` |
+| `standard_bottom_sheet.dart` | `material/scaffold.patch`（scaffold hunk） | `StandardBottomSheet(State)`、`PersistentBottomSheetController(isLocalHistoryEntry)`，供 app 侧 `MiniScaffold`（与上游逐字一致）继承 |
+
+**约定**：
+- compat 文件内一律 `import 'package:flutter/material.dart' hide <被替换名>`，不经过本包
+  barrel（避免自引用）；
+- 全包不引用 `TargetPlatform.ohos` 枚举（判断走 `selection_platform.dart` 的字符串比较），
+  官方 SDK 可编译；
+- 包不反向依赖 `package:PiliPlus/**`，app 侧行为经静态注入（如 `SelectionMenuConfig`）；
+- `lib/common/widgets/flutter/text_field/**` 等上游同有的 vendored 目录**未**迁入
+  （耦合业务模型，且上游自己也放在 lib/），属已知保留项。
+
+> 注：两个 shim 的 `pubspec.yaml` 顶部仍写着「等鸿蒙升 3.47 就删」的退出说明——
+> 实测鸿蒙 fork 已是 3.47.7 但 Material 仍未拆分出 SDK，该说明已过时；
+> 两个 shim 目前是长期必需的适配层（见本文 §0）。

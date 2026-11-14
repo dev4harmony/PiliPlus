@@ -36,7 +36,6 @@ export 'package:flutter/material.dart'
         PersistentBottomSheetController;
 
 export 'src/selection_area.dart';
-export 'src/selection_area.dart';
 
 // 越界拖拽的兜底（把选区边夹回手指所在那一行），供测试与调试单独引用。
 export 'src/selection_edge_clamp.dart';
