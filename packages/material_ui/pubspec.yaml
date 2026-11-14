@@ -20,3 +20,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # src/compat/draggable_scrollable_sheet.dart 用 listEquals 之外的
+  # collection 扩展（firstWhereOrNull 等）。
+  collection: any

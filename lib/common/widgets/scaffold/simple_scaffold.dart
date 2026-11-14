@@ -1,12 +1,19 @@
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/rendering.dart'
     show
         BoxParentData,
         BoxHitTestResult,
         ChildLayoutHelper,
         HitTestResult,
-        RenderMetaData;
+        RenderMetaData,
+        RenderPadding,
+        RenderProxyBox;
+import 'package:flutter/scheduler.dart'
+    show Ticker, TickerCallback, TickerProvider;
+import 'package:material_ui/material_ui.dart';
+
+part 'side_fab_layout.dart';
 
 class SimpleScaffold extends StatefulWidget {
   const SimpleScaffold({
@@ -15,12 +22,16 @@ class SimpleScaffold extends StatefulWidget {
     this.fab,
     this.appBar,
     required this.body,
+    this.fabSideLocked = false,
   });
 
   final Color? backgroundColor;
   final Widget? fab;
   final Widget? appBar;
   final Widget body;
+
+  /// 锁定 FAB 恒在右侧（禁用智感握姿换边），用于 fab 自带左右位移动画的页面
+  final bool fabSideLocked;
 
   @override
   State<SimpleScaffold> createState() => _SimpleScaffoldState();
@@ -68,6 +79,11 @@ class _SimpleScaffoldState extends State<SimpleScaffold>
 
   @override
   Widget build(BuildContext context) {
+    // 判定是否为横屏状态，禁用智感握姿
+    final view = View.of(context);
+    FabSideController.instance.recheck(
+      landscape: view.physicalSize.width > view.physicalSize.height,
+    );
     return Material(
       color: widget.backgroundColor,
       child: ScaffoldLayout(
@@ -80,6 +96,7 @@ class _SimpleScaffoldState extends State<SimpleScaffold>
           ),
         ),
         fab: widget.fab,
+        fabSideLocked: widget.fabSideLocked,
         appBar: widget.appBar,
         body: widget.body,
       ),
@@ -97,12 +114,14 @@ class ScaffoldLayout
     this.fab,
     this.appBar,
     required this.body,
+    this.fabSideLocked = false,
   });
 
   final Widget? statusBar;
   final Widget? fab;
   final Widget? appBar;
   final Widget body;
+  final bool fabSideLocked;
 
   @override
   Iterable<ScaffoldType> get slots => ScaffoldType.values;
@@ -119,7 +138,16 @@ class ScaffoldLayout
   SlottedContainerRenderObjectMixin<ScaffoldType, RenderBox> createRenderObject(
     BuildContext context,
   ) {
-    return _RenderScaffoldLayout();
+    return _RenderScaffoldLayout()..fabSideLocked = fabSideLocked;
+  }
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant SlottedContainerRenderObjectMixin<ScaffoldType, RenderBox>
+    renderObject,
+  ) {
+    (renderObject as _RenderScaffoldLayout).fabSideLocked = fabSideLocked;
   }
 }
 
@@ -129,6 +157,8 @@ class _RenderScaffoldLayout extends RenderBox
   RenderBox? get appBar => childForSlot(.appBar);
   RenderBox? get statusBar => childForSlot(.statusBar);
   RenderBox get body => childForSlot(.body)!;
+
+  bool fabSideLocked = false;
 
   Offset _getOffset(RenderBox child) {
     return (child.parentData as BoxParentData).offset;
@@ -179,13 +209,7 @@ class _RenderScaffoldLayout extends RenderBox
     final fab = this.fab;
     if (fab != null) {
       final fabSize = ChildLayoutHelper.layoutChild(fab, constraints.loosen());
-      _setOffset(
-        fab,
-        Offset(
-          constraints.maxWidth - fabSize.width,
-          constraints.maxHeight - fabSize.height,
-        ),
-      );
+      _setOffset(fab, sideFabOffset(constraints, fabSize));
     }
   }
 

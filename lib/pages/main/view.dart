@@ -5,7 +5,6 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
-import 'package:PiliPlus/common/widgets/flutter/tabs.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/main.dart';
@@ -443,12 +442,17 @@ class _MainAppState extends PopScopeState<MainApp>
                     ),
                     userAndSearchVertical(theme),
                     const Spacer(flex: 2),
+                    // apply `lib/scripts/navigation_drawer.patch`
                     Expanded(
                       flex: 5,
-                      child: SizedBox(
-                        width: 130,
-                        child: Obx(
-                          () => NavigationDrawer(
+                      child: Obx(
+                        // Drawer 内部是 ConstrainedBox.expand：高度无约束时
+                        // 子级 Column 的 Expanded 会拿到无限高度（布局断言、
+                        // 侧栏空白），必须由 Expanded 提供有界高度。
+                        () => SizedBox(
+                          width: 130,
+                          child: NavigationDrawer(
+                            flex: 5,
                             backgroundColor: Colors.transparent,
                             tilePadding: const .symmetric(
                               vertical: 5,
@@ -528,7 +532,7 @@ class _MainAppState extends PopScopeState<MainApp>
   Widget build(BuildContext context) {
     Widget child;
     if (_mainController.mainTabBarView) {
-      child = CustomTabBarView(
+      child = TabBarView(
         scrollDirection: _mainController.useBottomNav ? .horizontal : .vertical,
         physics: const NeverScrollableScrollPhysics(),
         controller: _mainController.controller,

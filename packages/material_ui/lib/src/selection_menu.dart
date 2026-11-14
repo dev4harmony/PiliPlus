@@ -64,8 +64,9 @@ final RegExp _schemeRegex = RegExp(r'[\w\-]+://\S');
 
 /// 把「分享 / 打开 / 站内搜索」三项加工进 `buttonItems`。
 ///
-/// - 分享插在「复制」之后（没有复制项时放末尾），与 Android 原生顺序一致；
-/// - 「打开 / 站内搜索」跟在分享（或复制）之后，按选中内容是否带 scheme 决定文案。
+/// **顺序：全部追加在末尾**（app 注入的项统一排在 SDK 自带项之后），这样系统/框架的
+/// 原生项始终占据工具栏前几位，不会被应用自定义动作挤到折叠区里。三项之间的相对
+/// 顺序是：分享 → 打开/站内搜索。
 ///
 /// 两个路径（`SelectableText` 的 [EditableTextState] 与 [SelectionArea] 的
 /// [SelectableRegionState]）共用这一份逻辑，保证多端一致。
@@ -73,31 +74,27 @@ List<ContextMenuButtonItem> ensureSelectionMenuButtons(
   List<ContextMenuButtonItem> buttonItems, {
   required String? Function() selectedTextOf,
   required VoidCallback hideToolbar,
+
   /// 覆盖平台判断，仅供测试；缺省取 [defaultTargetPlatform]。
   TargetPlatform? platform,
 }) {
   final TargetPlatform target = platform ?? defaultTargetPlatform;
   if (_isMobile(target) && SelectionMenuConfig.shareText != null) {
-    // framework 默认的分享项在鸿蒙上无效，先清掉再插自己的。
-    buttonItems.removeWhere(
-      (item) => item.type == ContextMenuButtonType.share,
-    );
-    final int copyIndex = buttonItems.indexWhere(
-      (item) => item.type == ContextMenuButtonType.copy,
-    );
-    buttonItems.insert(
-      copyIndex == -1 ? buttonItems.length : copyIndex + 1,
-      ContextMenuButtonItem(
-        type: ContextMenuButtonType.share,
-        onPressed: () {
-          final String? text = selectedTextOf();
-          hideToolbar();
-          if (text != null && text.trim().isNotEmpty) {
-            SelectionMenuConfig.shareText?.call(text);
-          }
-        },
-      ),
-    );
+    // framework 默认的分享项在鸿蒙上无效，先清掉再补自己的。
+    buttonItems
+      ..removeWhere((item) => item.type == ContextMenuButtonType.share)
+      ..add(
+        ContextMenuButtonItem(
+          type: ContextMenuButtonType.share,
+          onPressed: () {
+            final String? text = selectedTextOf();
+            hideToolbar();
+            if (text != null && text.trim().isNotEmpty) {
+              SelectionMenuConfig.shareText?.call(text);
+            }
+          },
+        ),
+      );
   }
 
   final String? text = selectedTextOf()?.trim();
@@ -108,13 +105,7 @@ List<ContextMenuButtonItem> ensureSelectionMenuButtons(
   if (text == null || text.isEmpty || action == null) {
     return buttonItems;
   }
-  final int anchor = buttonItems.lastIndexWhere(
-    (item) =>
-        item.type == ContextMenuButtonType.share ||
-        item.type == ContextMenuButtonType.copy,
-  );
-  buttonItems.insert(
-    anchor == -1 ? buttonItems.length : anchor + 1,
+  buttonItems.add(
     ContextMenuButtonItem(
       label: isScheme ? '打开' : '站内搜索',
       onPressed: () {
@@ -244,8 +235,8 @@ Widget? _buildOhosToolbarForRegion(
   SelectableRegionState selectableRegionState,
   List<ContextMenuButtonItem> buttonItems,
 ) {
-  final RenderObject? renderObject =
-      selectableRegionState.context.findRenderObject();
+  final RenderObject? renderObject = selectableRegionState.context
+      .findRenderObject();
   if (renderObject is! RenderBox || !renderObject.hasSize) {
     return null;
   }
@@ -350,8 +341,8 @@ Widget? buildOhosTextSelectionToolbar({
 TextSelectionToolbarAnchors nullSafeContextMenuAnchors(
   SelectableRegionState selectableRegionState,
 ) {
-  final RenderObject? renderObject =
-      selectableRegionState.context.findRenderObject();
+  final RenderObject? renderObject = selectableRegionState.context
+      .findRenderObject();
   if (renderObject is! RenderBox || !renderObject.hasSize) {
     return const TextSelectionToolbarAnchors(primaryAnchor: Offset.zero);
   }

@@ -7,6 +7,7 @@ import 'package:PiliPlus/common/widgets/custom_toast.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/harmony_adapt/window/system_bars.dart';
 import 'package:PiliPlus/harmony_adapt/appearance/appearance_sync.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_bridge.dart';
@@ -266,6 +267,9 @@ void main() async {
       // 查询面板支持的 HDR 类型：一个都不支持时 HDR 片源按 SDR 输出，
       // 不支持 HDR Vivid 时只发 HDR10 静态元数据
       HarmonyChannel.loadDisplayHdrFormats();
+      // 智感握姿：按设置下发原生握持手订阅
+      FabSideController.instance.init(enable: Pref.enableHoldingHandFab);
+      HarmonyChannel.setHoldingHandMonitor(Pref.enableHoldingHandFab);
       // 统一把深浅色模式与前景/背景色下发给原生，并跟随主题变化重发
       AppearanceSync.attach();
       // 首帧后对账一次系统栏期望：engine 重建 / 热重启后原生侧可能还停在上一

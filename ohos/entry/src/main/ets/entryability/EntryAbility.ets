@@ -31,6 +31,9 @@ const SHORTCUT_URI_MAP: Record<string, string> = {
 /// 底栏相关事件，与 Index.ets 保持一致
 const EVENT_TAB_SWITCH = 'EVENT_TAB_SWITCH';
 
+/// 底栏由隐藏翻回显示：Flutter 据此幂等对齐页签，与 Index.ets 保持一致
+const EVENT_SHELL_BARS_SHOWN = 'EVENT_SHELL_BARS_SHOWN';
+
 /// 顶栏相关事件，与 Index.ets 保持一致
 const EVENT_TOP_SEARCH = 'EVENT_TOP_SEARCH';
 const EVENT_TOP_MSG = 'EVENT_TOP_MSG';
@@ -85,6 +88,16 @@ export default class EntryAbility extends FlutterAbility {
   private initShellEventListeners(): void {
     this.context.eventHub.on(EVENT_TAB_SWITCH, (index: number) => {
       this.flutterChannel?.invokeMethod('showTab', { index: index });
+    });
+    // 底栏由隐藏翻回显示 → 让 Flutter 幂等对齐一次页签（首页/动态/我的）。
+    // 与 EVENT_TAB_SWITCH 分开：那是「用户点了底栏」（会触发刷新/回顶部），
+    // 这里只是显隐恢复后的静默对齐，见 Dart 侧 ShellTabSync。
+    // typeIndex 为 NavigationBarType 序号（自定义排序下与位置序号不同）。
+    this.context.eventHub.on(EVENT_SHELL_BARS_SHOWN, (index: number, typeIndex: number) => {
+      this.flutterChannel?.invokeMethod('onShellBarsShown', {
+        'index': index,
+        'type': typeIndex,
+      });
     });
     // 顶栏搜索框点击 → Flutter 打开搜索页
     this.context.eventHub.on(EVENT_TOP_SEARCH, () => {

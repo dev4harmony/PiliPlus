@@ -29,13 +29,19 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart'
+    show Scrollable, ScrollableState;
 import 'package:material_ui/material_ui.dart'
     hide
         EditableText,
         EditableTextState,
         SpellCheckConfiguration,
         TextSelectionGestureDetectorBuilder,
-        TextSelectionOverlay;
+        TextSelectionOverlay,
+        // 本文件内建 SDK 原生 Scrollable（与上游一致），compat 版会断
+        // SDK 的 _ScrollableScope 私有查找链。
+        Scrollable,
+        ScrollableState;
 import 'package:flutter/rendering.dart'
     hide RenderEditable, VerticalCaretMovementRun;
 import 'package:flutter/scheduler.dart';

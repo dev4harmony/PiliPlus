@@ -1,6 +1,6 @@
 import { BusinessError } from "@kit.BasicServicesKit";
 import window from "@ohos.window";
-import { WindowChromeController, WindowChromeState } from "./WindowChrome";
+import { TITLE_BAR_HEIGHT, WindowChromeController, WindowChromeState } from "./WindowChrome";
 import { SystemBarsController } from "./SystemBars";
 
 /**
@@ -12,6 +12,9 @@ export interface WindowSnapshot {
   maximized: boolean;
   contentFullScreen: boolean;
   titleBarVisible: boolean;
+  /// 标题带是否被鼠标唤出（仅自动收起态为 true）。Dart 侧据此让播放器顶部
+  /// 按钮整体下移，避免被呼出的标题带盖住。
+  titleBarRevealed: boolean;
   titleBarHeight: number;
   isMiniWindow: boolean;
   isWindowMode: boolean;
@@ -195,6 +198,7 @@ export class WindowState {
       'maximized': chrome?.maximized ?? false,
       'contentFullScreen': chrome?.contentFullScreen ?? false,
       'titleBarVisible': chrome?.titleBarVisible ?? false,
+      'titleBarRevealed': chrome?.titleBarRevealed ?? false,
       'titleBarHeight': chrome?.titleBarHeight ?? 0,
       'isMiniWindow': status === window.WindowStatusType.FLOATING,
       'isWindowMode': status === window.WindowStatusType.FLOATING ||
@@ -220,10 +224,19 @@ export class WindowState {
       console.error("WindowState", `readSafeArea failed: ${err}`);
     }
     // 自绘标题带占据窗口顶部，等价于一条顶部安全区：并进来后 Dart 侧无需感知标题带。
+    // 只在标题带真正占位时并入（titleBarHeight > 0）：全屏自动收起时高度为 0，
+    // 内容要能铺满窗口，唤出的标题带浮在内容之上、不推挤布局。
+    //
+    // 例外是「标题带被鼠标唤出」：此时也要把标题带高度并进安全区，让播放器
+    // 顶部那排按钮整体下移，避免呼出的标题带把它们盖住、点不到。
     let titleInset = 0;
     const chrome = this.chrome?.getState();
-    if (chrome !== undefined && chrome.titleBarVisible) {
-      titleInset = this.vp2px(chrome.titleBarHeight);
+    if (chrome !== undefined) {
+      if (chrome.titleBarHeight > 0) {
+        titleInset = this.vp2px(chrome.titleBarHeight);
+      } else if (chrome.titleBarRevealed) {
+        titleInset = this.vp2px(TITLE_BAR_HEIGHT);
+      }
     }
     // 先只算系统避让带（四边），它们构成「已经让位过」的区域，
     // 后面判断挖孔是否落在其中。
@@ -416,7 +429,7 @@ export class WindowState {
     }
     const snapshot = this.readSnapshot();
     const signature = `${snapshot.isFreeWindowMode}|${snapshot.maximized}|` +
-      `${snapshot.contentFullScreen}|${snapshot.titleBarVisible}|` +
+      `${snapshot.contentFullScreen}|${snapshot.titleBarVisible}|${snapshot.titleBarRevealed}|` +
       `${snapshot.titleBarHeight}|${snapshot.isMiniWindow}|${snapshot.isWindowMode}`;
     if (signature === this.lastSnapshotSignature) {
       return;
@@ -494,7 +507,7 @@ export class WindowState {
     this.safeAreaDelayedTimer = setTimeout(() => {
       this.safeAreaDelayedTimer = -1;
       this.emitSafeArea();
-    }, 60);
+    }, 32);
   };
   private safeAreaDelayedTimer: number = -1;
 

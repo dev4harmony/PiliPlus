@@ -18,7 +18,26 @@ export 'package:flutter/material.dart'
         // 一致但不改 SDK 就让鸿蒙用上「杆 + 球」手柄。
         SelectableText,
         TextField,
-        TextFormField;
+        TextFormField,
+        // 以下改由 src/compat/ 提供同名实现，对应 lib/scripts/*.patch：
+        // navigation_drawer（flex + 水波纹）、scrollable_gesture（识别器/方向参数）。
+        // NavigationDrawerDestination 必须与 compat NavigationDrawer 同源，
+        // 否则它内部的 _NavigationDrawerDestinationInfo.of 会因类型错配返回
+        // null（平板侧栏崩溃）。
+        NavigationDrawer,
+        NavigationDrawerDestination,
+        PageView,
+        Scrollable,
+        ScrollableState,
+        EdgeDraggingAutoScroller,
+        TabBarView,
+        DraggableScrollableSheet,
+        RichText,
+        RenderParagraph,
+        // lib/scripts/material/scaffold.patch 的等价实现（compat/bottom_sheet.dart
+        // + compat/standard_bottom_sheet.dart）。
+        BottomSheet,
+        PersistentBottomSheetController;
 
 export 'src/selection_area.dart';
 
@@ -34,9 +53,9 @@ export 'src/selection_handle.dart';
 // 取自 openharmony/global_system_resources 的主题 json，来源见文件头注释。
 export 'src/ohos_selection_theme.dart';
 
-// 鸿蒙样式放大镜（112×72 胶囊、1.4 倍）与工具栏（40vp 胶囊 + 原生对齐规则）。
-// 放大镜需要 app 启动时调一次 `installOhosTextMagnifier()` 才覆盖
-// SelectableText / TextField 的默认配置。
+// 鸿蒙样式放大镜（104×68 胶囊、1.4 倍）与工具栏（37vp 胶囊 + 原生对齐规则 +
+// 右侧溢出收起二级菜单）。放大镜需要 app 启动时调一次 `installOhosTextMagnifier()`
+// 才覆盖 SelectableText / TextField 的默认配置。
 export 'src/selection_magnifier.dart';
 export 'src/selection_toolbar.dart';
 
@@ -50,3 +69,25 @@ export 'src/selection_widgets.dart';
 // 鸿蒙 ArkUI 列表手感（惯性 fling + EdgeEffect.Spring 回弹）的复刻，
 // 平台判断与带业务语义的 physics 仍留在 app 侧（scroll_physics.dart）。
 export 'src/arkui_scroll_physics.dart';
+
+// SDK 补丁的等价实现（lib/scripts/*.patch），文件结构与上游 lib/scripts 对应。
+export 'src/compat/navigation_drawer.dart';
+export 'src/compat/page_view.dart';
+export 'src/compat/scrollable.dart'
+    hide
+        ViewportBuilder,
+        TwoDimensionalViewportBuilder,
+        DiagonalDragBehavior,
+        TwoDimensionalScrollable,
+        TwoDimensionalScrollableState;
+export 'src/compat/scrollable_helpers.dart';
+export 'src/compat/tabs.dart';
+export 'src/compat/draggable_scrollable_sheet.dart' hide DraggableScrollableController;
+export 'src/compat/paragraph.dart';
+export 'src/compat/rich_text.dart';
+export 'src/compat/bottom_sheet.dart'
+    show
+        BottomSheet,
+        BottomSheetState,
+        BottomSheetDefaultsM3;
+export 'src/compat/standard_bottom_sheet.dart';

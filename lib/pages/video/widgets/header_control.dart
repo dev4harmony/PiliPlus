@@ -701,7 +701,7 @@ class HeaderControlState extends State<HeaderControl>
                   onTap: () async {
                     Get.back();
                     try {
-                      final result = await FilePicker.platform.pickFiles(
+                      final result = await FilePicker.pickFile(
                         type: .custom,
                         allowedExtensions: const [
                           'json',
@@ -712,7 +712,7 @@ class HeaderControlState extends State<HeaderControl>
                         ],
                       );
                       if (result != null) {
-                        final file = result.files.first.xFile;
+                        final file = result.xFile;
                         final path = file.path;
                         final name = file.name;
                         final length = videoDetailCtr.subtitles.length;
@@ -1258,11 +1258,7 @@ class HeaderControlState extends State<HeaderControl>
                             '_',
                           );
                   // Reserved characters may not be used in file names. See: https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
-                  StorageUtils.saveBytes2File(
-                    name: name,
-                    bytes: bytes,
-                    allowedExtensions: [format.name],
-                  );
+                  StorageUtils.saveBytes2File(name: name, bytes: bytes);
                 } catch (e, s) {
                   Utils.reportError(e, s);
                   SmartDialog.showToast(e.toString());

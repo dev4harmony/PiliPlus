@@ -6,7 +6,7 @@
     },
     {
       "name": "foreground_text",
-      "value": "#000000"
+      "value": "#FFFFFF"
     },
     {
       "name": "placeholder_text",
@@ -39,6 +39,10 @@
     {
       "name": "title_bar_background",
       "value": "#1E1E1E"
+    },
+    {
+      "name": "title_button_hover",
+      "value": "#1FFFFFFF"
     }
   ]
 }

@@ -772,6 +772,10 @@ abstract final class Pref {
   static bool get enableHdsTopBar =>
       _setting.get(SettingBoxKey.enableHdsTopBar, defaultValue: false);
 
+  /// 鸿蒙智感握姿：FAB 跟随握持手左右换边
+  static bool get enableHoldingHandFab =>
+      _setting.get(SettingBoxKey.enableHoldingHandFab, defaultValue: true);
+
   /// 鸿蒙沉浸光感底栏材质等级，仅原生底栏启用时生效
   static HdsMaterialLevel get hdsTabMaterialLevel =>
       HdsMaterialLevel.values[_setting.get(
@@ -783,7 +787,7 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.enableStatusBarTapToTop, defaultValue: false);
 
   static bool get showActualVolume =>
-      _setting.get(SettingBoxKey.showActualVolume, defaultValue: false);
+      _setting.get(SettingBoxKey.showActualVolume, defaultValue: true);
 
   static bool get enableHeroCoverAnimation =>
       _setting.get(SettingBoxKey.enableHeroCoverAnimation, defaultValue: false);

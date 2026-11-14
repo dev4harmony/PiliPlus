@@ -106,34 +106,75 @@ class OhosSelectionTheme {
 
   static Color selectionHighlight(Brightness brightness) =>
       brightness == Brightness.dark
-          ? selectionHighlightDark
-          : selectionHighlightLight;
+      ? selectionHighlightDark
+      : selectionHighlightLight;
 
   // ---------------------------------------------------------------------------
   // 选中菜单 / 工具栏（`ohos_text_overlay_pattern` + `ohos_select_pattern`）
   // ---------------------------------------------------------------------------
 
-  /// 工具栏总高：`TextOverlayTheme::GetMenuToolbarHeight()` 硬编码 40vp，
-  /// 正好等于 按钮高 28vp + 上下内边距 2×6vp。
-  static const double menuToolbarHeight = 40;
+  /// 工具栏相对原生主题的整体缩放：字号 14fp → 13fp，其余尺寸按同一比例收，
+  /// 保持原生 40 = 28 + 2×6 的比例关系（不缩字号只缩盒子会显得字太挤）。
+  ///
+  /// 下面 [menuToolbarHeight] 等**已经是缩放后的落地值**，注释里的原生值只作来源对照。
+  static const double menuCompactScale = menuFontSize / 14;
 
-  /// 按钮高/最小宽（`text_overlay_menu_button_height` = 28vp、`..._width` = 30vp）。
-  static const double menuButtonHeight = 28;
-  static const double menuButtonMinWidth = 30;
+  /// 工具栏总高：原生 `TextOverlayTheme::GetMenuToolbarHeight()` 硬编码 40vp
+  /// （= 按钮 28 + 上下 2×6）。缩放后 = 26 + 2×5.5 = 37vp。
+  static const double menuToolbarHeight = 37;
 
-  /// 菜单整体内边距（`text_overlay_menu_padding_*` → `$float:padding_level3` = 6vp）。
-  static const double menuPadding = 6;
+  /// 按钮高/最小宽（原生 `text_overlay_menu_button_height` = 28vp、
+  /// `..._width` = 30vp），按比例缩到 26 / 28。
+  static const double menuButtonHeight = 26;
+  static const double menuButtonMinWidth = 28;
 
-  /// 按钮左右内边距（`text_overlay_menu_button_padding_left/right` → `padding_level6` = 12vp），
-  /// 上下为 0（`padding_level0`）。
-  static const double menuButtonPaddingHorizontal = 12;
+  /// 菜单整体内边距（原生 `text_overlay_menu_padding_*` →
+  /// `$float:padding_level3` = 6vp），按比例缩到 5.5vp。
+  static const double menuPadding = 5.5;
 
-  /// 按钮圆角。主题里没有 key，`TextOverlayTheme` 缺省 14vp = 按钮高的一半（胶囊）。
-  static const double menuButtonRadius = 14;
+  /// 按钮左右内边距（原生 `text_overlay_menu_button_padding_left/right` →
+  /// `padding_level6` = 12vp，上下为 0），按比例缩到 11vp。
+  static const double menuButtonPaddingHorizontal = 11;
+
+  /// 按钮之间的间距（原生 `MENU_BUTTON_SPACING = 4.0_vp`），按比例缩到 3.7vp。
+  ///
+  /// 只用于**展开后的二级菜单**（竖排）；收起态的单行工具栏按产品要求不留项间距，
+  /// 见 [menuButtonSpacingCollapsed]。
+  static const double menuButtonSpacing = 3.7;
+
+  /// 收起态（未展开）单行工具栏里，**相邻选项之间**的间距。
+  ///
+  /// 产品要求这里贴紧（= 0），只保留最外侧的 [menuPadding] 作为胶囊内边距；
+  /// 每个按钮自身还有 [menuButtonPaddingHorizontal] 的左右内边距，所以文字不会相连。
+  static const double menuButtonSpacingCollapsed = 0;
+
+  /// 按钮圆角。主题里没有 key，`TextOverlayTheme` 缺省 14vp = 按钮高的一半（胶囊），
+  /// 按比例缩到 13vp（仍是按钮胶囊）。
+  static const double menuButtonRadius = 13;
 
   /// 菜单容器圆角。原生 `TextOverlayComponent::BuildAnimation` 给的是按钮高
   /// （28vp，大于半高），渲染结果就是胶囊；这里直接取工具栏高的一半。
   static const double menuCornerRadius = menuToolbarHeight / 2;
+
+  /// 溢出按钮（把放不下的项收进二级菜单）的图标尺寸。
+  ///
+  /// SDK 的 `_TextSelectionToolbarOverflowButton`（`material/text_selection_toolbar.dart`
+  /// :814）是 `IconButton` + `Icon`，图标吃 `IconTheme` 缺省 24；本实现随 13fp 的文字
+  /// 一起缩到 20（= [menuFontSize] + 7），比文字略大一档，与 SDK 里「图标比文字大一点」
+  /// 的观感一致。
+  static const double menuOverflowIconSize = 20;
+
+  /// 溢出按钮宽度 = 图标 20 + 左右内边距 [menuButtonPaddingHorizontal]（11），
+  /// 与普通文字按钮的横向尺寸同量级。
+  static const double menuOverflowButtonWidth =
+      menuOverflowIconSize + menuButtonPaddingHorizontal;
+
+  /// 二级菜单（竖向展开态）的最小宽度：约 **4 个字**宽 + 左右内边距。
+  ///
+  /// 展开后如果只剩一两个窄项（比如「复制」「分享」），胶囊会瘦成一条细柱、看起来
+  /// 不像菜单，所以给一个下限；宽项更多时自然比它宽。
+  static const double menuOverflowMinWidth =
+      menuFontSize * 4 + menuButtonPaddingHorizontal * 2;
 
   /// 菜单与文字的间距（`text_overlay_menu_spacing_with_text` = **8vp**）。
   /// 注意不是 0：`ComputeSelectMenuPosition` 里菜单底边离选区首行上沿 =
@@ -145,8 +186,10 @@ class OhosSelectionTheme {
 
   /// 按钮文字：`text_overlay_text_font_size` = 14fp，字重
   /// `text_overlay_button_text_font_weight` = 4（OH 的 FontWeight 枚举 0..8 → W400）。
-  static const double menuFontSize = 14;
-  static const FontWeight menuFontWeight = FontWeight.w400;
+  /// 按产品要求比原生**小一点点**：14 → 13fp（0.93 倍，肉眼可辨但不会破坏行高节奏）。
+  /// 字重比原生**大一点点**：W400 → W500（13fp 偏细，加半档更清楚，又不至于像标题）。
+  static const double menuFontSize = 13;
+  static const FontWeight menuFontWeight = FontWeight.w500;
 
   /// 菜单最大宽（主题无 key，`MAX_OVERLAY_MENU_WIDTH` = 442vp）与水平间距
   /// （`OVERLAY_MENU_HORIZONTAL_GAP` = 16vp）。
@@ -175,28 +218,63 @@ class OhosSelectionTheme {
   static const Color menuHoveredDark = Color(0x0CFFFFFF);
 
   /// 按压底色，按亮暗主题取。
-  static Color menuPressed(Brightness brightness) => brightness == Brightness.dark
-      ? menuPressedDark
-      : menuPressedLight;
+  static Color menuPressed(Brightness brightness) =>
+      brightness == Brightness.dark ? menuPressedDark : menuPressedLight;
 
   /// 悬停底色，按亮暗主题取。
-  static Color menuHovered(Brightness brightness) => brightness == Brightness.dark
-      ? menuHoveredDark
-      : menuHoveredLight;
+  static Color menuHovered(Brightness brightness) =>
+      brightness == Brightness.dark ? menuHoveredDark : menuHoveredLight;
 
   /// 菜单描边：主题里 `text_overlay_menu_border_width` = 0vp、颜色 #33000000，
   /// 也就是**不画**边框。
   static const double menuBorderWidth = 0;
 
-  /// 菜单底色透明度
-  static const double menuBackgroundAlpha = 0.4;
+  /// 菜单底色透明度。
+  ///
+  /// 曾经是 0.4 半透明 + 背景模糊（原生 `menu_background_blur_style` 的观感）；
+  /// 按产品要求**去掉模糊、底色跟随应用背景**，所以这里是不透明。
+  static const double menuBackgroundAlpha = 1;
 
-  /// 是否给菜单加背景模糊。真机若出现兼容/性能问题（`BackdropFilter` 在部分
-  /// 后端会掉帧或渲染异常），把它置 false 就退回「纯色 + 半透明」。
-  static const bool menuBlurEnabled = true;
+  /// 是否给菜单加背景模糊。
+  ///
+  /// **已按要求关闭**：模糊在浅色/自定义背景色下会把底色染成灰，且与「背景跟随应用背景色」
+  /// 直接冲突。
+  static const bool menuBlurEnabled = false;
 
-  /// 背景模糊强度（Flutter 的 `ImageFilter.blur` sigma）。
+  /// 背景模糊强度（Flutter 的 `ImageFilter.blur` sigma）。当前未启用。
   static const double menuBlurSigma = 12;
+
+  // 菜单底色取 `ThemeData.scaffoldBackgroundColor`（与手柄球的填充色同源），需要
+  // `BuildContext`，实现在 `selection_toolbar.dart` 的
+  // `_OhosTextSelectionToolbarState._effectiveBackground`；[menuBackground] 只作拿不到
+  // 主题时的兜底。
+
+  /// 菜单底色在应用背景色之上**再泛白**的比例（亮暗都加）。
+  ///
+  /// 纯 `scaffoldBackgroundColor` 会让菜单和页面完全同色、只靠阴影和描边区分，
+  /// 深色下几乎看不出边界。这里统一往白色方向混 12%，深浅色都能各自「亮一点点」，
+  /// 又不至于变成另一块色块。
+  static const double menuBackgroundWhiten = 0.12;
+
+  /// 把 [color] 往白色方向混 [menuBackgroundWhiten]（保留原始 alpha）。
+  static Color whitenMenuBackground(Color color, {double? amount}) {
+    final double t = (amount ?? menuBackgroundWhiten).clamp(0.0, 1.0);
+    int channel(int value) => (value + (255 - value) * t).round();
+    return Color.fromARGB(
+      (color.a * 255).round(),
+      channel((color.r * 255).round()),
+      channel((color.g * 255).round()),
+      channel((color.b * 255).round()),
+    );
+  }
+
+  /// 溢出二级菜单展开/收起的动画时长。
+  ///
+  /// 要求是「快速」的 hero 动画：160ms、`easeOutCubic`，比 SDK 工具栏的 140ms
+  /// `AnimatedSize` 稍长一点点，但仍在"瞬时"区间内。
+  static const Duration menuOverflowAnimationDuration = Duration(
+    milliseconds: 160,
+  );
 
   // 菜单的出现/消失：**纯淡入淡出**（150ms）。
   //
@@ -219,14 +297,19 @@ class OhosSelectionTheme {
   // `magnifier_controller.cpp`
   // ---------------------------------------------------------------------------
 
-  /// 镜片尺寸 112 × 72 vp，圆角 36vp（胶囊），放大 1.4 倍。
-  static const double magnifierWidth = 112;
-  static const double magnifierHeight = 72;
-  static const double magnifierCornerRadius = 36;
+  /// 镜片尺寸：原生 112 × 72vp、圆角 36vp（胶囊）、放大 1.4 倍。
+  /// 按产品要求整体收一点点：**104 × 68**，圆角取高度一半（仍严格是胶囊）。
+  static const double magnifierWidth = 104;
+  static const double magnifierHeight = 68;
+  static const double magnifierCornerRadius = magnifierHeight / 2;
   static const double magnifierScale = 1.4;
 
-  /// 镜片中心在触点上方 80vp（`MAGNIFIER_OFFSETY`），贴屏幕/控件边缘时会压缩这段距离。
-  static const double magnifierVerticalOffset = 80;
+  /// 镜片中心在参考点上方 70vp（原生 `MAGNIFIER_OFFSETY` = 80vp）。
+  ///
+  /// 产品的评价口径是「镜片下沿离参考点（手指/光标）多远」：
+  /// 原生 80 − 72/2 = 44 → 现在 70 − 68/2 = **34**，比原生少 10vp，也比上一版
+  /// （74 − 36 = 38）再少 4vp。仍然留得住手指高度，不会盖到指尖。
+  static const double magnifierVerticalOffset = 70;
 
   /// 阴影 23vp / 强度 0.05；外轮廓 3（render 侧按 px 处理）+ 白色 50%
   /// （暗色 80%）。

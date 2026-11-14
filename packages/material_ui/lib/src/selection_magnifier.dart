@@ -10,34 +10,39 @@ import 'package:material_ui/src/selection_platform.dart';
 ///
 /// `TextMagnifier`（`material/magnifier.dart`）是 Android 的观感：77.37×37.9、
 /// 1.25 倍、灰色蒙层、圆角 20 的方块，并且**位置规则绑在"行"上**（贴着当前行、
-/// 跟手、行切换时做 70ms 位移动画）。鸿蒙的镜片是一枚 **112×72、圆角 36 的胶囊**，
-/// 1.4 倍、白色描边、中心固定在触点上方 80vp：
+/// 跟手、行切换时做 70ms 位移动画）。鸿蒙的镜片是一枚 **104×68 的胶囊**（原生
+/// 112×72 略收小）、1.4 倍、白色描边、中心固定在参考点上方 70vp：
 ///
 /// - 尺寸/倍数/描边/阴影/避让距离见 [OhosSelectionTheme]，取自
 ///   `core/components_ng/pattern/select_overlay/magnifier.h`；
 /// - 定位见 `magnifier_controller.cpp` 的 `UpdateMagnifierOffsetX/Y`：
-///   横向跟着参考点并夹进屏幕，纵向"中心在参考点上方 `MAGNIFIER_OFFSETY`(80vp)"，
-///   贴边时压缩这段距离（`clamp(magnifierY, 0, MAGNIFIER_OFFSETY)`）；
+///   **横向跟手指**（`MagnifierInfo.globalGesturePosition`，夹进屏幕），
+///   纵向"中心在参考点上方 `MAGNIFIER_OFFSETY`"，贴边时压缩这段距离；
 /// - 参考点离开文本控件（`IsLocalOffsetInHostRange` 失败）或落在键盘区时不再显示；
 /// - 进出场 150ms 淡入淡出（本实现只有淡入，SDK 的 overlay 是被同步移除的）。
 ///
-/// ## 参考点（采样点）
+/// ## 横向跟手指、纵向跟光标
 ///
-/// 镜片对准的是**光标/把柄所在位置**，不是手指 —— 拖手柄时手指按在球上，比光标低
-/// 一整个手柄高度，照着手指取样会把手指下方那段（通常已经是空白或下一行）放大。
-/// 原生的传参正是这么做的：
+/// 原生拖手柄时横向是**跟手**的：`OnHandleMove` 把当前拖拽点（`GetLocalOffset()`，
+/// 即手指位置）传给 `SetLocalOffset`，镜片横向就停在那根手指正上方；纵向则固定
+/// 「参考点上方 70vp」，避免镜片盖住手指。早先版本横向也取 `caretRect.center.dx`，
+/// 结果手柄球有 14vp 宽、光标在球心偏一侧时镜片会横向偏移一个字符，
+/// 与手指位置对不上 —— 按产品要求改回跟手。
 ///
-/// - 拖手柄：`text/text_select_overlay.cpp` 的 `OnHandleMove` 把
-///   `handleRect.GetOffset()` 加半个高度（手柄矩形中心）传给 `SetLocalOffset`；
-///   `TextFieldSelectOverlay::UpdateMagnifier` 收的也是 handle rect，单把柄走
-///   `SetMagnifierLocalOffsetToFloatingCaretPos`（`text_field_pattern.cpp:2969`，
-///   用 `GetFloatingCaretRect().Center()`）；
-/// - 长按选词：`TextPattern` 传的是手指位置，但那条路径上 `MagnifierInfo.caretRect`
-///   本来就落在手指所指那一行，取它一样对。
+/// 纵向的"参考点"仍取 [focusOf]（`caretRect` 中心）：手柄比文字行低一整颗球的高度，
+/// 拿手指的 y 会把手指下方那段空白放大。横向用 `globalGesturePosition.dx`，
+/// 纵向用 `caretRect.center.dy`。
 ///
-/// 所以统一用 [focusOf]（`caretRect` 中心）当参考点，位置和取样点都用它。
-/// `RawMagnifier` 的 `focalPointOffset` 语义是「内容点 - 镜片中心」，取
-/// `参考点 - 镜片中心`（纵向恒为 +80）即可，无需像原生那样自己算 `zoomOffset`。
+/// ## 镜片里不画任何额外指示
+///
+/// 镜片显示的就是被放大 1.4 倍的真实内容（文本、选中高亮、光标）。曾经在正中央画过
+/// 一根与手柄同宽同色的竖杆，产品反馈不需要，已移除。
+///
+/// ## 图层顺序
+///
+/// 镜片必须压在选择手柄之上（`shouldDisplayHandlesInMagnifier: true` →
+/// `SelectionOverlay.showMagnifier` 里 `below: null`，即插在手柄 overlay 的上面），
+/// 否则拖到行尾时镜片会被手柄球盖住一角。
 ///
 /// ## 接入方式
 ///
@@ -84,7 +89,9 @@ class OhosTextMagnifier extends StatelessWidget {
           // 参考点（光标）离开文本控件：原生直接收起镜片，这里退化成空 widget。
           return const SizedBox.shrink();
         }
-        final Offset focalPoint = focusOf(info) - rect.center;
+        // `RawMagnifier` 的 `focalPointOffset` 语义是「内容点 - 镜片中心」，
+        // 取样点仍是光标（纵向对齐行、横向对齐手指的 x）。
+        final Offset focalPoint = samplePointOf(info) - rect.center;
         return Positioned(
           left: rect.left,
           top: rect.top,
@@ -118,16 +125,20 @@ class OhosTextMagnifier extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.all(
-                        Radius.circular(
-                          OhosSelectionTheme.magnifierCornerRadius,
+                  // 只有一圈描边，镜片内不再叠加任何指示图形（放大内容自己已经带光标）。
+                  child: Opacity(
+                    opacity: opacity,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(
+                            OhosSelectionTheme.magnifierCornerRadius,
+                          ),
                         ),
-                      ),
-                      border: Border.all(
-                        color: borderColor,
-                        width: borderWidth,
+                        border: Border.all(
+                          color: borderColor,
+                          width: borderWidth,
+                        ),
                       ),
                     ),
                   ),
@@ -160,8 +171,10 @@ class OhosTextMagnifier extends StatelessWidget {
     if (!allowed.contains(focus)) {
       return null;
     }
+    // 横向跟手指（原生 `UpdateMagnifierOffsetX` 用的是拖拽点），不是跟选区/光标。
+    final double horizontal = gestureXOf(info);
     final double left = _clamp(
-      focus.dx - width / 2,
+      horizontal - width / 2,
       0,
       math.max(0, screen.width - width),
     );
@@ -173,11 +186,11 @@ class OhosTextMagnifier extends StatelessWidget {
     return Rect.fromLTWH(left, top, width, height);
   }
 
-  /// 镜片对准的参考点（overlay 坐标）：光标/把柄中心，而不是手指。
+  /// 镜片的纵向参考点（overlay 坐标）：光标/把柄中心，而不是手指。
   ///
-  /// 依据见类头注释：原生只在「长按选词」时用手指位置，拖手柄全程用
-  /// `handleRect` 中心；而两种场景下 `MagnifierInfo.caretRect` 都已经是那条信息，
-  /// 直接取它的中心即可。
+  /// 依据见类头注释：拖手柄时手指按在球上，比光标低一整个手柄高度，照着手指取样会把
+  /// 手指下方那段（通常已经是空白或下一行）放大。而 `MagnifierInfo.caretRect` 在拖把柄
+  /// 与长按选词两条路径上都落在正确的那一行，直接取中心即可。
   static Offset focusOf(MagnifierInfo info) {
     final Rect caret = info.caretRect;
     // 注意 SelectableRegion 给的 caretRect 宽度为 0（只有 x + 行高），不能用 isEmpty。
@@ -185,6 +198,22 @@ class OhosTextMagnifier extends StatelessWidget {
       return caret.center;
     }
     return info.globalGesturePosition;
+  }
+
+  /// 镜片的横向锚点（overlay 坐标）：**手指当前位置**。
+  static double gestureXOf(MagnifierInfo info) {
+    final double x = info.globalGesturePosition.dx;
+    if (x.isFinite) {
+      return x;
+    }
+    return focusOf(info).dx;
+  }
+
+  /// 镜片采样的内容点（overlay 坐标）= 手指所在列 × 光标所在行。
+  ///
+  /// 镜片中心显示的就是这一点的内容，所以「手指横坐标」和「光标纵坐标」两件事都要。
+  static Offset samplePointOf(MagnifierInfo info) {
+    return Offset(gestureXOf(info), focusOf(info).dy);
   }
 
   static double _clamp(double value, double lower, double upper) {
@@ -200,11 +229,19 @@ class OhosTextMagnifier extends StatelessWidget {
 
 /// 鸿蒙放大镜的 [TextMagnifierConfiguration]。
 ///
-/// `shouldDisplayHandlesInMagnifier: false`：原生的镜片里同样没有手柄（手柄画在
-/// 浮层里、且被镜片挡在下面）。
+/// `shouldDisplayHandlesInMagnifier: true` —— 这个字段在
+/// `SelectionOverlay.showMagnifier`（`widgets/text_selection.dart:1201-1205`）里只决定
+/// overlay 的插入位置：传 true 时 `below: null`，镜片插在手柄 overlay **之上**，
+/// 于是镜片盖住手柄（此前是 false，镜片被手柄球压住一角）。
+///
+/// 代价：手柄 overlay 进了 `BackdropFilter` 的取样范围。但镜片中心在参考点上方
+/// [OhosSelectionTheme.magnifierVerticalOffset]（70vp），镜片下沿离参考点仍有 34vp，
+/// 而止手柄/折叠光标的球挂在行下方，起手柄的球在行上方、热区边缘 —— 正常拖动时球
+/// 只是偶尔擦到镜片底边，不会在镜片里出现一颗放大的球。真的要彻底排掉只能改 SDK
+/// （让镜片的 BackdropFilter 跳过手柄 overlay 层）。
 final TextMagnifierConfiguration ohosTextMagnifierConfiguration =
     TextMagnifierConfiguration(
-      shouldDisplayHandlesInMagnifier: false,
+      shouldDisplayHandlesInMagnifier: true,
       magnifierBuilder:
           (
             BuildContext context,

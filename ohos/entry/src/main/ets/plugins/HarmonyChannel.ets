@@ -19,6 +19,7 @@ import {
 
 import display from "@ohos.display";
 import { appAppearance } from "../appearance/AppAppearance";
+import { MotionHand } from "../common/MotionHand";
 import { windowChrome } from "../window/WindowChrome";
 import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
 
@@ -447,6 +448,21 @@ export default class HarmonyChannel implements FlutterPlugin {
       //   result.success(true);
       //   break;
       // }
+      case "setHoldingHandMonitor": {
+        // 智感握姿：开关握持手+操作手订阅，变化时推送 onHoldingHandChange
+        const enable: boolean = call.argument('enable') ?? false;
+        if (deviceInfo.sdkApiVersion < 20) {
+          result.success(false);
+          break;
+        }
+        MotionHand.setMonitor(enable, (isLeft: boolean, fromOperating: boolean): void => {
+          const args: Record<string, boolean> =
+            { 'isLeft': isLeft, 'fromOperating': fromOperating };
+          this.channel?.invokeMethod("onHoldingHandChange", args);
+        });
+        result.success(true);
+        break;
+      }
       case "addUpToDesktop": {
         await this.addUpToDesktop(call);
         result.success(true);

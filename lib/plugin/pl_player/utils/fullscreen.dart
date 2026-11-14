@@ -17,15 +17,24 @@ import 'package:os_type/os_type.dart';
 /// 原生侧已把自由窗口标题带并进顶部上报，[HarmonyChannel.rootTopInset] 即
 /// 「播放器顶部必须让出的高度」。普通全屏页面自身已有黑边占位（上游行为），
 /// 不在此重复让位。
+///
+/// [allowRevealedTitleBar] 供播控顶栏使用：自由窗口全屏下鼠标唤出自绘标题带时，
+/// 原生会把标题带高度并进顶部安全区（见 ArkTS WindowState.readSafeArea），
+/// 顶栏据此整体下移一条标题带的高度，避免被呼出的标题带盖住点不到。
+/// 弹幕等其它消费方保持 false，避免唤出/收回时整片弹幕跳动。
 double? harmonyDecorTopInset(
   BuildContext context, {
   required bool isFullScreen,
   required bool removeSafeArea,
+  bool allowRevealedTitleBar = false,
 }) {
-  if (!OS.isHarmony ||
-      !WindowFacts.isWindowMode ||
-      !isFullScreen ||
-      removeSafeArea) {
+  if (!OS.isHarmony || !isFullScreen || removeSafeArea) {
+    return null;
+  }
+  final windowMode = WindowFacts.isWindowMode;
+  final revealedTitleBar =
+      allowRevealedTitleBar && WindowFacts.titleBarRevealed;
+  if (!windowMode && !revealedTitleBar) {
     return null;
   }
   final inset = HarmonyChannel.rootTopInset(context);

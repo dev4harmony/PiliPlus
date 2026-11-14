@@ -1,8 +1,10 @@
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
+import 'package:PiliPlus/harmony_adapt/shell_tab_sync.dart';
 import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -123,6 +125,19 @@ abstract class HarmonyChannel {
       case 'showTab':
         _onShellTabSwitch?.call(call.arguments['index'] as int? ?? 0);
         break;
+      // 原生 HDS 底栏「隐藏 → 显示」时上报（ArkTS Index.ets 在 shellBarsHidden
+      // 由 true 翻回 false 的那一帧发一次，带上当前页签的类型序号）。此时按原生
+      // 当前页签幂等对齐 Flutter：一致则什么都不做，见 [ShellTabSync.align]。
+      case 'onShellBarsShown':
+        {
+          final args = call.arguments;
+          final type = args is Map ? args['type'] : null;
+          ShellTabSync.align(
+            type is int ? type : -1,
+            dispatch: _onShellTabSwitch,
+          );
+          break;
+        }
       // ArkTS 顶栏搜索框点击 → Flutter 跳转搜索页
       case 'onTopSearchTap':
         _onTopSearchTap?.call();
@@ -138,6 +153,13 @@ abstract class HarmonyChannel {
       // ArkTS 分类栏切换 → Flutter 切换首页 TabController
       case 'onHomeTabChange':
         _onHomeTabChange?.call(call.arguments['index'] as int? ?? 0);
+        break;
+      // 原生握持手/操作手变化 → FAB 左右换边（智感握姿）
+      case 'onHoldingHandChange':
+        FabSideController.instance.syncFromNative(
+          isLeft: call.arguments['isLeft'] as bool? ?? false,
+          fromOperatingHand: call.arguments['fromOperating'] as bool? ?? false,
+        );
         break;
       default:
         break;
@@ -179,6 +201,10 @@ abstract class HarmonyChannel {
       await _channel.invokeMethod(method, args);
     } on PlatformException catch (_) {}
   }
+
+  /// 开关鸿蒙智感握姿的原生握持手订阅
+  static Future<void> setHoldingHandMonitor(bool enable) =>
+      _invoke('setHoldingHandMonitor', {'enable': enable});
 
   /// 向原生发送 shell 配置（Flutter 侧计算后通知 ArkTS）
   static Future<void> setShellBars({required bool useNativeTabs}) =>
