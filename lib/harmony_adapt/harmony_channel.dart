@@ -1,6 +1,7 @@
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
 import 'package:PiliPlus/harmony_adapt/shell_tab_sync.dart';
@@ -153,6 +154,13 @@ abstract class HarmonyChannel {
       case 'onHomeTabChange':
         _onHomeTabChange?.call(call.arguments['index'] as int? ?? 0);
         break;
+      // 原生握持手/操作手变化 → FAB 左右换边（智感握姿）
+      case 'onHoldingHandChange':
+        FabSideController.instance.syncFromNative(
+          isLeft: call.arguments['isLeft'] as bool? ?? false,
+          fromOperatingHand: call.arguments['fromOperating'] as bool? ?? false,
+        );
+        break;
       default:
         break;
     }
@@ -193,6 +201,10 @@ abstract class HarmonyChannel {
       await _channel.invokeMethod(method, args);
     } on PlatformException catch (_) {}
   }
+
+  /// 开关鸿蒙智感握姿的原生握持手订阅
+  static Future<void> setHoldingHandMonitor(bool enable) =>
+      _invoke('setHoldingHandMonitor', {'enable': enable});
 
   /// 向原生发送 shell 配置（Flutter 侧计算后通知 ArkTS）
   static Future<void> setShellBars({required bool useNativeTabs}) =>

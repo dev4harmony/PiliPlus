@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
@@ -46,6 +47,17 @@ List<SettingsModel> experimentalSettings = [
     leading: Icon(Icons.science_outlined),
     setKey: SettingBoxKey.showActualVolume,
     defaultVal: true,
+  ),
+  SwitchModel(
+    title: '鸿蒙智感握姿',
+    subtitle: '受支持的设备下，评论等浮动按钮跟随握持手自动换边',
+    leading: const Icon(Icons.back_hand_outlined),
+    setKey: SettingBoxKey.enableHoldingHandFab,
+    defaultVal: true,
+    onChanged: (value) {
+      FabSideController.instance.setEnabled(value);
+      HarmonyChannel.setHoldingHandMonitor(value);
+    },
   ),
   const SwitchModel(
     title: '点击状态栏快速回顶',
