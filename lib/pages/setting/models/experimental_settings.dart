@@ -4,8 +4,8 @@ import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:os_type/os_type.dart';
 
 List<SettingsModel> experimentalSettings = [
@@ -45,7 +45,7 @@ List<SettingsModel> experimentalSettings = [
     subtitle: '适配鸿蒙音量调节步进',
     leading: Icon(Icons.science_outlined),
     setKey: SettingBoxKey.showActualVolume,
-    defaultVal: false,
+    defaultVal: true,
   ),
   const SwitchModel(
     title: '点击状态栏快速回顶',

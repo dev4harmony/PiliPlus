@@ -783,7 +783,7 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.enableStatusBarTapToTop, defaultValue: false);
 
   static bool get showActualVolume =>
-      _setting.get(SettingBoxKey.showActualVolume, defaultValue: false);
+      _setting.get(SettingBoxKey.showActualVolume, defaultValue: true);
 
   static bool get enableHeroCoverAnimation =>
       _setting.get(SettingBoxKey.enableHeroCoverAnimation, defaultValue: false);
