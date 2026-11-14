@@ -77,6 +77,14 @@ jobs:
           echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
         shell: bash
 
+      - name: Precache ohos artifacts
+        run: flutter precache --ohos
+        shell: bash
+
+      - name: Apply ohos patches
+        run: bash tool/apply_patches.sh
+        shell: bash
+
       - name: Generate env.json
         run: dart .vscode/build_env.dart "${{ env.tag }}"
         shell: bash

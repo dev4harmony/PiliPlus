@@ -2,11 +2,52 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "precache_ohos",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "precache",
+        "--ohos"
+      ],
+      "presentation": {
+        "reveal": "silent"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "apply_patches",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "tool/apply_patches.sh"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "tool\\apply_patches.ps1"
+        ]
+      },
+      "dependsOn": [
+        "precache_ohos"
+      ],
+      "presentation": {
+        "reveal": "silent"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "build_env",
       "type": "shell",
       "command": "dart",
       "args": [
         ".vscode/build_env.dart"
+      ],
+      "dependsOn": [
+        "apply_patches"
       ],
       "presentation": {
         "reveal": "silent"

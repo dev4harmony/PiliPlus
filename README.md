@@ -22,6 +22,15 @@
 
 - 1、配置鸿蒙flutter3.44.9环境，参考[鸿蒙flutter3.44.9](https://gitcode.com/CPF-Flutter/flutter_flutter/tree/oh-3.44.9-dev)
 
+- 1.5、打上鸿蒙渲染相关补丁（首次构建前执行一次，幂等）：
+
+  ```bash
+  bash tool/apply_patches.sh                                        # macOS / Linux / git-bash
+  powershell -ExecutionPolicy Bypass -File tool\apply_patches.ps1   # Windows
+  ```
+
+  补丁内容与原理见 [tool/patches/README.md](tool/patches/README.md)。不打也能编译通过，只是视频/网页的平台视图无法进入硬件合成。
+
 - 2、通过vscode运行启动配置或是build_hap任务以确保应用内所需环境变量正确写入
 
 若遇到类似 **Package not available (the pubspec for image_picker 1.1.2 from git has version 1.0.2).** 这样的报错，可参考[这篇掘金](https://juejin.cn/post/7602936997175132212)

@@ -1,0 +1,124 @@
+diff --git a/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/embedding/ohos/FlutterPage.ets b/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/embedding/ohos/FlutterPage.ets
+index d9bc9d2999b..8ae5ec6393f 100644
+--- a/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/embedding/ohos/FlutterPage.ets
++++ b/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/embedding/ohos/FlutterPage.ets
+@@ -29,8 +29,13 @@ struct FlutterSurface {
+   @Prop xComponentRenderFit: RenderFit = RenderFit.RESIZE_FILL;
+   @Prop firstFrameDisplayed: boolean = false;
+   @Prop xComponentColor: Color = Color.Black
+-  /** When true, keep the main XComponent background transparent (HCPP hole-punch). */
+-  @Prop forceTransparentBackground: boolean = false;
++  /**
++   * 本帧可见的 HCPP 平台视图数（PlatformViewsControllerHybrid 每帧发布）。
++   * >0 时主 surface 让出 HWC 名额：RenderService 对同一 App 内相互重叠的自绘节点
++   * 只放行最下面一层（UpdateHwcNodeEnableByHwcNodeBelowSelfInApp），而 HCPP 的
++   * DISPLAY PV 永远叠在主 surface 之上，所以两者只能有一个走硬件合成。
++   */
++  @StorageLink('hcpp_pv_count') pvCount: number = 0;
+   @Prop defaultFocusOnTouch: boolean = false;
+ 
+   private surfaceLifecycleToken: number = 0;
+@@ -78,9 +83,14 @@ struct FlutterSurface {
+         this.flutterView = null;
+       })
+       .renderFit(this.xComponentRenderFit)
+-      .backgroundColor(this.forceTransparentBackground ? Color.Transparent :
+-        (this.firstFrameDisplayed && this.xComponentRenderFit == RenderFit.RESIZE_FILL ?
+-          this.xComponentColor : Color.Transparent))
++      // 背景色决定主 surface 自己能不能进 HWC，规则来自 RenderService：
++      //  - 不透明黑 → 放行（RSUniHwcVisitor::ProcessSolidLayerDisabled 的 "go directly" 分支）；
++      //  - 透明     → 判 DISABLED_BY_BACKGROUND_ALPHA，退出 HWC 竞争；
++      //  - 其它不透明色 → 判 DISABLED_BY_SOLID_BACKGROUND_ALPHA。
++      // 有可见 HCPP 平台视图时选择透明：PV 叠在本层之上且必相交，同 App 内只允许
++      // 最下面一层走 HWC，让位后视频/网页才能拿到名额。首帧前仍透明以避免黑闪。
++      .backgroundColor(this.firstFrameDisplayed && this.pvCount === 0
++        ? this.xComponentColor : Color.Transparent)
+       .expandSafeArea(this.safeAreaTypes, this.safeAreaEdges)
+       .onAreaChange((oldValue: Area, newValue: Area) => {
+         // Only handle when Y position changes (window decoration state changed)
+@@ -269,7 +279,6 @@ export struct FlutterPage {
+       xComponentRenderFit: this.xComponentRenderFit,
+       firstFrameDisplayed: this.firstFrameDisplayed,
+       xComponentColor: this.xComponentColor,
+-      forceTransparentBackground: this.hybridCompositionEnabled,
+       defaultFocusOnTouch: this.defaultFocusOnTouch
+     })
+   }
+diff --git a/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/plugin/platform/PlatformViewsControllerHybrid.ets b/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/plugin/platform/PlatformViewsControllerHybrid.ets
+index c12c8a1d299..3488767abc2 100644
+--- a/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/plugin/platform/PlatformViewsControllerHybrid.ets
++++ b/engine/src/flutter/shell/platform/ohos/flutter_embedding/flutter/src/main/ets/plugin/platform/PlatformViewsControllerHybrid.ets
+@@ -310,6 +310,11 @@ export interface OverlayRect {
+ // FlutterPage 按 viewId 取自己的部分，避免固定 key 的跨引擎覆盖。
+ const OVERLAY_RECT_MAP_KEY: string = 'hcpp_overlay_rects_map';
+ 
++// [主 surface 让位 HWC] 当前"可见"的 HCPP 平台视图数，供 FlutterPage 决定主 surface
++// 的背景色（有 PV → 透明让出 HWC 名额；无 PV → 不透明黑自己拿 HWC）。
++// 注意：FlutterPage 里 @StorageLink 的 key 必须与这里保持字面一致。
++export const HCPP_PV_COUNT_KEY: string = 'hcpp_pv_count';
++
+ // 单个 PointerData 字段，对照 native HandleTouchEvent 的 PointerData 构造
+ interface TouchDataItem {
+   change: number;
+@@ -360,6 +365,12 @@ export default class PlatformViewsControllerHybrid implements HybridCompositionH
+   private orphanedTouchViews: Set<number> = new Set();
+   // 本帧已收到的 overlay rect，onDisplayOverlayHybrid 逐条 push，onEndFrameHybrid flush 到 AppStorage。
+   private pendingOverlayRects: OverlayRect[] = [];
++  // [主 surface 让位 HWC] 本帧实际参与合成的 PV（onDisplayPlatformViewHybrid 逐帧填充）。
++  // 用"本帧可见的 PV 数"而不是"HCPP 是否开启"作判据：后者装完 app 恒为 true，
++  // 等于永久放弃主 surface 的 HWC 资格。
++  private frameShownPvIds: Set<number> = new Set();
++  // 上次写入 AppStorage 的值。-1 保证首帧必写一次（初始化 key）。
++  private publishedShownPvCount: number = -1;
+   /**
+    * 本帧引擎合成序（onDisplayPlatformViewHybrid 按引擎 composition_order 逐个
+    * 调用，此处按到达顺序记录）。ArkUI 侧 wrapper DVModel 是创建时一次性 push 的，
+@@ -747,6 +758,9 @@ export default class PlatformViewsControllerHybrid implements HybridCompositionH
+       this.frameDisplayOrder[this.frameDisplayOrder.length - 1] !== viewId) {
+       this.frameDisplayOrder.push(viewId);
+     }
++    // [主 surface 让位 HWC] 记下本帧真正参与合成的 PV；被 hidePlatformViewHybrid
++    // 隐藏（零尺寸/opacity 0）或未进 composition_order 的 PV 不会到这里。
++    this.frameShownPvIds.add(viewId);
+     // C++ OnDisplayPlatformView2 前四个参数(x/y/width/height)是 physical pixels(px)，
+     // ArkUI layout 用 vp，需 px2vp 转换。
+     const leftVp = px2vp(x);
+@@ -1604,6 +1618,8 @@ export default class PlatformViewsControllerHybrid implements HybridCompositionH
+     //     Map<viewKey, rects> 读-改-写：多引擎各自只更新自己的 slice，
+     //     FlutterPage 按 viewId 取自己的部分。每帧替换整个 Map（新实例），
+     //     保证 @StorageLink 引用变化触发 ForEach 重新求值（首页/无遮挡帧写空数组）。
++    //  3) 发布"本帧可见 PV 数"，驱动 FlutterPage 主 surface 背景在透明/不透明之间切换。
++    this.publishShownPvCount();
+     this.applyCompositionOrder();
+     const viewKey = this.flutterView?.getId();
+     if (viewKey == undefined) {
+@@ -1626,6 +1642,29 @@ export default class PlatformViewsControllerHybrid implements HybridCompositionH
+     this.pendingOverlayRects = [];
+   }
+ 
++  /**
++   * [主 surface 让位 HWC] 把"本帧可见的 HCPP 平台视图数"发布到 AppStorage。
++   *
++   * 背景：RenderService 对同一 App 内相互重叠的硬件合成候选只放行最下面一层
++   * （RSUniHwcVisitor::UpdateHwcNodeEnableByHwcNodeBelowSelfInApp），而 HCPP 的
++   * DISPLAY 平台视图永远叠在主 surface 之上。因此：
++   *  - 有可见 PV 时，主 surface 主动透明（自身被判 DISABLED_BY_BACKGROUND_ALPHA），
++   *    把唯一名额让给 PV（视频/网页），它们才有机会进 HWC；
++   *  - 没有 PV 时，主 surface 用不透明黑去拿 HWC（非黑不透明会撞
++   *    DISABLED_BY_SOLID_BACKGROUND_ALPHA）。
++   * 只在值变化时写 AppStorage，避免每帧触发 FlutterPage 重渲染；
++   * 用 Set 去重，同一 PV 一帧内多次上报也只算一次。
++   */
++  private publishShownPvCount(): void {
++    const count = this.frameShownPvIds.size;
++    this.frameShownPvIds.clear();
++    if (count === this.publishedShownPvCount) {
++      return;
++    }
++    this.publishedShownPvCount = count;
++    AppStorage.setOrCreate<number>(HCPP_PV_COUNT_KEY, count);
++  }
++
+   /**
+    * 把本控制器各 wrapper 的 DVModel 在 FlutterView children 中的相对顺序，
+    * 对齐到本帧引擎合成序（frameDisplayOrder，即 Dart 层当前的 PV 上下关系）。
