@@ -45,13 +45,17 @@ class CustomPopupMenuItemState<T> extends State<CustomPopupMenuItem<T>> {
       child: AnimatedDefaultTextStyle(
         style: style,
         duration: kThemeChangeDuration,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: widget.height),
-          child: Padding(
-            padding: _PopupMenuDefaultsM3.menuItemPadding,
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: widget.child,
+        // lib/scripts/material/popup_menu.patch：图标颜色跟随文字样式
+        child: IconTheme.merge(
+          data: IconThemeData(color: style.color),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: widget.height),
+            child: Padding(
+              padding: _PopupMenuDefaultsM3.menuItemPadding,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: widget.child,
+              ),
             ),
           ),
         ),

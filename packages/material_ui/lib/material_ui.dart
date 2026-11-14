@@ -18,8 +18,24 @@ export 'package:flutter/material.dart'
         // 一致但不改 SDK 就让鸿蒙用上「杆 + 球」手柄。
         SelectableText,
         TextField,
-        TextFormField;
+        TextFormField,
+        // 以下改由 src/compat/ 提供同名实现，对应 lib/scripts/*.patch：
+        // navigation_drawer（flex + 水波纹）、scrollable_gesture（识别器/方向参数）。
+        NavigationDrawer,
+        PageView,
+        Scrollable,
+        ScrollableState,
+        EdgeDraggingAutoScroller,
+        TabBarView,
+        DraggableScrollableSheet,
+        RichText,
+        RenderParagraph,
+        // lib/scripts/material/scaffold.patch 的等价实现（compat/bottom_sheet.dart
+        // + compat/standard_bottom_sheet.dart）。
+        BottomSheet,
+        PersistentBottomSheetController;
 
+export 'src/selection_area.dart';
 export 'src/selection_area.dart';
 
 // 越界拖拽的兜底（把选区边夹回手指所在那一行），供测试与调试单独引用。
@@ -50,3 +66,19 @@ export 'src/selection_widgets.dart';
 // 鸿蒙 ArkUI 列表手感（惯性 fling + EdgeEffect.Spring 回弹）的复刻，
 // 平台判断与带业务语义的 physics 仍留在 app 侧（scroll_physics.dart）。
 export 'src/arkui_scroll_physics.dart';
+
+// SDK 补丁的等价实现（lib/scripts/*.patch），文件结构与上游 lib/scripts 对应。
+export 'src/compat/navigation_drawer.dart' hide NavigationDrawerDestination;
+export 'src/compat/page_view.dart';
+export 'src/compat/scrollable.dart';
+export 'src/compat/scrollable_helpers.dart';
+export 'src/compat/tabs.dart';
+export 'src/compat/draggable_scrollable_sheet.dart' hide DraggableScrollableController;
+export 'src/compat/paragraph.dart';
+export 'src/compat/rich_text.dart';
+export 'src/compat/bottom_sheet.dart'
+    show
+        BottomSheet,
+        BottomSheetState,
+        BottomSheetDefaultsM3;
+export 'src/compat/standard_bottom_sheet.dart';

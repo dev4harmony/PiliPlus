@@ -11,10 +11,11 @@
 
 import 'dart:math' as math;
 
-import 'package:PiliPlus/common/widgets/flutter/page/scrollable.dart';
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart'
-    hide EdgeDraggingAutoScroller, Scrollable, ScrollableState;
+import 'package:flutter/material.dart'
+    hide Scrollable, ScrollableState, PageView, EdgeDraggingAutoScroller;
+
+import 'scrollable.dart';
 
 /// An auto scroller that scrolls the [scrollable] if a drag gesture drags close
 /// to its edge.

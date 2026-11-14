@@ -9,10 +9,7 @@ import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:material_ui/material_ui.dart' hide DraggableScrollableSheet;
-
-part 'package:PiliPlus/common/widgets/draggable_sheet/dyn.dart';
-part 'package:PiliPlus/common/widgets/draggable_sheet/topic.dart';
+import 'package:flutter/material.dart' hide DraggableScrollableSheet;
 
 /// Controls a [DraggableScrollableSheet].
 ///
@@ -287,6 +284,7 @@ class DraggableScrollableSheet extends StatefulWidget {
     this.snapAnimationDuration,
     this.controller,
     this.shouldCloseOnMinExtent = true,
+    this.initialScrollOffset = 0.0,
     required this.builder,
   }) : assert(minChildSize >= 0.0),
        assert(maxChildSize <= 1.0),
@@ -378,6 +376,11 @@ class DraggableScrollableSheet extends StatefulWidget {
   /// Set on emitted [DraggableScrollableNotification]s. It is up to parent
   /// classes to properly read and handle this value.
   final bool shouldCloseOnMinExtent;
+
+  /// The initial pixel scroll offset of the inner scroll position.
+  ///
+  /// Mirrors upstream `lib/scripts/draggable_scrollable_sheet.patch`.
+  final double initialScrollOffset;
 
   /// The builder that creates a child to display in this widget, which will
   /// use the provided [ScrollController] to enable dragging and scrolling
@@ -551,9 +554,19 @@ class _DraggableSheetExtent {
   }
 }
 
+/// Public alias for the private sheet state, mirroring upstream
+/// `lib/scripts/draggable_scrollable_sheet.patch` so subclasses outside this
+/// library can extend it.
+typedef DraggableScrollableSheetState = _DraggableScrollableSheetState;
+
 class _DraggableScrollableSheetState extends State<DraggableScrollableSheet> {
   late _DraggableScrollableSheetScrollController _scrollController;
+  set scrollController(_DraggableScrollableSheetScrollController controller) {
+    _scrollController = controller;
+  }
+
   late _DraggableSheetExtent _extent;
+  _DraggableSheetExtent get extent => _extent;
 
   @override
   void initState() {
@@ -567,10 +580,15 @@ class _DraggableScrollableSheetState extends State<DraggableScrollableSheet> {
       initialSize: widget.initialChildSize,
       shouldCloseOnMinExtent: widget.shouldCloseOnMinExtent,
     );
+    initScrollController();
+    widget.controller?._attach(_scrollController);
+  }
+
+  void initScrollController() {
     _scrollController = _DraggableScrollableSheetScrollController(
       extent: _extent,
+      initialScrollOffset: widget.initialScrollOffset,
     );
-    widget.controller?._attach(_scrollController);
   }
 
   List<double> _impliedSnapSizes() {
@@ -719,8 +737,16 @@ class _DraggableScrollableSheetState extends State<DraggableScrollableSheet> {
 ///  * [PrimaryScrollController], which can be used to establish a
 ///    [_DraggableScrollableSheetScrollController] as the primary controller for
 ///    descendants.
+/// Public alias for the private scroll controller, mirroring upstream
+/// `lib/scripts/draggable_scrollable_sheet.patch`.
+typedef DraggableScrollableSheetScrollController =
+    _DraggableScrollableSheetScrollController;
+
 class _DraggableScrollableSheetScrollController extends ScrollController {
-  _DraggableScrollableSheetScrollController({required this.extent});
+  _DraggableScrollableSheetScrollController({
+    required this.extent,
+    super.initialScrollOffset,
+  });
 
   _DraggableSheetExtent extent;
   VoidCallback? onPositionDetached;
@@ -736,6 +762,7 @@ class _DraggableScrollableSheetScrollController extends ScrollController {
       context: context,
       oldPosition: oldPosition,
       getExtent: () => extent,
+      initialPixels: initialScrollOffset,
     );
   }
 
@@ -788,6 +815,11 @@ class _DraggableScrollableSheetScrollController extends ScrollController {
 /// See also:
 ///
 ///  * [_DraggableScrollableSheetScrollController], which uses this as its [ScrollPosition].
+/// Public alias for the private scroll position, mirroring upstream
+/// `lib/scripts/draggable_scrollable_sheet.patch`.
+typedef DraggableScrollableSheetScrollPosition =
+    _DraggableScrollableSheetScrollPosition;
+
 class _DraggableScrollableSheetScrollPosition
     extends ScrollPositionWithSingleContext {
   _DraggableScrollableSheetScrollPosition({

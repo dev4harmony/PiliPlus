@@ -7,12 +7,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:PiliPlus/common/widgets/flutter/page/scrollable_helpers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:material_ui/material_ui.dart'
-    hide Scrollable, ScrollableState, EdgeDraggingAutoScroller;
+import 'package:flutter/material.dart'
+    hide Scrollable, ScrollableState, PageView, EdgeDraggingAutoScroller;
 import 'package:flutter/rendering.dart';
+
+import 'scrollable_helpers.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -73,8 +74,7 @@ typedef _EnsureVisibleResults = (List<Future<void>>, ScrollableState);
 ///    child.
 ///  * [ScrollNotification] and [NotificationListener], which can be used to watch
 ///    the scroll position without using a [ScrollController].
-class Scrollable<T extends HorizontalDragGestureRecognizer>
-    extends StatefulWidget {
+class Scrollable extends StatefulWidget {
   /// Creates a widget that scrolls.
   const Scrollable({
     super.key,
@@ -93,7 +93,8 @@ class Scrollable<T extends HorizontalDragGestureRecognizer>
     required this.horizontalDragGestureRecognizer,
   }) : assert(semanticChildCount == null || semanticChildCount >= 0);
 
-  final GestureRecognizerFactoryConstructor<T> horizontalDragGestureRecognizer;
+  // scrollable_gesture.patch: optional recognizer factory with upstream default.
+  final ValueGetter<HorizontalDragGestureRecognizer> horizontalDragGestureRecognizer;
 
   /// {@template flutter.widgets.Scrollable.axisDirection}
   /// The direction in which this widget scrolls.
@@ -298,7 +299,7 @@ class Scrollable<T extends HorizontalDragGestureRecognizer>
   Axis get axis => axisDirectionToAxis(axisDirection);
 
   @override
-  ScrollableState<T> createState() => ScrollableState<T>();
+  ScrollableState createState() => ScrollableState();
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -531,8 +532,7 @@ class _ScrollableScope extends InheritedWidget {
 ///
 /// This class is not intended to be subclassed. To specialize the behavior of a
 /// [Scrollable], provide it with a [ScrollPhysics].
-class ScrollableState<T extends HorizontalDragGestureRecognizer>
-    extends State<Scrollable<T>>
+class ScrollableState extends State<Scrollable>
     with TickerProviderStateMixin, RestorationMixin
     implements ScrollContext {
   // GETTERS
@@ -685,7 +685,7 @@ class ScrollableState<T extends HorizontalDragGestureRecognizer>
 
   @protected
   @override
-  void didUpdateWidget(Scrollable<T> oldWidget) {
+  void didUpdateWidget(Scrollable oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.controller != oldWidget.controller) {
@@ -753,6 +753,10 @@ class ScrollableState<T extends HorizontalDragGestureRecognizer>
       const <Type, GestureRecognizerFactory>{};
   bool _shouldIgnorePointer = false;
 
+  /// scrollable.patch: exposes whether pointer events are currently ignored.
+  @protected
+  bool get shouldIgnorePointer => _shouldIgnorePointer;
+
   bool? _lastCanDrag;
   Axis? _lastAxisDirection;
 
@@ -802,9 +806,10 @@ class ScrollableState<T extends HorizontalDragGestureRecognizer>
           };
         case Axis.horizontal:
           _gestureRecognizers = <Type, GestureRecognizerFactory>{
-            T: GestureRecognizerFactoryWithHandlers<T>(
+            HorizontalDragGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<HorizontalDragGestureRecognizer>(
               widget.horizontalDragGestureRecognizer,
-              (T instance) {
+              (HorizontalDragGestureRecognizer instance) {
                 instance
                   ..onDown = _handleDragDown
                   ..onStart = _handleDragStart

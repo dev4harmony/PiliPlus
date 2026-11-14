@@ -3,50 +3,27 @@ import 'package:material_ui/material_ui.dart';
 
 const double kBottomSheetDragHeight = 45.0;
 
-const double _minFlingVelocity = 700.0;
-const double _closeProgressThreshold = 0.5;
-
-/// A [BottomSheet] that tracks drags through a [VerticalDragGestureRecognizer]
-/// fed by a [Listener], instead of the internal `RawGestureDetector` of
-/// [BottomSheet].
-///
-/// The upstream project extends the SDK's public `BottomSheetState` to build
-/// this widget, but the HarmonyOS Flutter SDK keeps the bottom sheet state
-/// private. This port reimplements the same widget against the public API.
 // ignore: camel_case_types
-class BottomSheet_ extends StatefulWidget {
+class BottomSheet_ extends BottomSheet {
   const BottomSheet_({
     super.key,
-    this.animationController,
-    this.enableDrag = true,
-    this.onDragStart,
-    this.onDragEnd,
-    this.constraints,
-    required this.onClosing,
-    required this.builder,
+    super.animationController,
+    super.enableDrag = true,
+    super.onDragStart,
+    super.onDragEnd,
+    super.constraints,
+    required super.onClosing,
+    required super.builder,
     this.dragHeight = kBottomSheetDragHeight,
   });
 
-  final AnimationController? animationController;
-  final bool enableDrag;
-  final BottomSheetDragStartHandler? onDragStart;
-  final BottomSheetDragEndHandler? onDragEnd;
-  final BoxConstraints? constraints;
-  final VoidCallback onClosing;
-  final WidgetBuilder builder;
-
-  /// Only pointers that go down within this distance from the top of the
-  /// sheet start a drag.
   final double dragHeight;
 
   @override
-  State<BottomSheet_> createState() => _BottomSheet_State();
+  BottomSheetState<BottomSheet_> createState() => _MiniBottomSheetState();
 }
 
-// ignore: camel_case_types
-class _BottomSheet_State extends State<BottomSheet_> {
-  final GlobalKey _childKey = GlobalKey(debugLabel: 'BottomSheet child');
-
+class _MiniBottomSheetState extends BottomSheetState<BottomSheet_> {
   _VerticalDragGestureRecognizer? _verticalDragGestureRecognizer;
 
   _VerticalDragGestureRecognizer get verticalDragGestureRecognizer =>
@@ -61,70 +38,6 @@ class _BottomSheet_State extends State<BottomSheet_> {
             ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context)
             ..onlyAcceptDragOnThreshold = true;
 
-  double get _childHeight {
-    final RenderBox renderBox =
-        _childKey.currentContext!.findRenderObject()! as RenderBox;
-    return renderBox.size.height;
-  }
-
-  bool get _dismissUnderway =>
-      widget.animationController!.status == AnimationStatus.reverse;
-
-  void handleDragStart(DragStartDetails details) {
-    widget.onDragStart?.call(details);
-  }
-
-  void handleDragUpdate(DragUpdateDetails details) {
-    assert(
-      widget.enableDrag && widget.animationController != null,
-      "'BottomSheet_.animationController' cannot be null when "
-      "'BottomSheet_.enableDrag' is true.",
-    );
-    if (_dismissUnderway) {
-      return;
-    }
-    widget.animationController!.value -= details.primaryDelta! / _childHeight;
-  }
-
-  void handleDragEnd(DragEndDetails details) {
-    assert(
-      widget.enableDrag && widget.animationController != null,
-      "'BottomSheet_.animationController' cannot be null when "
-      "'BottomSheet_.enableDrag' is true.",
-    );
-    if (_dismissUnderway) {
-      return;
-    }
-    var isClosing = false;
-    if (details.velocity.pixelsPerSecond.dy > _minFlingVelocity) {
-      final double flingVelocity =
-          -details.velocity.pixelsPerSecond.dy / _childHeight;
-      if (widget.animationController!.value > 0.0) {
-        widget.animationController!.fling(velocity: flingVelocity);
-      }
-      if (flingVelocity < 0.0) {
-        isClosing = true;
-      }
-    } else if (widget.animationController!.value < _closeProgressThreshold) {
-      if (widget.animationController!.value > 0.0) {
-        widget.animationController!.fling(velocity: -1.0);
-      }
-      isClosing = true;
-    } else {
-      widget.animationController!.forward();
-    }
-
-    widget.onDragEnd?.call(details, isClosing: isClosing);
-
-    if (isClosing) {
-      widget.onClosing();
-    }
-  }
-
-  void _onPointerDown(PointerDownEvent event) {
-    verticalDragGestureRecognizer.addPointer(event);
-  }
-
   @override
   void dispose() {
     super.dispose();
@@ -132,22 +45,32 @@ class _BottomSheet_State extends State<BottomSheet_> {
     _verticalDragGestureRecognizer = null;
   }
 
+  void _onPointerDown(PointerDownEvent event) {
+    verticalDragGestureRecognizer.addPointer(event);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool useMaterial3 = Theme.of(context).useMaterial3;
+    late final defaults = useMaterial3
+        ? BottomSheetDefaultsM3(context)
+        : const BottomSheetThemeData();
+    late final bottomSheetTheme = Theme.of(context).bottomSheetTheme;
+    final BoxConstraints? constraints =
+        widget.constraints ??
+        bottomSheetTheme.constraints ??
+        defaults.constraints;
+
     Widget bottomSheet = KeyedSubtree(
-      key: _childKey,
+      key: childKey,
       child: widget.builder(context),
     );
 
-    if (widget.constraints != null &&
-        widget.constraints != const BoxConstraints()) {
+    if (constraints != null && constraints != const BoxConstraints()) {
       bottomSheet = Align(
         alignment: Alignment.bottomCenter,
         heightFactor: 1.0,
-        child: ConstrainedBox(
-          constraints: widget.constraints!,
-          child: bottomSheet,
-        ),
+        child: ConstrainedBox(constraints: constraints, child: bottomSheet),
       );
     }
 

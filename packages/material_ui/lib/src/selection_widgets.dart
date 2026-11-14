@@ -166,7 +166,8 @@ class TextField extends flutter.TextField {
     super.scrollPadding = const EdgeInsets.all(20.0),
     super.dragStartBehavior = DragStartBehavior.start,
     super.enableInteractiveSelection,
-    super.selectAllOnFocus,
+    // lib/scripts/material/text_field.patch：桌面端聚焦不再全选
+    super.selectAllOnFocus = false,
     super.selectionControls,
     super.onTap,
     super.onTapAlwaysCalled = false,
@@ -259,7 +260,8 @@ class TextFormField extends flutter.TextFormField {
     Brightness? keyboardAppearance,
     EdgeInsets scrollPadding = const EdgeInsets.all(20.0),
     bool? enableInteractiveSelection,
-    bool? selectAllOnFocus,
+    // lib/scripts/material/text_field.patch
+    bool? selectAllOnFocus = false,
     TextSelectionControls? selectionControls,
     InputCounterWidgetBuilder? buildCounter,
     ScrollPhysics? scrollPhysics,

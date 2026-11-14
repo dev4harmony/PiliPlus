@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:PiliPlus/common/widgets/flutter/page/scrollable.dart';
-import 'package:flutter/gestures.dart'
-    show DragStartBehavior, HorizontalDragGestureRecognizer;
-import 'package:material_ui/material_ui.dart'
-    hide PageView, Scrollable, ScrollableState;
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart'
+    hide Scrollable, ScrollableState, PageView, EdgeDraggingAutoScroller;
 import 'package:flutter/rendering.dart';
+
+import 'scrollable.dart';
 
 class _ForceImplicitScrollPhysics extends ScrollPhysics {
   const _ForceImplicitScrollPhysics({
@@ -68,8 +68,7 @@ const PageScrollPhysics _kPagePhysics = PageScrollPhysics();
 ///  * [GridView], for a scrollable grid of boxes.
 ///  * [ScrollNotification] and [NotificationListener], which can be used to watch
 ///    the scroll position without using a [ScrollController].
-class PageView<T extends HorizontalDragGestureRecognizer>
-    extends StatefulWidget {
+class PageView extends StatefulWidget {
   /// Creates a scrollable list that works page by page from an explicit [List]
   /// of widgets.
   ///
@@ -104,10 +103,11 @@ class PageView<T extends HorizontalDragGestureRecognizer>
     this.hitTestBehavior = HitTestBehavior.opaque,
     this.scrollBehavior,
     this.padEnds = true,
-    required this.horizontalDragGestureRecognizer,
+    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
   }) : childrenDelegate = SliverChildListDelegate(children);
 
-  final GestureRecognizerFactoryConstructor<T> horizontalDragGestureRecognizer;
+  // scrollable_gesture.patch: optional recognizer factory with upstream default.
+  final ValueGetter<HorizontalDragGestureRecognizer> horizontalDragGestureRecognizer;
 
   /// Creates a scrollable list that works page by page using widgets that are
   /// created on demand.
@@ -152,7 +152,7 @@ class PageView<T extends HorizontalDragGestureRecognizer>
     this.hitTestBehavior = HitTestBehavior.opaque,
     this.scrollBehavior,
     this.padEnds = true,
-    required this.horizontalDragGestureRecognizer,
+    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
   }) : childrenDelegate = SliverChildBuilderDelegate(
          itemBuilder,
          findChildIndexCallback: findChildIndexCallback,
@@ -186,7 +186,7 @@ class PageView<T extends HorizontalDragGestureRecognizer>
     this.hitTestBehavior = HitTestBehavior.opaque,
     this.scrollBehavior,
     this.padEnds = true,
-    required this.horizontalDragGestureRecognizer,
+    this.horizontalDragGestureRecognizer = HorizontalDragGestureRecognizer.new,
   });
 
   /// Controls whether the widget's pages will respond to
@@ -295,11 +295,10 @@ class PageView<T extends HorizontalDragGestureRecognizer>
   final bool padEnds;
 
   @override
-  State<PageView<T>> createState() => _PageViewState<T>();
+  State<PageView> createState() => _PageViewState();
 }
 
-class _PageViewState<T extends HorizontalDragGestureRecognizer>
-    extends State<PageView<T>> {
+class _PageViewState extends State<PageView> {
   int _lastReportedPage = 0;
 
   late PageController _controller;
@@ -324,7 +323,7 @@ class _PageViewState<T extends HorizontalDragGestureRecognizer>
   }
 
   @override
-  void didUpdateWidget(PageView<T> oldWidget) {
+  void didUpdateWidget(PageView oldWidget) {
     if (oldWidget.controller != widget.controller) {
       if (oldWidget.controller == null) {
         _controller.dispose();
@@ -380,7 +379,7 @@ class _PageViewState<T extends HorizontalDragGestureRecognizer>
         }
         return false;
       },
-      child: Scrollable<T>(
+      child: Scrollable(
         dragStartBehavior: widget.dragStartBehavior,
         axisDirection: axisDirection,
         controller: _controller,

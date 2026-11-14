@@ -1,5 +1,8 @@
-part of 'package:PiliPlus/common/widgets/flutter/draggable_scrollable_sheet.dart';
+import 'package:material_ui/material_ui.dart';
 
+/// Downstream-only (HarmonyOS fork) sheet variant that starts the inner scroll
+/// position at a given pixel offset, mirroring upstream's
+/// `initialScrollOffset` widget parameter via a dedicated subclass.
 class TopicDraggableScrollableSheet extends DraggableScrollableSheet {
   const TopicDraggableScrollableSheet({
     super.key,
@@ -24,30 +27,19 @@ class TopicDraggableScrollableSheet extends DraggableScrollableSheet {
 }
 
 class _TopicDraggableScrollableSheetState
-    extends _DraggableScrollableSheetState {
+    extends DraggableScrollableSheetState {
   @override
-  void initState() {
-    super.initState();
-    _extent = _DraggableSheetExtent(
-      minSize: widget.minChildSize,
-      maxSize: widget.maxChildSize,
-      snap: widget.snap,
-      snapSizes: _impliedSnapSizes(),
-      snapAnimationDuration: widget.snapAnimationDuration,
-      initialSize: widget.initialChildSize,
-      shouldCloseOnMinExtent: widget.shouldCloseOnMinExtent,
-    );
-    _scrollController = _TopicDraggableScrollableSheetScrollController(
-      extent: _extent,
+  void initScrollController() {
+    scrollController = _TopicDraggableScrollableSheetScrollController(
+      extent: extent,
       initialScrollOffset:
           (widget as TopicDraggableScrollableSheet).initialScrollOffset,
     );
-    widget.controller?._attach(_scrollController);
   }
 }
 
 class _TopicDraggableScrollableSheetScrollController
-    extends _DraggableScrollableSheetScrollController {
+    extends DraggableScrollableSheetScrollController {
   _TopicDraggableScrollableSheetScrollController({
     required super.extent,
     double initialScrollOffset = 0.0,
@@ -58,12 +50,12 @@ class _TopicDraggableScrollableSheetScrollController
   final double _initialScrollOffset;
 
   @override
-  _DraggableScrollableSheetScrollPosition createScrollPosition(
+  DraggableScrollableSheetScrollPosition createScrollPosition(
     ScrollPhysics physics,
     ScrollContext context,
     ScrollPosition? oldPosition,
   ) {
-    return _DraggableScrollableSheetScrollPosition(
+    return _TopicDraggableScrollableSheetScrollPosition(
       physics: physics.applyTo(const AlwaysScrollableScrollPhysics()),
       context: context,
       oldPosition: oldPosition,
@@ -71,4 +63,15 @@ class _TopicDraggableScrollableSheetScrollController
       initialPixels: _initialScrollOffset,
     );
   }
+}
+
+class _TopicDraggableScrollableSheetScrollPosition
+    extends DraggableScrollableSheetScrollPosition {
+  _TopicDraggableScrollableSheetScrollPosition({
+    required super.physics,
+    required super.context,
+    super.oldPosition,
+    required super.getExtent,
+    required super.initialPixels,
+  });
 }
