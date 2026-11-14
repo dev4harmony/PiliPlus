@@ -1,13 +1,13 @@
-import { common, wantAgent, WantAgent } from "@kit.AbilityKit";
-import { BusinessError, deviceInfo } from "@kit.BasicServicesKit";
+import { common } from "@kit.AbilityKit";
+import { deviceInfo } from "@kit.BasicServicesKit";
 import { http } from "@kit.NetworkKit";
 import { util } from "@kit.ArkTS";
 import { fileIo } from "@kit.CoreFileKit";
 import { formProvider } from "@kit.FormKit";
 import AbilityConstant from "@ohos.app.ability.AbilityConstant";
-import Want from "@ohos.app.ability.Want";
-import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
 import window from "@ohos.window";
+import { BackgroundTask } from "../common/BackgroundTask";
+import { AbilityAware, AbilityPluginBinding } from "@ohos/flutter_ohos";
 import {
   Any,
   FlutterPlugin,
@@ -23,12 +23,9 @@ import { MotionHand } from "../common/MotionHand";
 import { windowChrome } from "../window/WindowChrome";
 import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
 
-export default class HarmonyChannel implements FlutterPlugin {
+export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
   private channel: MethodChannel | null = null;
   private lastWindow: window.Window | null = null;
-  private bgTaskPromise: Promise<void> = Promise.resolve();
-  private isBackgroundTaskRunning: boolean = false;
-  private bgTaskWanted: boolean = false;
   /// 当前底部页签是否为首页（由 Flutter 同步）。
   /// 用于 dialog 隐藏/显示顶栏时的多级分支判断。
   private topBarIsHome: boolean = false;
@@ -52,6 +49,15 @@ export default class HarmonyChannel implements FlutterPlugin {
 
   getUniqueClassName(): string {
     return "HarmonyChannel";
+  }
+
+  onAttachedToAbility(binding: AbilityPluginBinding): void {
+    // 长时任务只能由 UIAbility 申请；纯 TS 类里 getContext(this) 返回
+    // undefined，必须用这里的 ability context
+    BackgroundTask.init(binding.getAbility().context as common.UIAbilityContext);
+  }
+
+  onDetachedFromAbility(): void {
   }
 
   onAttachedToEngine(binding: FlutterPluginBinding): void {
@@ -309,12 +315,16 @@ export default class HarmonyChannel implements FlutterPlugin {
         break;
       }
       case "startBackgroundTask": {
-        this.startBackgroundTaskInner();
-        result.success(true);
+        const running: boolean = call.argument('running') ?? false;
+        const task = BackgroundTask.getInstance();
+        task.setRunning(running).then((): void => {
+          result.success(task.isRunning());
+        });
         break;
       }
-      case "stopBackgroundTask": {
-        this.stopBackgroundTaskInner();
+      case "updateBackgroundProgress": {
+        const progress: number = call.argument('progress') ?? 0;
+        BackgroundTask.getInstance().updateProgress(progress);
         result.success(true);
         break;
       }
@@ -555,69 +565,6 @@ export default class HarmonyChannel implements FlutterPlugin {
     } finally {
       httpRequest?.destroy();
     }
-  }
-
-  private startBackgroundTaskInner(): void {
-    this.enqueueBgTask(true);
-  }
-
-  private stopBackgroundTaskInner(): void {
-    this.enqueueBgTask(false);
-  }
-
-  /**
-   * Promise 链式队列：将所有 start/stop 请求排队执行，
-   * 只根据最终期望状态 (bgTaskWanted) 决定实际操作，消除竞态条件。
-   */
-  private enqueueBgTask(wanted: boolean): void {
-    this.bgTaskWanted = wanted;
-    this.bgTaskPromise = this.bgTaskPromise.then(async (): Promise<void> => {
-      if (this.bgTaskWanted) {
-        // 期望启动；若实际未运行则执行启动
-        if (this.isBackgroundTaskRunning) {
-          return;
-        }
-        try {
-          const context: common.UIAbilityContext = getContext() as common.UIAbilityContext;
-          const wantAgentInfo: wantAgent.WantAgentInfo = {
-            wants: [
-              {
-                bundleName: context.abilityInfo.bundleName,
-                abilityName: context.abilityInfo.name,
-              } as Want,
-            ],
-            actionType: wantAgent.OperationType.START_ABILITY,
-            requestCode: 0,
-            actionFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG] as Array<wantAgent.WantAgentFlags>,
-          };
-          const wantAgentObj: WantAgent = await wantAgent.getWantAgent(wantAgentInfo);
-          const list: Array<string> = ["dataTransfer"];
-          await backgroundTaskManager.startBackgroundRunning(
-            context, list, wantAgentObj,
-          );
-          this.isBackgroundTaskRunning = true;
-          console.info("HarmonyChannel", "Background task started (dataTransfer)");
-        } catch (error) {
-          console.error("HarmonyChannel",
-            `startBackgroundTask failed, code: ${(error as BusinessError).code}, msg: ${(error as
-              BusinessError).message}`);
-        }
-      } else {
-        // 期望停止；若实际在运行则执行停止
-        if (!this.isBackgroundTaskRunning) {
-          return;
-        }
-        try {
-          await backgroundTaskManager.stopBackgroundRunning(getContext());
-          this.isBackgroundTaskRunning = false;
-          console.info("HarmonyChannel", "Background task stopped");
-        } catch (error) {
-          console.error("HarmonyChannel",
-            `stopBackgroundTask failed, code: ${(error as BusinessError).code}, msg: ${(error as
-              BusinessError).message}`);
-        }
-      }
-    });
   }
 
   /**

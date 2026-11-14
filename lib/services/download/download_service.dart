@@ -428,6 +428,8 @@ class DownloadService extends GetxService {
   }
 
   Future<void> _startDownload(BiliDownloadEntryInfo entry) async {
+    // 用户刚触发下载、处于前台时申请，成功率最高
+    _startBackgroundTask();
     try {
       if (!await downloadDanmaku(entry: entry)) {
         return;
@@ -507,7 +509,6 @@ class DownloadService extends GetxService {
         default:
           break;
       }
-      _startBackgroundTask();
     } catch (e) {
       _updateCurStatus(DownloadStatus.failPlayUrl);
       if (kDebugMode) {
@@ -521,16 +522,18 @@ class DownloadService extends GetxService {
     return entryJsonFile.writeAsString(jsonEncode(entry.toJson()));
   }
 
-  /// 启动鸿蒙长时任务，用于后台下载
+  /// 申请鸿蒙长时任务。调用点在 _startDownload 开头，此时 entry 尚处于
+  /// wait 状态（不能用 isDownloading 判断），但马上会开始下载。
+  /// dataTransfer 类型 10 分钟无进度更新会被系统取消，
+  /// 进度经 [HarmonyChannel.updateBackgroundProgress] 保活。
   void _startBackgroundTask() {
     if (!OS.isHarmony) return;
-    HarmonyChannel.startBackgroundTask();
+    HarmonyChannel.setBackgroundTask(true);
   }
 
-  /// 停止鸿蒙长时任务
   void _stopBackgroundTask() {
     if (!OS.isHarmony) return;
-    HarmonyChannel.stopBackgroundTask();
+    HarmonyChannel.setBackgroundTask(false);
   }
 
   void _onReceive(int progress, int total) {
@@ -542,6 +545,10 @@ class DownloadService extends GetxService {
         ..downloadedBytes = progress
         ..status = DownloadStatus.downloading;
       curDownload.refresh();
+      // dataTransfer 长时任务需周期性更新进度，否则 10 分钟后被系统取消
+      if (total != 0) {
+        HarmonyChannel.updateBackgroundProgress(progress * 100 ~/ total);
+      }
     }
   }
 
@@ -599,7 +606,10 @@ class DownloadService extends GetxService {
     curDownload.value = null;
     _downloadManager = null;
     _audioDownloadManager = null;
-    _stopBackgroundTask();
+    HarmonyChannel.updateBackgroundProgress(0);
+    if (waitDownloadQueue.isEmpty) {
+      _stopBackgroundTask();
+    }
     nextDownload();
   }
 
@@ -675,7 +685,10 @@ class DownloadService extends GetxService {
     } else {
       _updateCurStatus(DownloadStatus.pause);
     }
-    _stopBackgroundTask();
+    // 队列还有后续任务时不 stop，避免 stop/start 震荡
+    if (!downloadNext || waitDownloadQueue.isEmpty) {
+      _stopBackgroundTask();
+    }
     if (downloadNext) {
       nextDownload();
     }

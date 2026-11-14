@@ -337,11 +337,17 @@ abstract class HarmonyChannel {
   static Future<void> setShellBarsScrollHidden(bool hidden) =>
       _invoke('setShellBarsScrollHidden', {'hidden': hidden});
 
-  /// 启动长时任务，用于下载
-  static Future<void> startBackgroundTask() => _invoke('startBackgroundTask');
-
-  /// 停止长时任务
-  static Future<void> stopBackgroundTask() => _invoke('stopBackgroundTask');
+  /// 启动/停止长时任务（后台下载）。返回当前任务是否在运行。
+  static Future<bool> setBackgroundTask(bool running) async {
+    if (!OS.isHarmony) return false;
+    try {
+      return await _channel.invokeMethod<bool>('startBackgroundTask', {
+        'running': running,
+      }) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// 取走 ETS 侧暂存的接续数据并跳转视频页。冷启动在首帧后调用，
   /// 热启动由 onContinuationRestore 推送触发；数据取走即清除，不会重复跳转。
@@ -386,6 +392,11 @@ abstract class HarmonyChannel {
   static void _setContinuationActive(bool active) {
     _channel.invokeMethod('setContinuationActive', {'active': active});
   }
+
+  /// 上报下载进度（0~100）给长时任务实况窗，同时作为
+  /// dataTransfer 任务 10 分钟保活的进度更新。
+  static Future<void> updateBackgroundProgress(int progress) =>
+      _invoke('updateBackgroundProgress', {'progress': progress});
 
   /// 测试用，ai生成信息请忽略这部分更改
   static Future csy(value) {
