@@ -14,7 +14,7 @@ import 'package:os_type/os_type.dart';
 /// | --- | --- | --- | --- | --- |
 /// | 细长竖屏（直板机 / 大折叠外屏） | 非播放页 | - | - | [portraitOnly] |
 /// | 细长竖屏 | 播放页（视频/直播） | 竖屏视频/竖屏直播流 | 任意 | [portraitOnly] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 否 | [followSystem] |
+/// | 细长竖屏 | 播放页 | 横屏视频 | 否 | [userPortrait] |
 /// | 细长竖屏 | 播放页 | 横屏视频 | 是（窗口已是横屏） | [followSystem] |
 /// | 细长竖屏 | 播放页 | 横屏视频 | 是（窗口是竖屏） | [userLandscape] |
 /// | 其它（平板/2in1/阔折叠/阔直板/折叠内屏） | 任意 | 任意 | 任意 | [followSystem] |
@@ -22,6 +22,11 @@ import 'package:os_type/os_type.dart';
 /// 竖屏视频锁竖向对齐 B 站：不论旋转锁定与设备方向，非全屏与全屏都保持竖向。
 /// 该策略在**进入播放页、视频方向已知时**就生效（由播放器尺寸回调同步），
 /// 不是等进全屏才设，因此转动设备时窗口不会先转过去再被拉回来。
+///
+/// 非全屏横屏视频用 [userPortrait]（USER_ROTATION_PORTRAIT）：进入播放页 /
+/// 退出全屏时向系统发一次「临时转回竖屏」，之后恢复跟随传感器（锁开则不再
+/// 跟随）。因此横置手机进入播放页会先正常落到竖屏非全屏；退出全屏也会先转回
+/// 竖屏，不会被「窗口横屏自动进全屏」再拉回全屏。
 ///
 /// 退出全屏只是把「是否全屏」置 false，重算结果自然是当前页面应有的策略；
 /// `portraitOnly` 由离开播放页的路由事件触发，不存在「退出全屏该回哪个策略」
@@ -48,13 +53,22 @@ abstract final class OrientationPolicy {
     if (!_onPlayerPage) return .portraitOnly;
     // 竖屏视频（含竖屏直播流）：非全屏与全屏都锁竖向，对齐 B 站。
     if (_videoVertical) return .portraitOnly;
-    if (!_fullScreen) return .followSystem;
+    // 横屏视频非全屏：USER_ROTATION_PORTRAIT —— 进入播放页 / 退出全屏时向
+    // 系统发一次「临时转回竖屏」，之后恢复跟随传感器（锁开则不跟随）。
+    // 横置手机进入播放页因此会先正常落到竖屏非全屏；退出全屏也会先转回竖屏，
+    // 避免窗口保持横屏后被「窗口横屏自动进全屏」重新拉回全屏。
+    if (!_fullScreen) return .userPortrait;
     // 横屏视频全屏：窗口已经是横屏时（例如用户转动设备后自动进全屏）不再
     // 重新请求旋转，避免系统重选横屏方向造成「先左转再 180°」；否则临时
     // 转到横屏，之后跟随传感器——旋转锁关闭时转回竖屏会连窗口一起转回竖屏
     // 并触发自动退出全屏，旋转锁打开时保持横屏、只能点按钮退出。
     return _windowIsLandscape ? .followSystem : .userLandscape;
   }
+
+  /// 当前非全屏播放页是否刚向系统发过「临时转竖屏」（USER_ROTATION_PORTRAIT）。
+  /// 退出全屏后调用方可据此等待窗口真正变成竖屏，再切非全屏布局，避免旋转
+  /// 过程中先闪一帧横屏非全屏布局。
+  static bool get isTemporaryPortrait => current == .userPortrait;
 
   /// 当前窗口是否已是横屏。按引擎上报的窗口尺寸判断，不读屏幕方向属性。
   static bool get _windowIsLandscape {

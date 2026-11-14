@@ -2108,9 +2108,18 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           }
           if (OS.isHarmony) {
             // 退出全屏时人仍在播放页：把「是否全屏」置 false，策略重算为
-            // followSystem；portraitOnly 由离开播放页的路由事件触发。
+            // userPortrait（USER_ROTATION_PORTRAIT）——向系统发一次「临时
+            // 转回竖屏」，让窗口回到竖屏非全屏，避免保持横屏后被自动进全屏
+            // 重新拉回；之后恢复跟随传感器。portraitOnly 由离开播放页的
+            // 路由事件触发。
             _lastFsExitAt = DateTime.now();
             await OrientationPolicy.setFullScreen(false);
+            // 退出全屏会向系统发一次「临时转回竖屏」：等窗口真正变成竖屏再切
+            // 非全屏布局，否则旋转过程中会先闪一帧横屏非全屏布局。
+            if (!WindowFacts.isWindowMode &&
+                OrientationPolicy.isTemporaryPortrait) {
+              await _waitForPortraitViewport();
+            }
           } else {
             if (orientation == null && mode == .none) {
               return;
@@ -2173,8 +2182,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     SmartDialog.showToast('切换播放画面失败，切换清晰度可重试');
   }
 
-  /// 等待平台视口旋转为横屏（宽>高），带超时兜底。
-  Future<void> _waitForLandscapeViewport({
+  /// 等待平台视口真正旋转到目标方向（按引擎上报的物理尺寸判断），带超时
+  /// 兜底。旋转动画期间先保持当前布局，避免先渲染一帧方向不匹配的布局造成
+  /// 闪烁。
+  Future<void> _waitForViewport({
+    required bool landscape,
     Duration timeout = const Duration(milliseconds: 600),
   }) async {
     final views = WidgetsBinding.instance.platformDispatcher.views;
@@ -2183,10 +2195,20 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     final stopwatch = Stopwatch()..start();
     while (stopwatch.elapsedMilliseconds < timeout.inMilliseconds) {
       final size = view.physicalSize;
-      if (size.width > size.height) return;
+      if ((size.width > size.height) == landscape) return;
       await Future<void>.delayed(const Duration(milliseconds: 16));
     }
   }
+
+  /// 等待平台视口旋转为横屏（宽>高），带超时兜底。
+  Future<void> _waitForLandscapeViewport({
+    Duration timeout = const Duration(milliseconds: 600),
+  }) => _waitForViewport(landscape: true, timeout: timeout);
+
+  /// 等待平台视口旋转为竖屏（高≥宽），带超时兜底。
+  Future<void> _waitForPortraitViewport({
+    Duration timeout = const Duration(milliseconds: 600),
+  }) => _waitForViewport(landscape: false, timeout: timeout);
 
   void addPositionListener(ValueChanged<Duration> listener) {
     if (_playerCount == 0) return;

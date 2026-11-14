@@ -7,8 +7,15 @@ import 'package:os_type/os_type.dart';
 /// 是否全屏」唯一决定，本类只负责把策略下发给原生。
 enum HarmonyOrientationPolicy {
   /// `AUTO_ROTATION_RESTRICTED`（8）：四方向跟随重力/智感，受控制中心的
-  /// 旋转锁定开关控制。用于播放页，以及平板/2in1/阔折叠等跟随系统的形态。
+  /// 旋转锁定开关控制。用于平板/2in1/阔折叠等跟随系统的形态，以及横屏
+  /// 视频全屏中「窗口已经横屏」的状态。
   followSystem('follow'),
+
+  /// `USER_ROTATION_PORTRAIT`（13）：**临时**旋转到竖屏，之后跟随传感器
+  /// （受控制中心旋转锁定控制）。用于细长竖屏形态设备上「横屏视频、非全屏」
+  /// 的播放页：进入播放页 / 退出全屏时向系统发一次「临时转回竖屏」，让页面
+  /// 落到竖屏非全屏；之后用户转动设备时再跟随。
+  userPortrait('userPortrait'),
 
   /// `AUTO_ROTATION_PORTRAIT`（6）：仅竖向，不受旋转锁定控制。用于细长竖屏
   /// 形态设备（直板机 / 大折叠外屏）的非播放页。

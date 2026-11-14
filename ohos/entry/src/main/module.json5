@@ -32,10 +32,14 @@
           }
         ],
         backgroundModes: ["audioPlayback", "dataTransfer"],
-        // 方向交给系统：auto_rotation_restricted = 跟随重力/智感旋转，并遵守
-        // 控制中心的旋转锁定开关；不支持智感的设备由系统自动回落。
-        // 不用 unspecified：它在直板机上等价于固定竖屏，转手机不会有反应。
-        orientation: "auto_rotation_restricted",
+        // 方向交给系统：unspecified（UNSPECIFIED=0，系统默认）——直板机固定
+        // 竖屏（开屏与首帧都是竖屏，不会出现「先横后竖」的启动旋转动画），
+        // 平板/折叠按形态判定四方向并参与智感旋转。
+        // 注意不要用 auto_rotation_unspecified（AUTO_ROTATION_UNSPECIFIED=12），
+        // 那是自动旋转策略，直板机上也会跟随重力，开屏会先横再转竖。
+        // 运行时的旋转能力不依赖这里：进入 app 后由 OrientationPolicy 按
+        // 「设备形态 + 页面 + 视频方向」覆盖。
+        orientation: "unspecified",
         preferMultiWindowOrientation: "landscape_auto",
         skills: [
           {
