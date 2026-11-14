@@ -8,8 +8,7 @@
 ///   把上游那段 `_initWindows()` / `_enumFontCallback()` 抄回来即可。
 /// - Linux 的 fontconfig 分支是纯 `dart:ffi`，原样保留。
 /// - **自定义字体导入**（[pickFonts] / [init] / [fontFile]）与平台无关，全部保留；
-///   只是文件选择器换成鸿蒙适配 fork（`file_picker_ohos`）的
-///   `FilePicker.platform.pickFiles()` 实例 API。
+///   文件选择器与上游一致，走静态 `FilePicker.pickFiles()`。
 ///
 /// 鸿蒙本身没有枚举系统字体的通道，[FontUtils.getFont] 在 ohos 上返回空集合——
 /// 字体设置页的系统字体列表因此为空，只剩「默认」与用户导入的自定义字体。
@@ -102,25 +101,22 @@ abstract final class FontUtils {
   @pragma('vm:notify-debugger-on-exception')
   static Future<Map<String, Uint8List>?> pickFonts() async {
     try {
-      // 鸿蒙适配 fork 仅提供 FilePicker.platform 实例方法（上游是静态的
-      // FilePicker.pickFiles），返回值也仍是旧版的 FilePickerResult。
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
+      final files = await FilePicker.pickFiles(
+        type: .custom,
         allowedExtensions: _kFontExts,
-        allowMultiple: true,
       );
-      final files = result?.files;
-      if (files != null && files.isNotEmpty) {
+      if (files.isNotEmpty) {
         final Map<String, Uint8List> fonts = {};
         final now = DateTime.now().millisecondsSinceEpoch.toString();
-        await Future.wait(
-          files.map((file) async {
-            final name = '$now/${path.basenameWithoutExtension(file.name)}';
-            final bytes = await file.xFile.readAsBytes();
-            await _loadFont(bytes, fontFamily: name);
-            fonts[name] = bytes;
-          }),
-        );
+
+        Future<void> loadFont(file) async {
+          final name = '$now/${path.basenameWithoutExtension(file.name)}';
+          final bytes = await file.readAsBytes();
+          await _loadFont(bytes, fontFamily: name);
+          fonts[name] = bytes;
+        }
+
+        await Future.wait(files.map(loadFont));
         return fonts;
       }
     } catch (_) {

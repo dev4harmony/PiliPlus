@@ -771,7 +771,7 @@ void _showDownPathDialog(BuildContext context, VoidCallback setState) {
         DialogOption(
           onPressed: () async {
             Get.back();
-            final path = await FilePicker.platform.getDirectoryPath(
+            final path = await FilePicker.getDirectoryPath(
               initialDirectory: Directory(downloadPath).existsSync()
                   ? downloadPath
                   : null,
