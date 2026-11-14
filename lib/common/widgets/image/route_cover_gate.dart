@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// 页面被顶层不透明路由覆盖时，把 [child]（封面图等大图）从树上摘掉、
@@ -8,7 +7,15 @@ import 'package:flutter/widgets.dart';
 /// 依赖 Flutter 的既有行为：`Overlay` 会把被不透明路由盖住的 route 的
 /// `TickerMode` 置为 disabled。使用这个信号不需要额外的 NavigatorObserver，
 /// 也不会误伤盖在上面的新页面（新页面的 TickerMode 仍是 enabled）。
-class RouteCoverGate extends StatelessWidget {
+///
+/// 释放原理：卸载 [child] 后图片的 listener 归零，从 live 降级为普通
+/// keepAlive 缓存条目（不受 100MB/64MB LRU 上限约束，不会自动淘汰），
+/// 所以还需在卸载后的那一帧把 ImageCache 清掉，内存才真正下降。
+/// 这里用全局 [ImageCache.clear] 而不是按 key evict：封面的 cache key
+/// 经 cached_network_image_ce 内部 ResizeImage 包装、依赖 MediaQuery
+/// 尺寸，在 widget 侧无法可靠枚举；而仍被上层页面显示的 live 图片
+/// clear 不会动它们，代价只是其余条目返回时走一次磁盘重解码。
+class RouteCoverGate extends StatefulWidget {
   const RouteCoverGate({
     super.key,
     required this.child,
@@ -18,31 +25,44 @@ class RouteCoverGate extends StatelessWidget {
   final Widget child;
   final Widget placeholder;
 
-  /// 同一次覆盖只清一次图片缓存。
-  static bool _cacheCleared = false;
+  @override
+  State<RouteCoverGate> createState() => _RouteCoverGateState();
+}
+
+class _RouteCoverGateState extends State<RouteCoverGate> {
+  bool _covered = false;
+  bool _purgedThisCover = false;
 
   @override
-  Widget build(BuildContext context) {
-    if (TickerMode.valuesOf(context).enabled) {
-      _cacheCleared = false;
-      return child;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // TickerMode.of 建立依赖后，覆盖状态变化会再次触发本方法
+    final covered = !TickerMode.valuesOf(context).enabled;
+    if (covered == _covered) {
+      return;
     }
-    if (!_cacheCleared) {
-      _cacheCleared = true;
-      // ImageCache 自己还持有一份解码结果，只销毁 widget 的引用回收不掉，
-      // 等这批图片子树卸载后的这一帧再清。
+    _covered = covered;
+    if (covered && !_purgedThisCover) {
+      _purgedThisCover = true;
+      // 等这一帧结束：child 已卸载、listener 已归零、图片已从 live
+      // 降级为缓存条目，此时清理才真正释放解码内存。
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final imageCache = PaintingBinding.instance.imageCache;
-        if (kDebugMode) {
-          debugPrint(
-            'RouteCoverGate: 页面被覆盖，清图片缓存 '
-            '${imageCache.currentSizeBytes >> 10} KB, '
-            'live=${imageCache.liveImageCount}',
-          );
+        if (!mounted || !_covered) {
+          return;
         }
+        final imageCache = PaintingBinding.instance.imageCache;
+        debugPrint(
+          'RouteCoverGate: 页面被覆盖，清图片缓存 '
+          '${imageCache.currentSizeBytes >> 10} KB, '
+          'live=${imageCache.liveImageCount}',
+        );
         imageCache.clear();
       });
     }
-    return placeholder;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _covered ? widget.placeholder : widget.child;
   }
 }
