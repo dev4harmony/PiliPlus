@@ -1199,7 +1199,7 @@ packages:
     description:
       path: media_kit
       ref: feat-simple-video
-      resolved-ref: cd65fdb25b6f11460799ad2255537de686d40d87
+      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.2.3"
@@ -1244,7 +1244,7 @@ packages:
     description:
       path: "libs/ohos/media_kit_libs_ohos"
       ref: feat-simple-video
-      resolved-ref: cd65fdb25b6f11460799ad2255537de686d40d87
+      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.0.0"
@@ -1253,7 +1253,7 @@ packages:
     description:
       path: "libs/universal/media_kit_libs_video"
       ref: feat-simple-video
-      resolved-ref: cd65fdb25b6f11460799ad2255537de686d40d87
+      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.0.7"
@@ -1280,7 +1280,7 @@ packages:
     description:
       path: media_kit_video
       ref: feat-simple-video
-      resolved-ref: cd65fdb25b6f11460799ad2255537de686d40d87
+      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "2.0.1"

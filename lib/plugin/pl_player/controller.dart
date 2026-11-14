@@ -521,6 +521,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   late double subtitleFontScale = Pref.subtitleFontScale;
   late double subtitleFontScaleFS = Pref.subtitleFontScaleFS;
   late int subtitlePaddingH = Pref.subtitlePaddingH;
+  int? tmpSubtitlePaddingB;
   late int subtitlePaddingB = Pref.subtitlePaddingB;
   late double subtitleBgOpacity = Pref.subtitleBgOpacity;
   final bool showVipDanmaku = Pref.showVipDanmaku; // loop unswitching
@@ -629,18 +630,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     final subTitleStyle = this.subTitleStyle;
     return SubtitleViewConfiguration(
       style: subTitleStyle,
-      // TODO 鸿蒙待适配 strokeStyle media_kit
-      // strokeStyle: subtitleBgOpacity == 0
-      //     ? subTitleStyle.copyWith(
-      //         color: null,
-      //         background: null,
-      //         backgroundColor: null,
-      //         foreground: Paint()
-      //           ..color = Colors.black
-      //           ..style = PaintingStyle.stroke
-      //           ..strokeWidth = subtitleStrokeWidth,
-      //       )
-      //     : null,
+      strokeStyle: subtitleBgOpacity == 0
+          ? subTitleStyle.copyWith(
+              color: null,
+              background: null,
+              backgroundColor: null,
+              foreground: Paint()
+                ..color = Colors.black
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = subtitleStrokeWidth,
+            )
+          : null,
       padding: EdgeInsets.only(
         left: subtitlePaddingH.toDouble(),
         right: subtitlePaddingH.toDouble(),
@@ -655,7 +655,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   void onUpdatePadding(EdgeInsets padding) {
+    tmpSubtitlePaddingB = null;
     subtitlePaddingB = padding.bottom.round().clamp(0, 200);
+    updateSubtitleStyle();
     putSubtitleSettings();
   }
 
