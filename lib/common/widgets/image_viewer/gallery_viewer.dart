@@ -111,10 +111,15 @@ class _GalleryViewerState extends State<GalleryViewer>
 
   Future<void> _initPlayer() async {
     assert(_player == null);
-    final player = Player();
-    _videoController = VideoController(player);
+    final player = await Player.create();
     if (!mounted) {
-      player.dispose();
+      await player.dispose();
+      _videoController = null;
+      return;
+    }
+    _videoController = await VideoController.create(player);
+    if (!mounted) {
+      await player.dispose();
       _videoController = null;
       return;
     }

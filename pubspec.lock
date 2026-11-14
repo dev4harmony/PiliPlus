@@ -628,10 +628,11 @@ packages:
   flutter_displaymode:
     dependency: "direct main"
     description:
-      name: flutter_displaymode
-      sha256: ecd44b1e902b0073b42ff5b55bf283f38e088270724cdbb7f7065ccf54aa60a8
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "."
+      ref: master
+      resolved-ref: "3ad848c904ff4412c9d783ee4b6888106cc8a193"
+      url: "https://gitcode.com/oh-flutter/flutter_displaymode.git"
+    source: git
     version: "0.7.0"
   flutter_html:
     dependency: "direct main"
@@ -1191,7 +1192,7 @@ packages:
     description:
       path: media_kit
       ref: feat-simple-video
-      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
+      resolved-ref: a511b11c284a78b83e8f175f75a37eb75f5cc5ee
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.2.3"
@@ -1272,7 +1273,7 @@ packages:
     description:
       path: media_kit_video
       ref: feat-simple-video
-      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
+      resolved-ref: a511b11c284a78b83e8f175f75a37eb75f5cc5ee
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "2.0.1"
