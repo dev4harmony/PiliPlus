@@ -324,7 +324,8 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
       }
       case "updateBackgroundProgress": {
         const progress: number = call.argument('progress') ?? 0;
-        BackgroundTask.getInstance().updateProgress(progress);
+        const remaining: string = call.argument('remaining') ?? '';
+        BackgroundTask.getInstance().updateProgress(progress, remaining);
         result.success(true);
         break;
       }

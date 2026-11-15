@@ -27,6 +27,7 @@ export class BackgroundTask {
   private queue: Promise<void> = Promise.resolve();
   private notificationId: number = -1;
   private lastProgress: number = -1;
+  private remaining: string = '';
   private lastPublish: number = 0;
   private keepAliveTimer: number = -1;
   /// 已 publish 的进度通知 id（downloadTemplate 与任务通知共用 id，但
@@ -71,11 +72,12 @@ export class BackgroundTask {
     return this.queue;
   }
 
-  updateProgress(progress: number): void {
+  updateProgress(progress: number, remaining: string): void {
     if (!this.running) {
       return;
     }
     this.lastProgress = progress;
+    this.remaining = remaining;
     this.publish();
   }
 
@@ -228,7 +230,7 @@ export class BackgroundTask {
         name: 'downloadTemplate',
         data: {
           title: '离线缓存中...',
-          fileName: $r('app.string.EntryAbility_label'),
+          fileName: this.remaining,
           progressValue: progress,
         },
       },

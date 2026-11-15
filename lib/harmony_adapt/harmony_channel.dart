@@ -395,8 +395,11 @@ abstract class HarmonyChannel {
 
   /// 上报下载进度（0~100）给长时任务实况窗，同时作为
   /// dataTransfer 任务 10 分钟保活的进度更新。
-  static Future<void> updateBackgroundProgress(int progress) =>
-      _invoke('updateBackgroundProgress', {'progress': progress});
+  static Future<void> updateBackgroundProgress(int progress, String remaining) =>
+      _invoke('updateBackgroundProgress', {
+        'progress': progress,
+        'remaining': remaining,
+      });
 
   /// 测试用，ai生成信息请忽略这部分更改
   static Future csy(value) {
