@@ -22,12 +22,17 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-
 // 基于 Flutter 3.44.9 的 widgets/scrollable.dart（官方源），应用上游
 // lib/scripts/scrollable_gesture.patch（horizontalDragGestureRecognizer 参数）
 // 与 lib/scripts/scrollable.patch（shouldIgnorePointer getter）。
 import 'package:flutter/widgets.dart'
     hide EdgeDraggingAutoScroller;
+// 本文件是 SDK scrollable.dart 的副本。_ScrollableScope 是私有类，副本与 SDK
+// 各有一份、互不相同。SDK 内置的 ListView/GridView 内部构造的是 SDK 版
+// Scrollable，挂的是 SDK 版 _ScrollableScope，因此本副本的 maybeOf 对这些
+// 列表永远返回 null。这里用别名导入 SDK 版，供 of() 回退（见 of 内注释）。
+import 'package:flutter/widgets.dart' as sdk_widgets
+    show Scrollable;
 
 import 'scrollable_helpers.dart';
 
@@ -371,6 +376,15 @@ class Scrollable extends StatefulWidget {
   /// * [Scrollable.of], which is similar to this method, but asserts
   ///   if no [Scrollable] ancestor is found.
   static ScrollableState? maybeOf(BuildContext context, {Axis? axis}) {
+    // PiliNara 鸿蒙分支局部修改：先查本副本的 scope，找不到再回退到 SDK 版。
+    // 原因：SDK 内置的 ListView/GridView 内部构造的是 SDK 版 Scrollable，挂的
+    // 是 SDK 那 份私有 _ScrollableScope；本副本的 scope 与它不是同一个类，
+    // 只查本副本会永远得到 null，进而让 of() 在 release 下抛 NPE。
+    final sdkScrollable = sdk_widgets.Scrollable.maybeOf(context, axis: axis);
+    if (sdkScrollable != null) {
+      // ScrollPosition 是两边共享的类，可直接交给本副本的状态包装使用。
+      return _SdkScrollableStateAdapter(sdkScrollable.position);
+    }
     // This is the context that will need to establish the dependency.
     final originalContext = context;
     InheritedElement? element = context.getElementForInheritedWidgetOfExactType<_ScrollableScope>();
@@ -2548,4 +2562,21 @@ class _HorizontalInnerDimensionState extends ScrollableState {
     // TwoDimensionalScrollableState.
     return _configuration.buildOverscrollIndicator(context, child, details);
   }
+}
+
+/// 把 SDK 版 Scrollable 的 [ScrollPosition] 适配成本副本的 [ScrollableState]。
+///
+/// 背景见 [Scrollable.maybeOf] 内的注释。业务侧经 [Scrollable.of] 拿到的
+/// 最常用成员就是 `position`（如 `Scrollable.of(ctx).position.correctBy(..)`），
+/// 而 [ScrollPosition] 是 SDK 与本副本共用的同一个类，因此这里只需把 position
+/// 转发出去即可，语义与直接用 SDK 的 state 完全一致。
+///
+/// 该类不参与 widget 生命周期，仅作为查询结果的载体。
+class _SdkScrollableStateAdapter extends ScrollableState {
+  _SdkScrollableStateAdapter(this._adaptedPosition);
+
+  final ScrollPosition _adaptedPosition;
+
+  @override
+  ScrollPosition get position => _adaptedPosition;
 }
