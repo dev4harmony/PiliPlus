@@ -534,7 +534,7 @@ class DownloadService extends GetxService {
       if (total != 0) {
         HarmonyChannel.updateBackgroundProgress(
           progress * 100 ~/ total,
-          '剩余${waitDownloadQueue.length + 1}项',
+          '剩余${waitDownloadQueue.length}项',
         );
       }
     }
