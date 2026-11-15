@@ -628,11 +628,10 @@ packages:
   flutter_displaymode:
     dependency: "direct main"
     description:
-      path: "."
-      ref: master
-      resolved-ref: "3ad848c904ff4412c9d783ee4b6888106cc8a193"
-      url: "https://gitcode.com/oh-flutter/flutter_displaymode.git"
-    source: git
+      name: flutter_displaymode
+      sha256: ecd44b1e902b0073b42ff5b55bf283f38e088270724cdbb7f7065ccf54aa60a8
+      url: "https://pub.flutter-io.cn"
+    source: hosted
     version: "0.7.0"
   flutter_html:
     dependency: "direct main"
