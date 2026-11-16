@@ -94,11 +94,9 @@ abstract final class LoginUtils {
   static String generateBuvid() {
     final md5Str = Digest(
       List.generate(16, (_) => Utils.random.nextInt(256)),
-    ).toString();
+    ).toString().toUpperCase();
     return 'XY${md5Str[2]}${md5Str[12]}${md5Str[22]}$md5Str';
   }
-
-  static final buvid = Pref.buvid;
 
   // static String getUUID() {
   //   return const Uuid().v4().replaceAll('-', '');

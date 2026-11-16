@@ -2,25 +2,26 @@ import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/text_field.dart';
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/live.dart';
-import 'package:PiliPlus/models/common/publish_panel_type.dart';
 import 'package:PiliPlus/pages/common/publish/common_rich_text_pub_page.dart';
+import 'package:PiliPlus/pages/fans_medal/controller.dart';
+import 'package:PiliPlus/pages/fans_medal/medal_setting_mixin.dart';
 import 'package:PiliPlus/pages/live_emote/controller.dart';
 import 'package:PiliPlus/pages/live_emote/view.dart';
 import 'package:PiliPlus/pages/live_room/controller.dart';
+import 'package:PiliPlus/pages/live_room/medal/medal_mixin.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide TextField;
 
 class LiveSendDmPanel extends CommonRichTextPubPage {
-  final bool fromEmote;
   final LiveRoomController liveRoomController;
 
   const LiveSendDmPanel({
     super.key,
     super.items,
     super.onSave,
-    super.autofocus = true,
-    this.fromEmote = false,
+    super.autofocus,
+    super.panelType,
     required this.liveRoomController,
   });
 
@@ -28,21 +29,19 @@ class LiveSendDmPanel extends CommonRichTextPubPage {
   State<LiveSendDmPanel> createState() => _ReplyPageState();
 }
 
-class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
-  LiveRoomController get liveRoomController => widget.liveRoomController;
-
+class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel>
+    with MedalSettingMixin, LiveMedalMixin {
   @override
-  void initState() {
-    super.initState();
-    if (widget.fromEmote) {
-      updatePanelType(PanelType.emoji);
-    }
-  }
+  late final LiveRoomController liveController = widget.liveRoomController;
+  @override
+  FansMedalController get medalController => liveController.medalController;
+  @override
+  ColorScheme get colorScheme => theme.colorScheme;
 
   @override
   void dispose() {
     Get.delete<LiveEmotePanelController>(
-      tag: liveRoomController.roomId.toString(),
+      tag: liveController.roomId.toString(),
     );
     super.dispose();
   }
@@ -81,7 +80,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
     ),
     child: LiveEmotePanel(
       onChoose: onChooseEmote,
-      roomId: liveRoomController.roomId,
+      roomId: liveController.roomId,
       onSendEmoticonUnique: (emote) {
         onCustomPublish(
           message: emote.emoticonUnique!,
@@ -111,26 +110,24 @@ class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
               );
             },
           ),
+          ?medalBtn,
           const SizedBox(width: 12),
           Expanded(
-            child: Obx(
-              () => RichTextField(
-                key: key,
-                textInputAction: .send,
-                controller: editController,
-                autofocus: false,
-                readOnly: readOnly.value,
-                onChanged: onChanged,
-                onSubmitted: onSubmitted,
-                focusNode: focusNode,
-                decoration: const InputDecoration(
-                  hintText: "输入弹幕内容",
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(fontSize: 14),
-                ),
-                style: theme.textTheme.bodyLarge,
-                // inputFormatters: [LengthLimitingTextInputFormatter(20)],
+            child: RichTextField(
+              key: key,
+              textInputAction: .send,
+              controller: editController,
+              autofocus: false,
+              onChanged: onChanged,
+              onSubmitted: onSubmitted,
+              focusNode: focusNode,
+              decoration: const InputDecoration(
+                hintText: "输入弹幕内容",
+                border: InputBorder.none,
+                hintStyle: TextStyle(fontSize: 14),
               ),
+              style: theme.textTheme.bodyLarge,
+              // inputFormatters: [LengthLimitingTextInputFormatter(20)],
             ),
           ),
           Obx(
@@ -185,7 +182,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
       message = buffer.toString();
     }
     final res = await LiveHttp.sendLiveMsg(
-      roomId: liveRoomController.roomId,
+      roomId: liveController.roomId,
       msg: message,
       dmType: dmType,
       emoticonOptions: emoticonOptions,
@@ -195,7 +192,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
     if (res.isSuccess) {
       hasPub = true;
       Get.back();
-      liveRoomController
+      liveController
         ..savedDanmaku?.clear()
         ..savedDanmaku = null;
       SmartDialog.showToast('发送成功');

@@ -26,6 +26,10 @@ class SeasonInfoItem extends StatelessWidget {
     required this.enableMultiSelect,
     required this.progress,
     required this.updateSeasonDm,
+    required this.updateSeasonSeg,
+    required this.updateSeasonVolume,
+    required this.updateSeasonPlayInfo,
+    required this.updateSeasonSeasonInfo,
   });
 
   final BaseMultiSelectMixin<DownloadSeasonInfo> controller;
@@ -35,6 +39,10 @@ class SeasonInfoItem extends StatelessWidget {
   final bool enableMultiSelect;
   final ChangeNotifier progress;
   final ValueChanged<DownloadSeasonInfo> updateSeasonDm;
+  final ValueChanged<DownloadSeasonInfo> updateSeasonSeg;
+  final ValueChanged<DownloadSeasonInfo> updateSeasonVolume;
+  final ValueChanged<DownloadSeasonInfo> updateSeasonPlayInfo;
+  final ValueChanged<DownloadSeasonInfo> updateSeasonSeasonInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -66,14 +74,42 @@ class SeasonInfoItem extends StatelessWidget {
                       },
                     );
                   },
-                  child: const Text('删除', style: TextStyle(fontSize: 14)),
+                  child: const Text('删除'),
                 ),
                 DialogOption(
                   onPressed: () {
                     Get.back();
                     updateSeasonDm(season);
                   },
-                  child: const Text('更新弹幕', style: TextStyle(fontSize: 14)),
+                  child: const Text('更新弹幕'),
+                ),
+                DialogOption(
+                  onPressed: () {
+                    Get.back();
+                    updateSeasonSeg(season);
+                  },
+                  child: const Text('更新片段'),
+                ),
+                DialogOption(
+                  onPressed: () {
+                    Get.back();
+                    updateSeasonSeasonInfo(season);
+                  },
+                  child: const Text('更新合集信息'),
+                ),
+                DialogOption(
+                  onPressed: () {
+                    Get.back();
+                    updateSeasonVolume(season);
+                  },
+                  child: const Text('更新音量均衡'),
+                ),
+                DialogOption(
+                  onPressed: () {
+                    Get.back();
+                    updateSeasonPlayInfo(season);
+                  },
+                  child: const Text('更新字幕、分段信息'),
                 ),
               ],
             ),

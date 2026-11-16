@@ -28,8 +28,6 @@ import 'package:PiliPlus/pages/fav_detail/controller.dart'
 import 'package:PiliPlus/pages/group_panel/view.dart';
 import 'package:PiliPlus/pages/login/geetest/geetest_webview_dialog.dart';
 import 'package:PiliPlus/utils/accounts.dart';
-import 'package:PiliPlus/utils/extension/context_ext.dart';
-import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
@@ -44,6 +42,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:PiliPlus/utils/extension/size_ext.dart';
 
 abstract final class RequestUtils {
   static Future<void> syncHistoryStatus() async {
@@ -199,12 +198,12 @@ abstract final class RequestUtils {
                     useSafeArea: true,
                     isScrollControlled: true,
                     constraints: BoxConstraints(
-                      maxWidth: min(640, context.mediaQueryShortestSide),
+                      maxWidth: min(640, MediaQuery.sizeOf(context).shortestSide),
                     ),
                     builder: (BuildContext context) {
                       final maxChildSize =
                           PlatformUtils.isMobile &&
-                              !context.mediaQuerySize.isPortrait
+                              !MediaQuery.sizeOf(context).isPortrait
                           ? 1.0
                           : 0.7;
                       return DraggableScrollableSheet(

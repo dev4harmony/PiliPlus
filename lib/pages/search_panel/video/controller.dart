@@ -7,7 +7,6 @@ import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/pages/search_panel/controller.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
-import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -91,7 +90,7 @@ class SearchVideoController
       useSafeArea: true,
       isScrollControlled: true,
       constraints: BoxConstraints(
-        maxWidth: min(640, ContextExtensions(context).mediaQueryShortestSide),
+        maxWidth: min(640, MediaQuery.sizeOf(context).shortestSide),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {

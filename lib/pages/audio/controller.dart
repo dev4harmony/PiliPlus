@@ -164,14 +164,14 @@ class AudioController extends GetxController
       _lastVolume = null;
     }
     desktopVolume.value = volume;
-    player?.setVolume(volume * 100);
+    setVolumeCapped(player, volume);
   }
 
   void syncVolume([_]) {
     final volume = desktopVolume.value;
     PlPlayerController.instance
       ?..volume.value = volume
-      ..videoPlayerController?.setVolume(volume * 100);
+      ..setVolumeCapped(player, volume);
     GStorage.setting.put(SettingBoxKey.desktopVolume, volume.toPrecision(3));
   }
 
@@ -253,12 +253,25 @@ class AudioController extends GetxController
     return player?.state.playing ?? false;
   }
 
-  Future<void>? onPlay() {
-    return player?.play();
+  Future<void>? onPlay() async {
+    if (player == null) return;
+    await player?.play();
+    await audioSessionHandler?.setActive(true);
   }
 
-  Future<void>? onPause() {
-    return player?.pause();
+  Future<void>? onPause() async {
+    if (player == null) return;
+    await player?.pause();
+    await audioSessionHandler?.setActive(false);
+  }
+
+  Future<void>? playOrPause() {
+    if (player == null) return null;
+    if (player!.state.playing) {
+      return onPause();
+    } else {
+      return onPlay();
+    }
   }
 
   Future<void>? onSeek(Duration duration) {
@@ -381,10 +394,7 @@ class AudioController extends GetxController
           return;
         }
         if (_start == null) position.value = 0;
-        final audio = audios.findClosestTarget(
-          (e) => e.id <= cacheAudioQa,
-          (a, b) => a.id > b.id ? a : b,
-        );
+        final audio = audios.findTargetMedia((e) => e.id, cacheAudioQa);
         _onOpenMedia(VideoUtils.getCdnUrl(audio.playUrls), volume: volume);
       } else if (playInfo.hasPlayUrl()) {
         final playUrl = playInfo.playUrl;
@@ -478,6 +488,11 @@ class AudioController extends GetxController
       player = null;
       return;
     }
+    // >100% 的音量走 af 增益+限幅，避免直接放大 mpv volume 导致削波
+    await setVolumeCapped(
+      player,
+      PlatformUtils.isDesktop ? desktopVolume.value : Pref.playerVolume / 100,
+    );
     final stream = player!.stream;
     _subscriptions = [
       stream.position.listen((position) {
@@ -773,10 +788,6 @@ class AudioController extends GetxController
     );
   }
 
-  Future<void>? playOrPause() {
-    return player?.playOrPause();
-  }
-
   bool playPrev() {
     if (index != null && playlist != null && player != null) {
       final prev = index! - 1;
@@ -887,8 +898,7 @@ class AudioController extends GetxController
   int? get timeLength => player?.state.duration.inMilliseconds ?? 0;
 
   @override
-  Future<void>? seekTo(Duration duration, {required bool isSeek}) =>
-      onSeek(duration);
+  Future<void>? seekTo(Duration duration) => onSeek(duration);
 
   @override
   bool get autoPlay => true;

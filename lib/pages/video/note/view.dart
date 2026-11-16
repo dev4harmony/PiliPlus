@@ -7,6 +7,7 @@ import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models_new/video/video_note_list/list.dart';
+import 'package:PiliPlus/pages/article/view.dart';
 import 'package:PiliPlus/pages/common/slide/common_slide_page.dart';
 import 'package:PiliPlus/pages/video/note/controller.dart';
 import 'package:PiliPlus/pages/webview/view.dart';
@@ -55,7 +56,7 @@ class _NoteListPageState extends State<NoteListPage>
   }
 
   @override
-  Widget buildPage(ThemeData theme) {
+  Widget buildPage() {
     return Material(
       child: MiniScaffold(
         body: Column(
@@ -90,7 +91,7 @@ class _NoteListPageState extends State<NoteListPage>
                 ],
               ),
             ),
-            Expanded(child: enableSlide ? slideList(theme) : buildList(theme)),
+            Expanded(child: enableSlide ? slideList() : buildList()),
           ],
         ),
       ),
@@ -107,7 +108,7 @@ class _NoteListPageState extends State<NoteListPage>
   }
 
   @override
-  Widget buildList(ThemeData theme) {
+  Widget buildList() {
     final child = refreshIndicator(
       onRefresh: _controller.onRefresh,
       child: CustomScrollView(
@@ -117,7 +118,7 @@ class _NoteListPageState extends State<NoteListPage>
           SliverPadding(
             padding: const .only(bottom: 100),
             sliver: Obx(
-              () => _buildBody(theme, _controller.loadingState.value),
+              () => _buildBody(_controller.loadingState.value),
             ),
           ),
         ],
@@ -165,7 +166,6 @@ class _NoteListPageState extends State<NoteListPage>
   }
 
   Widget _buildBody(
-    ThemeData theme,
     LoadingState<List<VideoNoteItemModel>?> loadingState,
   ) {
     switch (loadingState) {
@@ -188,7 +188,7 @@ class _NoteListPageState extends State<NoteListPage>
               if (index == response.length - 1) {
                 _controller.onLoadMore();
               }
-              return _itemWidget(theme, response[index]);
+              return _itemWidget(response[index]);
             },
             itemCount: response.length,
             separatorBuilder: (context, index) => divider,
@@ -203,16 +203,13 @@ class _NoteListPageState extends State<NoteListPage>
     }
   }
 
-  Widget _itemWidget(ThemeData theme, VideoNoteItemModel item) {
+  Widget _itemWidget(VideoNoteItemModel item) {
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
-        onTap: () => Get.toNamed(
-          '/articlePage',
-          parameters: {
-            'id': item.cvid!.toString(),
-            'type': 'read',
-          },
+        onTap: () => ArticlePage.toArticlePage(
+          id: item.cvid!.toString(),
+          type: .read,
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),

@@ -90,7 +90,24 @@ class _SavePanelState extends State<SavePanel> {
     } else if (_item case final DynamicItemModel i) {
       uri = _parseDyn(i);
       if (kDebugMode) debugPrint(uri);
+    } else if (_item case final Iterable<ReplyInfo> i) {
+      _parseReply(i.first);
     }
+  }
+
+  static String _reply2Uri(
+    ReplyInfo reply,
+    bool hasRoot, [
+    String? enterUri,
+  ]) {
+    var uri =
+        'bilibili://comment/detail/${reply.type}/${reply.oid}/${hasRoot ? reply.root : reply.id}/';
+    final parameters = [
+      if (hasRoot) 'anchor=${reply.id}',
+      if (enterUri != null) 'enterUri=$enterUri',
+    ];
+    if (parameters.isNotEmpty) uri += '?${parameters.join("&")}';
+    return uri;
   }
 
   void _parseReply(ReplyInfo reply) {
@@ -110,9 +127,7 @@ class _SavePanelState extends State<SavePanel> {
           final ctr = Get.find<PgcIntroController>(tag: heroTag);
           final pgcItem = ctr.pgcItem;
           final cid = ctr.cid.value;
-          final episode = pgcItem.episodes!.firstWhere(
-            (e) => e.cid == cid,
-          );
+          final episode = ctr.findEpisode(cid);
           cover = episode.cover;
           title =
               episode.shareCopy ??
@@ -120,11 +135,11 @@ class _SavePanelState extends State<SavePanel> {
           pubdate = episode.pubTime;
           uname = pgcItem.upInfo?.uname;
 
-          final oid = reply.oid;
-          final type = reply.type.toInt();
-          final anchor = hasRoot ? 'anchor=${reply.id}&' : '';
-          uri =
-              'bilibili://comment/detail/$type/$oid/$rootId/?${anchor}enterUri=bilibili://pgc/season/ep/${ctr.epId}';
+          uri = _reply2Uri(
+            reply,
+            hasRoot,
+            'bilibili://pgc/season/ep/${ctr.epId}',
+          );
         } else {
           final ctr = Get.find<UgcIntroController>(tag: heroTag);
           final videoDetail = ctr.videoDetail.value;
@@ -146,19 +161,16 @@ class _SavePanelState extends State<SavePanel> {
         dynItem = Get.arguments['item'] as DynamicItemModel;
         uname = dynItem.modules.moduleAuthor?.name;
       } catch (_) {}
-      final type = reply.type.toInt();
-      final oid = reply.oid;
-      final rootId = hasRoot ? reply.root : reply.id;
-
-      if (type == 1) {
+      final type = reply.type;
+      if (type == .ONE) {
         uri =
-            'https://www.bilibili.com/video/av$oid?comment_on=1&comment_root_id=$rootId${hasRoot ? '&comment_secondary_id=${reply.id}' : ''}';
+            'https://www.bilibili.com/video/av${reply.oid}?comment_on=1&comment_root_id=${hasRoot ? reply.root : reply.id}${hasRoot ? '&comment_secondary_id=${reply.id}' : ''}';
       } else {
-        final enterUri = dynItem == null
-            ? ''
-            : 'enterUri=${_parseDyn(dynItem)}';
-        uri =
-            'bilibili://comment/detail/$type/$oid/$rootId/?${hasRoot ? 'anchor=${reply.id}&' : ''}$enterUri';
+        uri = _reply2Uri(
+          reply,
+          hasRoot,
+          dynItem == null ? null : _parseDyn(dynItem),
+        );
       }
     } else if (currentRoute.startsWith('/Scaffold')) {
       try {
@@ -181,20 +193,11 @@ class _SavePanelState extends State<SavePanel> {
       } catch (_) {}
     } else if (currentRoute.startsWith('/articlePage')) {
       try {
-        final type = reply.type.toInt();
-        final oid = reply.oid;
-        final rootId = hasRoot ? reply.root : reply.id;
-        final anchor = hasRoot ? 'anchor=${reply.id}&' : '';
         final enterUri =
             'bilibili://following/detail/${Get.parameters['id'] ?? Get.arguments?['id']}';
-        uri =
-            'bilibili://comment/detail/$type/$oid/$rootId/?${anchor}enterUri=$enterUri';
+        uri = _reply2Uri(reply, hasRoot, enterUri);
       } catch (_) {}
     } else if (currentRoute.startsWith('/musicDetail')) {
-      final type = reply.type.toInt();
-      final oid = reply.oid;
-      final rootId = hasRoot ? reply.root : reply.id;
-      final anchor = hasRoot ? 'anchor=${reply.id}&' : '';
       String enterUri = '';
       try {
         final ctr = Get.find<MusicDetailController>(
@@ -217,7 +220,9 @@ class _SavePanelState extends State<SavePanel> {
           }
         }
       } catch (_) {}
-      uri = 'bilibili://comment/detail/$type/$oid/$rootId/?$anchor$enterUri';
+      uri = _reply2Uri(reply, hasRoot, enterUri);
+    } else {
+      uri = _reply2Uri(reply, hasRoot);
     }
 
     if (kDebugMode) debugPrint(uri);
@@ -332,12 +337,53 @@ class _SavePanelState extends State<SavePanel> {
     }
   }
 
+  ReplyItemGrpc _handleReply(ReplyInfo i, [divider = true]) => ReplyItemGrpc(
+    replyItem: i,
+    replyLevel: 0,
+    upMid: widget.upMid,
+    needDivider: divider,
+  );
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final padding = MediaQuery.viewPaddingOf(context);
     final maxWidth = MediaQuery.sizeOf(context).shortestSide;
     late final coverSize = MediaQuery.textScalerOf(context).scale(65);
+
+    final Widget child;
+
+    switch (_item) {
+      case ReplyInfo reply:
+        child = _handleReply(reply, false);
+      case DynamicItemModel dyn:
+        child = DynamicPanel(
+          item: dyn,
+          isDetail: true,
+          isSave: true,
+        );
+      case Iterable<ReplyInfo> chain:
+        final first = chain.first;
+        final List<Widget> children;
+        if (first.parent == .ZERO) {
+          children = [
+            _handleReply(first, false),
+            Divider(
+              height: 20,
+              color: theme.dividerColor.withValues(alpha: 0.1),
+              thickness: 3.5,
+            ),
+            ...chain.skip(1).map(_handleReply),
+          ];
+        } else {
+          children = chain.map(_handleReply).toList();
+        }
+        child = Column(children: children);
+      default:
+        throw UnsupportedError(_item.toString());
+    }
+
     return Stack(
       clipBehavior: .none,
       alignment: .center,
@@ -367,22 +413,7 @@ class _SavePanelState extends State<SavePanel> {
                     mainAxisSize: .min,
                     crossAxisAlignment: .start,
                     children: [
-                      IgnorePointer(
-                        child: switch (_item) {
-                          ReplyInfo reply => ReplyItemGrpc(
-                            replyItem: reply,
-                            replyLevel: 0,
-                            needDivider: false,
-                            upMid: widget.upMid,
-                          ),
-                          DynamicItemModel dyn => DynamicPanel(
-                            item: dyn,
-                            isDetail: true,
-                            isSave: true,
-                          ),
-                          _ => throw UnsupportedError(_item.toString()),
-                        },
-                      ),
+                      IgnorePointer(child: child),
                       if (cover?.isNotEmpty == true &&
                           title?.isNotEmpty == true)
                         Container(
@@ -419,6 +450,7 @@ class _SavePanelState extends State<SavePanel> {
                                     ),
                                     if (pubdate != null)
                                       Text(
+                                        softWrap: false,
                                         DateFormatUtils.format(
                                           pubdate,
                                           format: dateFormat,

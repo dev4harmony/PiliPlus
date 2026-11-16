@@ -15,12 +15,18 @@ abstract final class ApiType {
       Api.roomEntryAction,
       Api.liveLikeReport,
       Api.mediaListHistory,
+
+      // live trace
+      Api.liveTraceE,
+      Api.liveTraceX,
+
       // Api.historyList,
       // Api.pauseHistory,
       // Api.clearHistory,
       // Api.delHistory,
       // Api.searchHistory,
       // Api.historyStatus,
+
       // progress
       Api.pgcInfo,
       Api.pugvInfo,
@@ -98,6 +104,7 @@ abstract final class ApiType {
       Api.ugcUrl,
       Api.pgcUrl,
       Api.pugvUrl,
+      Api.ogvUrl,
       Api.tvPlayUrl,
       Api.videoshot,
     },

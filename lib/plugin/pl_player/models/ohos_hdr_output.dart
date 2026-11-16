@@ -1,4 +1,4 @@
-import 'package:PiliPlus/models/common/video/video_quality.dart';
+import 'package:PiliPlus/models/common/video/base_quality.dart';
 
 /// 创建 Player 时就固定、之后改不了的鸿蒙视频输出：
 /// - `platformView`：画面走平台视图（XComponent）还是 Flutter 纹理；

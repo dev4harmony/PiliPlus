@@ -676,6 +676,14 @@ const DetailListReply$json = {
       '6': '.bilibili.main.community.reply.v1.DetailListReply.SubjectTitle',
       '10': 'subjectTitle'
     },
+    {
+      '1': 'mixed_cards',
+      '3': 11,
+      '4': 3,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.MixedCard',
+      '10': 'mixedCards'
+    },
   ],
   '3': [DetailListReply_SubjectTitle$json],
 };
@@ -713,11 +721,12 @@ final $typed_data.Uint8List detailListReplyDescriptor = $convert.base64Decode(
     '5iaWxpYmlsaS5wYWdpbmF0aW9uLkZlZWRQYWdpbmF0aW9uUmVwbHlSD3BhZ2luYXRpb25SZXBs'
     'eRIdCgpzZXNzaW9uX2lkGAkgASgJUglzZXNzaW9uSWQSYwoNc3ViamVjdF90aXRsZRgKIAEoCz'
     'I+LmJpbGliaWxpLm1haW4uY29tbXVuaXR5LnJlcGx5LnYxLkRldGFpbExpc3RSZXBseS5TdWJq'
-    'ZWN0VGl0bGVSDHN1YmplY3RUaXRsZRrOAQoMU3ViamVjdFRpdGxlEhsKCWxlZnRfaWNvbhgBIA'
-    'EoCVIIbGVmdEljb24SFAoFdGl0bGUYAiABKAlSBXRpdGxlEhIKBGxpbmsYAyABKAlSBGxpbmsS'
-    'GwoJcnBpZF9tdXRlGAQgASgDUghycGlkTXV0ZRJaCgtwdXNoX3N3aXRjaBgFIAEoDjI5LmJpbG'
-    'liaWxpLm1haW4uY29tbXVuaXR5LnJlcGx5LnYxLlJlcGx5Tm90aWZpY2F0aW9uU3dpdGNoUgpw'
-    'dXNoU3dpdGNo');
+    'ZWN0VGl0bGVSDHN1YmplY3RUaXRsZRJMCgttaXhlZF9jYXJkcxgLIAMoCzIrLmJpbGliaWxpLm'
+    '1haW4uY29tbXVuaXR5LnJlcGx5LnYxLk1peGVkQ2FyZFIKbWl4ZWRDYXJkcxrOAQoMU3ViamVj'
+    'dFRpdGxlEhsKCWxlZnRfaWNvbhgBIAEoCVIIbGVmdEljb24SFAoFdGl0bGUYAiABKAlSBXRpdG'
+    'xlEhIKBGxpbmsYAyABKAlSBGxpbmsSGwoJcnBpZF9tdXRlGAQgASgDUghycGlkTXV0ZRJaCgtw'
+    'dXNoX3N3aXRjaBgFIAEoDjI5LmJpbGliaWxpLm1haW4uY29tbXVuaXR5LnJlcGx5LnYxLlJlcG'
+    'x5Tm90aWZpY2F0aW9uU3dpdGNoUgpwdXNoU3dpdGNo');
 
 @$core.Deprecated('Use detailListReqDescriptor instead')
 const DetailListReq$json = {
@@ -2113,6 +2122,24 @@ const MixedCard$json = {
   '1': 'MixedCard',
   '2': [
     {
+      '1': 'fold',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.FoldCard',
+      '9': 0,
+      '10': 'fold'
+    },
+    {
+      '1': 'hotspot',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.HotspotCard',
+      '9': 0,
+      '10': 'hotspot'
+    },
+    {
       '1': 'question',
       '3': 4,
       '4': 1,
@@ -2144,16 +2171,21 @@ const MixedCard_Type$json = {
   '2': [
     {'1': 'UNKNOWN', '2': 0},
     {'1': 'QUESTION', '2': 1},
+    {'1': 'FOLD', '2': 2},
+    {'1': 'Hotspot', '2': 3},
   ],
 };
 
 /// Descriptor for `MixedCard`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List mixedCardDescriptor = $convert.base64Decode(
-    'CglNaXhlZENhcmQSTAoIcXVlc3Rpb24YBCABKAsyLi5iaWxpYmlsaS5tYWluLmNvbW11bml0eS'
-    '5yZXBseS52MS5RdWVzdGlvbkNhcmRIAFIIcXVlc3Rpb24SRAoEdHlwZRgBIAEoDjIwLmJpbGli'
-    'aWxpLm1haW4uY29tbXVuaXR5LnJlcGx5LnYxLk1peGVkQ2FyZC5UeXBlUgR0eXBlEhAKA29pZB'
-    'gCIAEoCVIDb2lkEiEKDGRpc3BsYXlfcmFuaxgDIAEoA1ILZGlzcGxheVJhbmsiIQoEVHlwZRIL'
-    'CgdVTktOT1dOEAASDAoIUVVFU1RJT04QAUIGCgRpdGVt');
+    'CglNaXhlZENhcmQSQAoEZm9sZBgFIAEoCzIqLmJpbGliaWxpLm1haW4uY29tbXVuaXR5LnJlcG'
+    'x5LnYxLkZvbGRDYXJkSABSBGZvbGQSSQoHaG90c3BvdBgGIAEoCzItLmJpbGliaWxpLm1haW4u'
+    'Y29tbXVuaXR5LnJlcGx5LnYxLkhvdHNwb3RDYXJkSABSB2hvdHNwb3QSTAoIcXVlc3Rpb24YBC'
+    'ABKAsyLi5iaWxpYmlsaS5tYWluLmNvbW11bml0eS5yZXBseS52MS5RdWVzdGlvbkNhcmRIAFII'
+    'cXVlc3Rpb24SRAoEdHlwZRgBIAEoDjIwLmJpbGliaWxpLm1haW4uY29tbXVuaXR5LnJlcGx5Ln'
+    'YxLk1peGVkQ2FyZC5UeXBlUgR0eXBlEhAKA29pZBgCIAEoCVIDb2lkEiEKDGRpc3BsYXlfcmFu'
+    'axgDIAEoA1ILZGlzcGxheVJhbmsiOAoEVHlwZRILCgdVTktOT1dOEAASDAoIUVVFU1RJT04QAR'
+    'IICgRGT0xEEAISCwoHSG90c3BvdBADQgYKBGl0ZW0=');
 
 @$core.Deprecated('Use noticeDescriptor instead')
 const Notice$json = {
@@ -3292,6 +3324,35 @@ final $typed_data.Uint8List replyInAppPushPayloadDescriptor = $convert.base64Dec
     'VyaWFsLkFyY2hpdmVIAFIDYXJjGkcKB0FyY2hpdmUSEAoDYWlkGAEgASgDUgNhaWQSFAoFdGl0'
     'bGUYAiABKAlSBXRpdGxlEhQKBWNvdmVyGAMgASgJUgVjb3ZlckIGCgRpdGVt');
 
+@$core.Deprecated('Use parentReplyMemberDescriptor instead')
+const ParentReplyMember$json = {
+  '1': 'ParentReplyMember',
+  '2': [
+    {'1': 'mid', '3': 1, '4': 1, '5': 3, '10': 'mid'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+  ],
+};
+
+/// Descriptor for `ParentReplyMember`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List parentReplyMemberDescriptor = $convert.base64Decode(
+    'ChFQYXJlbnRSZXBseU1lbWJlchIQCgNtaWQYASABKANSA21pZBISCgRuYW1lGAIgASgJUgRuYW'
+    '1l');
+
+@$core.Deprecated('Use hotReplyInfoDescriptor instead')
+const HotReplyInfo$json = {
+  '1': 'HotReplyInfo',
+  '2': [
+    {'1': 'arc_title', '3': 1, '4': 1, '5': 9, '10': 'arcTitle'},
+    {'1': 'opinion_idx', '3': 2, '4': 1, '5': 5, '10': 'opinionIdx'},
+    {'1': 'from_text', '3': 3, '4': 1, '5': 9, '10': 'fromText'},
+  ],
+};
+
+/// Descriptor for `HotReplyInfo`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List hotReplyInfoDescriptor = $convert.base64Decode(
+    'CgxIb3RSZXBseUluZm8SGwoJYXJjX3RpdGxlGAEgASgJUghhcmNUaXRsZRIfCgtvcGluaW9uX2'
+    'lkeBgCIAEoBVIKb3BpbmlvbklkeBIbCglmcm9tX3RleHQYAyABKAlSCGZyb21UZXh0');
+
 @$core.Deprecated('Use replyInfoDescriptor instead')
 const ReplyInfo$json = {
   '1': 'ReplyInfo',
@@ -3355,6 +3416,22 @@ const ReplyInfo$json = {
       '6': '.bilibili.main.community.reply.v1.Content',
       '10': 'translatedContent'
     },
+    {
+      '1': 'parent_reply_member',
+      '3': 18,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.ParentReplyMember',
+      '10': 'parentReplyMember'
+    },
+    {
+      '1': 'hot_info',
+      '3': 19,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.HotReplyInfo',
+      '10': 'hotInfo'
+    },
   ],
 };
 
@@ -3372,7 +3449,10 @@ final $typed_data.Uint8List replyInfoDescriptor = $convert.base64Decode(
     'NvbnRyb2wSRwoJbWVtYmVyX3YyGA8gASgLMiouYmlsaWJpbGkubWFpbi5jb21tdW5pdHkucmVw'
     'bHkudjEuTWVtYmVyVjJSCG1lbWJlclYyEh0KCnRyYWNrX2luZm8YECABKAlSCXRyYWNrSW5mbx'
     'JYChJ0cmFuc2xhdGVkX2NvbnRlbnQYESABKAsyKS5iaWxpYmlsaS5tYWluLmNvbW11bml0eS5y'
-    'ZXBseS52MS5Db250ZW50UhF0cmFuc2xhdGVkQ29udGVudA==');
+    'ZXBseS52MS5Db250ZW50UhF0cmFuc2xhdGVkQ29udGVudBJjChNwYXJlbnRfcmVwbHlfbWVtYm'
+    'VyGBIgASgLMjMuYmlsaWJpbGkubWFpbi5jb21tdW5pdHkucmVwbHkudjEuUGFyZW50UmVwbHlN'
+    'ZW1iZXJSEXBhcmVudFJlcGx5TWVtYmVyEkkKCGhvdF9pbmZvGBMgASgLMi4uYmlsaWJpbGkubW'
+    'Fpbi5jb21tdW5pdHkucmVwbHkudjEuSG90UmVwbHlJbmZvUgdob3RJbmZv');
 
 @$core.Deprecated('Use replyInfoReplyDescriptor instead')
 const ReplyInfoReply$json = {
@@ -4663,3 +4743,143 @@ final $typed_data.Uint8List translateReplyRespDescriptor = $convert.base64Decode
     'ZWRSZXBsaWVzRW50cnlSEXRyYW5zbGF0ZWRSZXBsaWVzGnEKFlRyYW5zbGF0ZWRSZXBsaWVzRW'
     '50cnkSEAoDa2V5GAEgASgDUgNrZXkSQQoFdmFsdWUYAiABKAsyKy5iaWxpYmlsaS5tYWluLmNv'
     'bW11bml0eS5yZXBseS52MS5SZXBseUluZm9SBXZhbHVlOgI4AQ==');
+
+@$core.Deprecated('Use hotspotCardDescriptor instead')
+const HotspotCard$json = {
+  '1': 'HotspotCard',
+  '2': [
+    {'1': 'icon', '3': 1, '4': 1, '5': 9, '10': 'icon'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'title_text', '3': 3, '4': 1, '5': 9, '10': 'titleText'},
+    {'1': 'rpid', '3': 4, '4': 1, '5': 3, '10': 'rpid'},
+    {'1': 'oid', '3': 5, '4': 1, '5': 3, '10': 'oid'},
+    {
+      '1': 'content',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.Content',
+      '10': 'content'
+    },
+    {
+      '1': 'member',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.MemberV2',
+      '10': 'member'
+    },
+    {'1': 'hotspot_id', '3': 8, '4': 1, '5': 3, '10': 'hotspotId'},
+    {
+      '1': 'reply_control',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.ReplyControl',
+      '10': 'replyControl'
+    },
+    {'1': 'like', '3': 10, '4': 1, '5': 3, '10': 'like'},
+    {'1': 'arc_title', '3': 11, '4': 1, '5': 9, '10': 'arcTitle'},
+    {'1': 'from_text', '3': 12, '4': 1, '5': 9, '10': 'fromText'},
+    {'1': 'type', '3': 13, '4': 1, '5': 5, '10': 'type'},
+  ],
+};
+
+/// Descriptor for `HotspotCard`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List hotspotCardDescriptor = $convert.base64Decode(
+    'CgtIb3RzcG90Q2FyZBISCgRpY29uGAEgASgJUgRpY29uEhQKBXRpdGxlGAIgASgJUgV0aXRsZR'
+    'IdCgp0aXRsZV90ZXh0GAMgASgJUgl0aXRsZVRleHQSEgoEcnBpZBgEIAEoA1IEcnBpZBIQCgNv'
+    'aWQYBSABKANSA29pZBJDCgdjb250ZW50GAYgASgLMikuYmlsaWJpbGkubWFpbi5jb21tdW5pdH'
+    'kucmVwbHkudjEuQ29udGVudFIHY29udGVudBJCCgZtZW1iZXIYByABKAsyKi5iaWxpYmlsaS5t'
+    'YWluLmNvbW11bml0eS5yZXBseS52MS5NZW1iZXJWMlIGbWVtYmVyEh0KCmhvdHNwb3RfaWQYCC'
+    'ABKANSCWhvdHNwb3RJZBJTCg1yZXBseV9jb250cm9sGAkgASgLMi4uYmlsaWJpbGkubWFpbi5j'
+    'b21tdW5pdHkucmVwbHkudjEuUmVwbHlDb250cm9sUgxyZXBseUNvbnRyb2wSEgoEbGlrZRgKIA'
+    'EoA1IEbGlrZRIbCglhcmNfdGl0bGUYCyABKAlSCGFyY1RpdGxlEhsKCWZyb21fdGV4dBgMIAEo'
+    'CVIIZnJvbVRleHQSEgoEdHlwZRgNIAEoBVIEdHlwZQ==');
+
+@$core.Deprecated('Use foldCardDescriptor instead')
+const FoldCard$json = {
+  '1': 'FoldCard',
+  '2': [
+    {'1': 'bottom_text', '3': 1, '4': 1, '5': 9, '10': 'bottomText'},
+    {
+      '1': 'fold_pagination',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.pagination.FeedPagination',
+      '10': 'foldPagination'
+    },
+  ],
+};
+
+/// Descriptor for `FoldCard`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List foldCardDescriptor = $convert.base64Decode(
+    'CghGb2xkQ2FyZBIfCgtib3R0b21fdGV4dBgBIAEoCVIKYm90dG9tVGV4dBJMCg9mb2xkX3BhZ2'
+    'luYXRpb24YAiABKAsyIy5iaWxpYmlsaS5wYWdpbmF0aW9uLkZlZWRQYWdpbmF0aW9uUg5mb2xk'
+    'UGFnaW5hdGlvbg==');
+
+@$core.Deprecated('Use foldListReqDescriptor instead')
+const FoldListReq$json = {
+  '1': 'FoldListReq',
+  '2': [
+    {'1': 'oid', '3': 1, '4': 1, '5': 3, '10': 'oid'},
+    {'1': 'type', '3': 2, '4': 1, '5': 3, '10': 'type'},
+    {'1': 'extra', '3': 3, '4': 1, '5': 9, '10': 'extra'},
+    {
+      '1': 'pagination',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.pagination.FeedPagination',
+      '10': 'pagination'
+    },
+  ],
+};
+
+/// Descriptor for `FoldListReq`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List foldListReqDescriptor = $convert.base64Decode(
+    'CgtGb2xkTGlzdFJlcRIQCgNvaWQYASABKANSA29pZBISCgR0eXBlGAIgASgDUgR0eXBlEhQKBW'
+    'V4dHJhGAMgASgJUgVleHRyYRJDCgpwYWdpbmF0aW9uGAQgASgLMiMuYmlsaWJpbGkucGFnaW5h'
+    'dGlvbi5GZWVkUGFnaW5hdGlvblIKcGFnaW5hdGlvbg==');
+
+@$core.Deprecated('Use foldListRespDescriptor instead')
+const FoldListResp$json = {
+  '1': 'FoldListResp',
+  '2': [
+    {
+      '1': 'replies',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.ReplyInfo',
+      '10': 'replies'
+    },
+    {
+      '1': 'pagination_reply',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.pagination.FeedPaginationReply',
+      '10': 'paginationReply'
+    },
+    {'1': 'title', '3': 3, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'subject_control',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.bilibili.main.community.reply.v1.SubjectControl',
+      '10': 'subjectControl'
+    },
+  ],
+};
+
+/// Descriptor for `FoldListResp`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List foldListRespDescriptor = $convert.base64Decode(
+    'CgxGb2xkTGlzdFJlc3ASRQoHcmVwbGllcxgBIAMoCzIrLmJpbGliaWxpLm1haW4uY29tbXVuaX'
+    'R5LnJlcGx5LnYxLlJlcGx5SW5mb1IHcmVwbGllcxJTChBwYWdpbmF0aW9uX3JlcGx5GAIgASgL'
+    'MiguYmlsaWJpbGkucGFnaW5hdGlvbi5GZWVkUGFnaW5hdGlvblJlcGx5Ug9wYWdpbmF0aW9uUm'
+    'VwbHkSFAoFdGl0bGUYAyABKAlSBXRpdGxlElkKD3N1YmplY3RfY29udHJvbBgEIAEoCzIwLmJp'
+    'bGliaWxpLm1haW4uY29tbXVuaXR5LnJlcGx5LnYxLlN1YmplY3RDb250cm9sUg5zdWJqZWN0Q2'
+    '9udHJvbA==');
