@@ -12,6 +12,7 @@ import OsTypePlugin from 'os_type';
 import NativeDeviceOrientationPlugin from 'native_device_orientation';
 import MediaKitVideoPlugin from 'media_kit_video';
 import MediaKitLibsOhosPlugin from 'media_kit_libs_ohos';
+import LivePhotoMakerPlugin from 'live_photo_maker';
 import ImagePickerPlugin from 'image_picker_ohos';
 import ImageCropperPlugin from 'image_cropper';
 import FlutterVolumeControllerPlugin from 'flutter_volume_controller';
@@ -50,6 +51,7 @@ export class GeneratedPluginRegistrant {
       flutterEngine.getPlugins()?.add(new NativeDeviceOrientationPlugin());
       flutterEngine.getPlugins()?.add(new MediaKitVideoPlugin());
       flutterEngine.getPlugins()?.add(new MediaKitLibsOhosPlugin());
+      flutterEngine.getPlugins()?.add(new LivePhotoMakerPlugin());
       flutterEngine.getPlugins()?.add(new ImagePickerPlugin());
       flutterEngine.getPlugins()?.add(new ImageCropperPlugin());
       flutterEngine.getPlugins()?.add(new FlutterVolumeControllerPlugin());

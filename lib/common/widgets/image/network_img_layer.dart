@@ -105,8 +105,7 @@ class NetworkImgLayer extends StatelessWidget {
     }
     // 鸿蒙下优化内存：被顶层路由覆盖时释放解码后的图片，见 [RouteCoverGate]
     return RouteCoverGate(
-      placeholder: getPlaceHolder?.call() ??
-          _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
+      placeholder: _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
       child: image,
     );
   }

@@ -2,6 +2,7 @@ import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/harmony_adapt/device/device_form.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/harmony_adapt/continuation.dart';
 import 'package:PiliPlus/models/common/harmony/hds_material_level.dart';
@@ -157,6 +158,13 @@ abstract class HarmonyChannel {
       case 'onHomeTabChange':
         _onHomeTabChange?.call(call.arguments['index'] as int? ?? 0);
         break;
+      // 原生握持手/操作手变化 → FAB 左右换边（智感握姿）
+      case 'onHoldingHandChange':
+        FabSideController.instance.syncFromNative(
+          isLeft: call.arguments['isLeft'] as bool? ?? false,
+          fromOperatingHand: call.arguments['fromOperating'] as bool? ?? false,
+        );
+        break;
       default:
         break;
     }
@@ -197,6 +205,10 @@ abstract class HarmonyChannel {
       await _channel.invokeMethod(method, args);
     } on PlatformException catch (_) {}
   }
+
+  /// 开关鸿蒙智感握姿的原生握持手订阅
+  static Future<void> setHoldingHandMonitor(bool enable) =>
+      _invoke('setHoldingHandMonitor', {'enable': enable});
 
   /// 向原生发送 shell 配置（Flutter 侧计算后通知 ArkTS）
   static Future<void> setShellBars({required bool useNativeTabs}) =>
@@ -329,11 +341,17 @@ abstract class HarmonyChannel {
   static Future<void> setShellBarsScrollHidden(bool hidden) =>
       _invoke('setShellBarsScrollHidden', {'hidden': hidden});
 
-  /// 启动长时任务，用于下载
-  static Future<void> startBackgroundTask() => _invoke('startBackgroundTask');
-
-  /// 停止长时任务
-  static Future<void> stopBackgroundTask() => _invoke('stopBackgroundTask');
+  /// 启动/停止长时任务（后台下载）。返回当前任务是否在运行。
+  static Future<bool> setBackgroundTask(bool running) async {
+    if (!OS.isHarmony) return false;
+    try {
+      return await _channel.invokeMethod<bool>('startBackgroundTask', {
+        'running': running,
+      }) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// 取走 ETS 侧暂存的接续数据并跳转视频页。冷启动在首帧后调用，
   /// 热启动由 onContinuationRestore 推送触发；数据取走即清除，不会重复跳转。
@@ -378,6 +396,14 @@ abstract class HarmonyChannel {
   static void _setContinuationActive(bool active) {
     _channel.invokeMethod('setContinuationActive', {'active': active});
   }
+
+  /// 上报下载进度（0~100）给长时任务实况窗，同时作为
+  /// dataTransfer 任务 10 分钟保活的进度更新。
+  static Future<void> updateBackgroundProgress(int progress, String remaining) =>
+      _invoke('updateBackgroundProgress', {
+        'progress': progress,
+        'remaining': remaining,
+      });
 
   /// 测试用，ai生成信息请忽略这部分更改
   static Future csy(value) {

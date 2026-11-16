@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ui' show SemanticsRole;
+// ignore_for_file: prefer_initializing_formals
 
 import 'package:flutter/foundation.dart' show clampDouble;
-import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:material_ui/material_ui.dart' hide TabBarView;
+import 'package:flutter/gestures.dart'
+    show DragStartBehavior, HorizontalDragGestureRecognizer;
+import 'package:flutter/material.dart'
+    hide Scrollable, ScrollableState, PageView, EdgeDraggingAutoScroller;
+
+import 'page_view.dart';
 
 /// A page view that displays the widget which corresponds to the currently
 /// selected tab.
@@ -22,11 +26,11 @@ import 'package:material_ui/material_ui.dart' hide TabBarView;
 /// [children] list and the length of the [TabBar.tabs] list.
 ///
 /// To see a sample implementation, visit the [TabController] documentation.
-class CustomTabBarView extends StatefulWidget {
+class TabBarView extends StatefulWidget {
   /// Creates a page view with one child per tab.
   ///
   /// The length of [children] must be the same as the [controller]'s length.
-  const CustomTabBarView({
+  const TabBarView({
     super.key,
     required this.children,
     this.controller,
@@ -35,7 +39,18 @@ class CustomTabBarView extends StatefulWidget {
     this.viewportFraction = 1.0,
     this.clipBehavior = Clip.hardEdge,
     this.scrollDirection = Axis.horizontal,
+    this.hitTestBehavior = HitTestBehavior.opaque,
+    this.horizontalDragGestureRecognizer,
   });
+
+  /// tabs.patch hunk of scrollable_gesture.patch.
+  final Axis scrollDirection;
+
+  /// tabs.patch hunk of scrollable_gesture.patch.
+  final HitTestBehavior hitTestBehavior;
+
+  // tabs.patch hunk of scrollable_gesture.patch.
+  final ValueGetter<HorizontalDragGestureRecognizer>? horizontalDragGestureRecognizer;
 
   /// This widget's selection and animation state.
   ///
@@ -71,13 +86,11 @@ class CustomTabBarView extends StatefulWidget {
   /// Defaults to [Clip.hardEdge].
   final Clip clipBehavior;
 
-  final Axis scrollDirection;
-
   @override
-  State<CustomTabBarView> createState() => _CustomTabBarViewState();
+  State<TabBarView> createState() => _TabBarViewState();
 }
 
-class _CustomTabBarViewState extends State<CustomTabBarView> {
+class _TabBarViewState extends State<TabBarView> {
   TabController? _controller;
   PageController? _pageController;
   late List<Widget> _childrenWithKey;
@@ -162,7 +175,7 @@ class _CustomTabBarViewState extends State<CustomTabBarView> {
   }
 
   @override
-  void didUpdateWidget(CustomTabBarView oldWidget) {
+  void didUpdateWidget(TabBarView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.controller != oldWidget.controller) {
       _updateTabController();
@@ -197,7 +210,7 @@ class _CustomTabBarViewState extends State<CustomTabBarView> {
   void _updateChildren() {
     _childrenWithKey = KeyedSubtree.ensureUniqueKeysForList(
       widget.children.map<Widget>((Widget child) {
-        return Semantics(role: SemanticsRole.tabPanel, child: child);
+        return Semantics(role: .tabPanel, child: child);
       }).toList(),
     );
   }
@@ -218,7 +231,7 @@ class _CustomTabBarViewState extends State<CustomTabBarView> {
       return;
     }
 
-    final bool adjacentDestination =
+    final adjacentDestination =
         (_currentIndex! - _controller!.previousIndex).abs() == 1;
     if (adjacentDestination) {
       _warpToAdjacentTab(_controller!.animationDuration);
@@ -360,9 +373,11 @@ class _CustomTabBarViewState extends State<CustomTabBarView> {
         dragStartBehavior: widget.dragStartBehavior,
         clipBehavior: widget.clipBehavior,
         controller: _pageController,
+        hitTestBehavior: widget.hitTestBehavior,
         physics: widget.physics == null
             ? const PageScrollPhysics().applyTo(const ClampingScrollPhysics())
             : const PageScrollPhysics().applyTo(widget.physics),
+        horizontalDragGestureRecognizer: widget.horizontalDragGestureRecognizer,
         children: _childrenWithKey,
       ),
     );

@@ -1,14 +1,10 @@
 import 'dart:async' show Completer;
 
-// Port of the Flutter framework's private `_StandardBottomSheet` /
-// `PersistentBottomSheetController` internals, which are not public in the
-// HarmonyOS Flutter SDK.
-// ignore_for_file: library_private_types_in_public_api
-
 import 'package:PiliPlus/common/widgets/scaffold/bottom_sheet.dart';
+import 'package:PiliPlus/common/widgets/scaffold/bottom_sheet_layout.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/rendering.dart'
-    show RenderStack, BoxHitTestResult, StackParentData;
 
 class MiniScaffold extends StatefulWidget {
   const MiniScaffold({
@@ -32,9 +28,7 @@ class MiniScaffold extends StatefulWidget {
 
 class MiniScaffoldState extends State<MiniScaffold>
     with TickerProviderStateMixin {
-  final _dismissedBottomSheets = <_StandardBottomSheet>[];
-  MiniBottomSheetController? _currentBottomSheet;
-  LocalHistoryEntry? _persistentSheetHistoryEntry;
+  PersistentBottomSheetController? _currentBottomSheet;
 
   void _closeCurrentBottomSheet() {
     if (_currentBottomSheet != null) {
@@ -50,9 +44,8 @@ class MiniScaffoldState extends State<MiniScaffold>
     }
   }
 
-  MiniBottomSheetController _buildBottomSheet(
+  PersistentBottomSheetController _buildBottomSheet(
     WidgetBuilder builder, {
-    required bool isPersistent,
     required AnimationController animationController,
     BoxConstraints? constraints,
     bool? enableDrag,
@@ -60,19 +53,11 @@ class MiniScaffoldState extends State<MiniScaffold>
     double dragHeight = kBottomSheetDragHeight,
   }) {
     final completer = Completer<void>();
-    final bottomSheetKey = GlobalKey<_StandardBottomSheetState>();
-    late _StandardBottomSheet bottomSheet;
+    final bottomSheetKey = GlobalKey<StandardBottomSheetState>();
+    late StandardBottomSheet bottomSheet;
 
     var removedEntry = false;
     var doingDispose = false;
-
-    void removePersistentSheetHistoryEntryIfNeeded() {
-      assert(isPersistent);
-      if (_persistentSheetHistoryEntry != null) {
-        _persistentSheetHistoryEntry!.remove();
-        _persistentSheetHistoryEntry = null;
-      }
-    }
 
     void removeCurrentBottomSheet() {
       removedEntry = true;
@@ -82,37 +67,24 @@ class MiniScaffoldState extends State<MiniScaffold>
       assert(_currentBottomSheet!.widget == bottomSheet);
       assert(bottomSheetKey.currentState != null);
 
-      if (isPersistent) {
-        removePersistentSheetHistoryEntryIfNeeded();
-      }
-
       bottomSheetKey.currentState!.close();
-      setState(() {
-        _currentBottomSheet = null;
-      });
 
-      if (!animationController.isDismissed) {
-        _dismissedBottomSheets.add(bottomSheet);
-      }
       completer.complete();
     }
 
-    final LocalHistoryEntry? entry = isPersistent
-        ? null
-        : LocalHistoryEntry(
-            onRemove: () {
-              if (!removedEntry &&
-                  _currentBottomSheet?.widget == bottomSheet &&
-                  !doingDispose) {
-                removeCurrentBottomSheet();
-              }
-            },
-          );
+    final LocalHistoryEntry entry = LocalHistoryEntry(
+      onRemove: () {
+        if (!removedEntry &&
+            _currentBottomSheet?.widget == bottomSheet &&
+            !doingDispose) {
+          removeCurrentBottomSheet();
+        }
+      },
+    );
 
     void removeEntryIfNeeded() {
-      if (!isPersistent && !removedEntry) {
-        assert(entry != null);
-        entry!.remove();
+      if (!removedEntry) {
+        entry.remove();
         removedEntry = true;
       }
     }
@@ -120,7 +92,7 @@ class MiniScaffoldState extends State<MiniScaffold>
     bottomSheet = _StandardBottomSheet(
       key: bottomSheetKey,
       animationController: animationController,
-      enableDrag: enableDrag ?? !isPersistent,
+      enableDrag: enableDrag ?? true,
       dragHeight: dragHeight,
       onClosing: () {
         if (_currentBottomSheet == null) {
@@ -130,10 +102,11 @@ class MiniScaffoldState extends State<MiniScaffold>
         removeEntryIfNeeded();
       },
       onDismissed: () {
-        if (_dismissedBottomSheets.contains(bottomSheet)) {
-          setState(() {
-            _dismissedBottomSheets.remove(bottomSheet);
-          });
+        if (bottomSheet == _currentBottomSheet?.widget) {
+          _currentBottomSheet = null;
+          if (mounted) {
+            setState(() {});
+          }
         }
       },
       onDispose: () {
@@ -144,26 +117,24 @@ class MiniScaffoldState extends State<MiniScaffold>
         }
       },
       builder: builder,
-      isPersistent: isPersistent,
+      isPersistent: false,
       constraints: constraints,
     );
 
-    if (!isPersistent) {
-      ModalRoute.of(context)!.addLocalHistoryEntry(entry!);
-    }
+    (Get.routing.route! as ModalRoute).addLocalHistoryEntry(entry);
 
-    return MiniBottomSheetController(
+    return PersistentBottomSheetController(
       bottomSheet,
       completer,
-      entry != null ? entry.remove : removeCurrentBottomSheet,
+      entry.remove,
       (VoidCallback fn) {
         bottomSheetKey.currentState?.setState(fn);
       },
-      !isPersistent,
+      true,
     );
   }
 
-  MiniBottomSheetController showBottomSheet(
+  PersistentBottomSheetController showBottomSheet(
     WidgetBuilder builder, {
     BoxConstraints? constraints,
     bool? enableDrag,
@@ -171,8 +142,6 @@ class MiniScaffoldState extends State<MiniScaffold>
     AnimationStyle? sheetAnimationStyle,
     double dragHeight = kBottomSheetDragHeight,
   }) {
-    assert(debugCheckHasMediaQuery(context));
-
     _closeCurrentBottomSheet();
     final AnimationController controller =
         (transitionAnimationController ??
@@ -184,7 +153,6 @@ class MiniScaffoldState extends State<MiniScaffold>
     setState(() {
       _currentBottomSheet = _buildBottomSheet(
         builder,
-        isPersistent: false,
         animationController: controller,
         constraints: constraints,
         enableDrag: enableDrag,
@@ -197,124 +165,43 @@ class MiniScaffoldState extends State<MiniScaffold>
 
   @override
   Widget build(BuildContext context) {
-    return BottomSheetStack(
-      clipBehavior: .none,
-      alignment: .bottomCenter,
-      children: [
-        widget.body,
-        ..._dismissedBottomSheets,
-        ?_currentBottomSheet?.widget,
-      ],
+    return BottomSheetLayout(
+      body: widget.body,
+      bottomSheet: _currentBottomSheet?.widget,
     );
   }
 }
 
-/// A controller for the bottom sheet currently shown by [MiniScaffoldState].
-///
-/// This is a port of the SDK's `PersistentBottomSheetController`, which is not
-/// publicly constructible in the HarmonyOS Flutter SDK.
-class MiniBottomSheetController {
-  MiniBottomSheetController(
-    this.widget,
-    this.completer,
-    this.close,
-    this.setState,
-    this.isLocalHistoryEntry,
-  );
-
-  final _StandardBottomSheet widget;
-  final Completer<void> completer;
-  final VoidCallback close;
-  final StateSetter? setState;
-  final bool isLocalHistoryEntry;
-}
-
-class _StandardBottomSheet extends StatefulWidget {
+class _StandardBottomSheet extends StandardBottomSheet {
   const _StandardBottomSheet({
     super.key,
-    required this.animationController,
-    this.enableDrag = true,
-    required this.onClosing,
-    required this.onDismissed,
-    required this.builder,
-    this.isPersistent = false,
-    this.constraints,
-    this.onDispose,
+    required super.animationController,
+    super.enableDrag,
+    required super.onClosing,
+    required super.onDismissed,
+    required super.builder,
+    super.isPersistent,
+    super.constraints,
+    super.onDispose,
     this.dragHeight = kBottomSheetDragHeight,
   });
 
-  final AnimationController
-  animationController; // we control it, but it must be disposed by whoever created it.
-  final bool enableDrag;
-  final VoidCallback? onClosing;
-  final VoidCallback? onDismissed;
-  final VoidCallback? onDispose;
-  final WidgetBuilder builder;
-  final bool isPersistent;
-  final BoxConstraints? constraints;
   final double dragHeight;
 
   @override
-  _StandardBottomSheetState createState() => _StandardBottomSheetState();
+  StandardBottomSheetState<_StandardBottomSheet> createState() =>
+      _StandardBottomSheetState();
 }
 
-class _StandardBottomSheetState extends State<_StandardBottomSheet> {
-  // Same curve as the SDK's `_standardBottomSheetCurve` (`standardEasing`).
-  static const Curve _standardBottomSheetCurve = Easing.legacy;
-
-  ParametricCurve<double> animationCurve = _standardBottomSheetCurve;
-
-  @override
-  void initState() {
-    super.initState();
-    assert(widget.animationController.isForwardOrCompleted);
-    widget.animationController.addStatusListener(_handleStatusChange);
-  }
-
-  @override
-  void dispose() {
-    widget.animationController.removeStatusListener(_handleStatusChange);
-    widget.onDispose?.call();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(_StandardBottomSheet oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    assert(widget.animationController == oldWidget.animationController);
-  }
-
-  void close() {
-    widget.animationController.reverse();
-    widget.onClosing?.call();
-  }
-
-  void _handleDragStart(DragStartDetails details) {
-    // Allow the bottom sheet to track the user's finger accurately.
-    animationCurve = Curves.linear;
-  }
-
-  void _handleDragEnd(DragEndDetails details, {bool? isClosing}) {
-    // Allow the bottom sheet to animate smoothly from its current position.
-    animationCurve = Split(
-      widget.animationController.value,
-      endCurve: _standardBottomSheetCurve,
-    );
-  }
-
-  void _handleStatusChange(AnimationStatus status) {
-    if (status.isDismissed) {
-      widget.onDismissed?.call();
-    }
-  }
-
+class _StandardBottomSheetState
+    extends StandardBottomSheetState<_StandardBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final child = BottomSheet_(
       animationController: widget.animationController,
       enableDrag: widget.enableDrag,
-      onDragStart: _handleDragStart,
-      onDragEnd: _handleDragEnd,
+      onDragStart: handleDragStart,
+      onDragEnd: handleDragEnd,
       onClosing: widget.onClosing!,
       builder: widget.builder,
       constraints: widget.constraints,
@@ -341,59 +228,5 @@ class _StandardBottomSheetState extends State<_StandardBottomSheet> {
       ),
       child: child,
     );
-  }
-}
-
-class BottomSheetStack extends Stack {
-  const BottomSheetStack({
-    super.key,
-    super.alignment,
-    super.textDirection,
-    super.fit,
-    super.clipBehavior,
-    super.children,
-  });
-
-  @override
-  RenderBottomSheetStack createRenderObject(BuildContext context) {
-    return RenderBottomSheetStack(
-      alignment: alignment,
-      textDirection: textDirection ?? Directionality.maybeOf(context),
-      fit: fit,
-      clipBehavior: clipBehavior,
-    );
-  }
-}
-
-class RenderBottomSheetStack extends RenderStack {
-  RenderBottomSheetStack({
-    super.children,
-    super.alignment,
-    super.textDirection,
-    super.fit,
-    super.clipBehavior,
-  });
-
-  /// HitTest lastChild only
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
-    RenderBox? child = lastChild;
-    if (child != null) {
-      final childParentData = child.parentData! as StackParentData;
-      return result.addWithPaintOffset(
-        offset: childParentData.offset,
-        position: position,
-        hitTest: (BoxHitTestResult result, Offset transformed) {
-          assert(transformed == position - childParentData.offset);
-          final isHit = child.hitTest(result, position: transformed);
-          if (childParentData.previousSibling != null) {
-            return false;
-          } else {
-            return isHit;
-          }
-        },
-      );
-    }
-    return false;
   }
 }

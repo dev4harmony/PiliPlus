@@ -17,11 +17,9 @@ library;
 import 'dart:math';
 import 'dart:ui' as ui show TextHeightBehavior;
 
-import 'package:PiliPlus/common/widgets/flutter/text/paragraph.dart';
-import 'package:PiliPlus/common/widgets/flutter/text/rich_text.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart' hide Text, RichText;
-import 'package:flutter/rendering.dart' hide RenderParagraph;
+import 'package:flutter/rendering.dart' hide RichText, RenderParagraph;
 
 /// A run of text with a single style.
 ///

@@ -20,7 +20,6 @@ import 'dart:io' show File, Platform;
 
 import 'package:PiliPlus/common/widgets/colored_box_transition.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
-import 'package:PiliPlus/common/widgets/flutter/page/page_view.dart';
 import 'package:PiliPlus/common/widgets/gesture/image_double_tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/gesture/image_horizontal_drag_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/gesture/image_tap_gesture_recognizer.dart';
@@ -44,7 +43,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/gestures.dart' show LongPressGestureRecognizer;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:get/get.dart';
-import 'package:material_ui/material_ui.dart' hide Image, PageView;
+import 'package:material_ui/material_ui.dart' hide Image;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:os_type/os_type.dart';
@@ -112,10 +111,15 @@ class _GalleryViewerState extends State<GalleryViewer>
 
   Future<void> _initPlayer() async {
     assert(_player == null);
-    final player = Player();
-    _videoController = VideoController(player);
+    final player = await Player.create();
     if (!mounted) {
-      player.dispose();
+      await player.dispose();
+      _videoController = null;
+      return;
+    }
+    _videoController = await VideoController.create(player);
+    if (!mounted) {
+      await player.dispose();
       _videoController = null;
       return;
     }
@@ -331,7 +335,7 @@ class _GalleryViewerState extends State<GalleryViewer>
                 alignment: .topLeft,
                 animation: _animateController,
                 onTransform: _onTransform,
-                child: PageView<ImageHorizontalDragGestureRecognizer>.builder(
+                child: PageView.builder(
                   controller: _pageController,
                   onPageChanged: _onPageChanged,
                   physics: const AlwaysScrollableScrollPhysics(

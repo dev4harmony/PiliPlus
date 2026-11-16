@@ -124,6 +124,10 @@ class RenderParagraph extends RenderBox
 
   final TextPainter _textPainter;
 
+  /// 上游 `lib/scripts/text.patch` 在 RenderParagraph 上暴露的只读
+  /// TextPainter 访问器，供库外代码读取布局结果。
+  TextPainter get textPainter => _textPainter;
+
   // Currently, computing min/max intrinsic width/height will destroy state
   // inside the painter. Instead of calling _layout again to get back the correct
   // state, use a separate TextPainter for intrinsics calculation.

@@ -1,5 +1,4 @@
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
-import 'package:PiliPlus/common/widgets/flutter/page/tabs.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart';
@@ -14,7 +13,7 @@ import 'package:PiliPlus/pages/history/controller.dart';
 import 'package:PiliPlus/pages/history/widgets/item.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:material_ui/material_ui.dart' hide TabBarView;
+import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -133,7 +132,7 @@ class _HistoryPageState extends State<HistoryPage>
                       ],
                     ),
                     Expanded(
-                      child: TabBarView<CustomHorizontalDragGestureRecognizer>(
+                      child: TabBarView(
                         physics: enableMultiSelect
                             ? const NeverScrollableScrollPhysics()
                             : tabBarScrollPhysics,

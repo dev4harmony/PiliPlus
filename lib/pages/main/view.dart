@@ -5,8 +5,8 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
-import 'package:PiliPlus/common/widgets/flutter/tabs.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
+import 'package:PiliPlus/common/widgets/main_layout.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/main.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -47,7 +47,7 @@ class _MainAppState extends PopScopeState<MainApp>
   final _mainController = Get.put(MainController());
   late final _setting = GStorage.setting;
   late EdgeInsets _padding;
-  late ThemeData theme;
+  late ColorScheme _colorScheme;
   Brightness? _brightness;
   Worker? _nativeTabsWorker;
   Worker? _nativeTopBarWorker;
@@ -73,7 +73,9 @@ class _MainAppState extends PopScopeState<MainApp>
       );
     });
     // 主题色由 appearance_sync.dart 统一监听下发，这里不再补发。
-    _nativeTopBarWorker = ever(_mainController.useNativeTopBar, (useNativeTopBar) {
+    _nativeTopBarWorker = ever(_mainController.useNativeTopBar, (
+      useNativeTopBar,
+    ) {
       if (!mounted || !useNativeTopBar) return;
       // 同样补发首帧时因 useNativeTopBar 未就绪而跳过的顶栏显隐同步：
       // 横屏（侧栏布局）或已有子页面覆盖主页时，原生顶栏不应显示
@@ -102,8 +104,8 @@ class _MainAppState extends PopScopeState<MainApp>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _padding = MediaQuery.viewPaddingOf(context);
-    theme = Theme.of(context);
-    final brightness = theme.brightness;
+    _colorScheme = ColorScheme.of(context);
+    final brightness = _colorScheme.brightness;
     NetworkImgLayer.reduce =
         NetworkImgLayer.reduceLuxColor != null && brightness.isDark;
     if (PlatformUtils.isDesktop) {
@@ -336,35 +338,19 @@ class _MainAppState extends PopScopeState<MainApp>
         return null;
       }
       if (_mainController.floatingNavBar) {
-        // 悬浮底栏必须拿到「松」的宽度约束才能保持自身 destinations.length * 86 的
-        // 宽度。上游从 `e89241109 opt ui` 起把主页换成了自绘的 MainLayout，那里给
-        // bottomNav 的是 constraints.loosen() 再手动水平居中；鸿蒙没跟进这个骨架
-        // 重构（状态栏取色依赖 Scaffold 里那个零高 AppBar，换掉代价太大），而
-        // Scaffold.bottomNavigationBar 下发的是 fullWidthConstraints —— 宽度是紧
-        // 约束（material/scaffold.dart:1035 `looseConstraints.tighten(width:)`），
-        // FloatingNavigationBar 内部的 SizedBox 会被 enforce 成整屏宽。
-        //
-        // 这里用 Align 吃掉紧宽度：Align 自己撑满宽度，子节点拿到松约束、按自身
-        // 宽度水平居中；heightFactor: 1 让高度仍按子节点算，Scaffold 据此计算的
-        // body 内边距与改动前一致。两侧空白区域 Align 不参与命中测试，点击会穿透
-        // 到下面的内容，与上游 MainLayout 的表现一致。
-        bottomNav = Align(
-          alignment: Alignment.bottomCenter,
-          heightFactor: 1,
-          child: Obx(
-            () => FloatingNavigationBar(
-              onDestinationSelected: _mainController.setIndex,
-              selectedIndex: _mainController.selectedIndex.value,
-              destinations: _mainController.navigationBars
-                  .map(
-                    (e) => FloatingNavigationDestination(
-                      label: e.label,
-                      icon: _buildIcon(type: e),
-                      selectedIcon: _buildIcon(type: e, selected: true),
-                    ),
-                  )
-                  .toList(),
-            ),
+        bottomNav = Obx(
+          () => FloatingNavigationBar(
+            onDestinationSelected: _mainController.setIndex,
+            selectedIndex: _mainController.selectedIndex.value,
+            destinations: _mainController.navigationBars
+                .map(
+                  (e) => FloatingNavigationDestination(
+                    label: e.label,
+                    icon: _buildIcon(type: e),
+                    selectedIcon: _buildIcon(type: e, selected: true),
+                  ),
+                )
+                .toList(),
           ),
         );
       } else if (_mainController.enableMYBar) {
@@ -433,94 +419,70 @@ class _MainAppState extends PopScopeState<MainApp>
     return bottomNav;
   }
 
-  Widget _sideBar(ThemeData theme) {
-    final Widget sideBar = _mainController.navigationBars.length > 1
-        ? context.isTablet && _mainController.optTabletNav
-              ? Column(
-                  children: [
-                    SizedBox(
-                      height: MediaQuery.paddingOf(context).top + 25,
-                    ),
-                    userAndSearchVertical(theme),
-                    const Spacer(flex: 2),
-                    Expanded(
-                      flex: 5,
-                      child: SizedBox(
-                        width: 130,
-                        child: Obx(
-                          () => NavigationDrawer(
-                            backgroundColor: Colors.transparent,
-                            tilePadding: const .symmetric(
-                              vertical: 5,
-                              horizontal: 12,
-                            ),
-                            indicatorShape: const RoundedRectangleBorder(
-                              borderRadius: .all(.circular(16)),
-                            ),
-                            onDestinationSelected: _mainController.setIndex,
-                            selectedIndex: _mainController.selectedIndex.value,
-                            children: _mainController.navigationBars
-                                .map(
-                                  (e) => NavigationDrawerDestination(
-                                    label: Text(e.label),
-                                    icon: _buildIcon(type: e),
-                                    selectedIcon: _buildIcon(
-                                      type: e,
-                                      selected: true,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
+  Widget _sideBar() {
+    if (_mainController.navigationBars.length > 1) {
+      if (context.isTablet && _mainController.optTabletNav) {
+        return Padding(
+          padding: const .only(top: 25),
+          child: MediaQuery.removePadding(
+            context: context,
+            removeRight: true,
+            child: DrawerTheme(
+              data: DrawerThemeData(width: 130 + _padding.left),
+              child: Obx(
+                () => NavigationDrawer(
+                  /// apply `lib/scripts/navigation_drawer.patch`
+                  flex: 5,
+                  backgroundColor: Colors.transparent,
+                  onDestinationSelected: _mainController.setIndex,
+                  selectedIndex: _mainController.selectedIndex.value,
+                  header: Expanded(flex: 4, child: userAndSearchVertical()),
+                  tilePadding: const .symmetric(vertical: 5, horizontal: 12),
+                  indicatorShape: const RoundedRectangleBorder(
+                    borderRadius: .all(.circular(16)),
+                  ),
+                  children: _mainController.navigationBars
+                      .map(
+                        (e) => NavigationDrawerDestination(
+                          label: Text(e.label),
+                          icon: _buildIcon(type: e),
+                          selectedIcon: _buildIcon(
+                            type: e,
+                            selected: true,
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                )
-              : Obx(
-                  () => NavigationRail(
-                    groupAlignment: 0.5,
-                    selectedIndex: _mainController.selectedIndex.value,
-                    onDestinationSelected: _mainController.setIndex,
-                    labelType: .selected,
-                    leading: userAndSearchVertical(theme),
-                    destinations: _mainController.navigationBars
-                        .map(
-                          (e) => NavigationRailDestination(
-                            label: Text(e.label),
-                            icon: _buildIcon(type: e),
-                            selectedIcon: _buildIcon(type: e, selected: true),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                )
-        : Container(
-            width: 80,
-            padding: const .only(top: 10),
-            child: userAndSearchVertical(theme),
-          );
-    // NavigationDrawer / NavigationRail 内部各自带一层 SafeArea：抽屉那层是
-    // SafeArea(bottom: false)，左右两侧都吃（见 SDK navigation_drawer.dart）。
-    // 而这两侧的避让本页都已经让过了——右侧由 build 里包住整个 body 的
-    // Padding(right: _padding.right) 负责，左侧由下面这层 Padding 负责（侧栏
-    // 上方的头像/消息/搜索列不在 SafeArea 内，两组控件得一起移，否则一个右移
-    // 一个不动会错位）。这里把子树里的 padding.left/right 清掉，避免二次避让：
-    // 抽屉宽度是固定的 130，右边再让一次就只剩 100 出头，页签的选中底色跟着
-    // 变窄、标签还会被 Stack 裁掉（大屏横屏且右侧有挖孔/安全区时最明显）。
-    final left = MediaQuery.paddingOf(context).left;
-    final Widget child = MediaQuery.removePadding(
-      context: context,
-      removeLeft: true,
-      removeRight: true,
-      child: sideBar,
-    );
-    if (left <= 0) {
-      return child;
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      return Obx(
+        () => NavigationRail(
+          groupAlignment: 0.5,
+          labelType: .selected,
+          leading: userAndSearchVertical(),
+          backgroundColor: Colors.transparent,
+          onDestinationSelected: _mainController.setIndex,
+          selectedIndex: _mainController.selectedIndex.value,
+          destinations: _mainController.navigationBars
+              .map(
+                (e) => NavigationRailDestination(
+                  label: Text(e.label),
+                  icon: _buildIcon(type: e),
+                  selectedIcon: _buildIcon(type: e, selected: true),
+                ),
+              )
+              .toList(),
+        ),
+      );
     }
-    return Padding(
-      padding: EdgeInsets.only(left: left),
-      child: child,
+    return Container(
+      width: 80,
+      margin: .only(top: 12 + _padding.top, left: _padding.left),
+      child: userAndSearchVertical(),
     );
   }
 
@@ -528,10 +490,10 @@ class _MainAppState extends PopScopeState<MainApp>
   Widget build(BuildContext context) {
     Widget child;
     if (_mainController.mainTabBarView) {
-      child = CustomTabBarView(
-        scrollDirection: _mainController.useBottomNav ? .horizontal : .vertical,
-        physics: const NeverScrollableScrollPhysics(),
+      child = TabBarView(
         controller: _mainController.controller,
+        physics: const NeverScrollableScrollPhysics(),
+        scrollDirection: _mainController.useBottomNav ? .horizontal : .vertical,
         children: _mainController.navigationBars.map((i) => i.page).toList(),
       );
     } else {
@@ -542,23 +504,43 @@ class _MainAppState extends PopScopeState<MainApp>
       );
     }
 
+    // 骨架用上游自绘的 MainLayout（sideBar / bottomNav / body 三个槽位），
+    // 横竖屏只切换「哪个槽位有内容」，body 那棵子树的 widget 链类型恒定，
+    // PageView 的 Element 不会被重建（旧实现按 useBottomNav 在
+    // Row / ColoredBox 之间二选一，横竖屏切换会把 PageView 连同
+    // ScrollPosition 一起重建，页面回落到 PageController.initialPage）。
+    Widget? sideBar;
     Widget? bottomNav;
+    final EdgeInsets padding;
     if (_mainController.useBottomNav) {
       bottomNav = _bottomNav;
-      child = Row(children: [Expanded(child: child)]);
+      if (bottomNav != null) {
+        bottomNav = MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          child: bottomNav,
+        );
+      }
+      padding = EdgeInsets.only(left: _padding.left, right: _padding.right);
     } else {
-      child = Row(
-        children: [
-          _sideBar(theme),
-          VerticalDivider(
-            width: 1,
-            endIndent: _padding.bottom,
-            color: theme.colorScheme.outline.withValues(alpha: 0.06),
+      sideBar = DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(
+              color: _colorScheme.outline.withValues(alpha: 0.06),
+            ),
           ),
-          Expanded(child: child),
-        ],
+        ),
+        child: _sideBar(),
       );
+      padding = EdgeInsets.only(right: _padding.right);
     }
+
+    final mainLayout = MainLayout(
+      sideBar: sideBar,
+      bottomNav: bottomNav,
+      body: Padding(padding: padding, child: child),
+    );
 
     // Flutter 在鸿蒙平台上的状态栏颜色依赖于AppBar设置的backgroundColor进行取色，因此需要写这个神人代码保证取色能力正常
     final backgroundColor =
@@ -566,7 +548,7 @@ class _MainAppState extends PopScopeState<MainApp>
         ? const Color.fromARGB(0, 255, 255, 255)
         : const Color.fromARGB(0, 0, 0, 0);
 
-    child = Scaffold(
+    final scaffold = Scaffold(
       extendBody: true,
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true, // 扩展安全区
@@ -574,27 +556,27 @@ class _MainAppState extends PopScopeState<MainApp>
         toolbarHeight: 0,
         backgroundColor: backgroundColor,
       ),
-      body: Padding(
-        padding: EdgeInsets.only(
-          left: _mainController.useBottomNav ? _padding.left : 0.0,
-          right: _padding.right,
-        ),
-        child: child,
-      ),
-      bottomNavigationBar: bottomNav,
+      body: mainLayout,
     );
 
     if (PlatformUtils.isMobile) {
-      child = AnnotatedRegion<SystemUiOverlayStyle>(
+      return AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
+          // 这里必须把状态栏也写全：本区域的样式会整体替换上一份，缺
+          // statusBarColor 时鸿蒙侧会按未指定处理、回落成默认的不透明
+          // 色，首页顶栏区域跟着发白。沉浸光感顶栏关闭时没有原生顶栏
+          // 盖在上面，这个回落才看得见（其余页面的 AnnotatedRegion 都
+          // 显式带了透明）。
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: _colorScheme.brightness.reverse,
           systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: theme.brightness.reverse,
+          systemNavigationBarIconBrightness: _colorScheme.brightness.reverse,
         ),
-        child: child,
+        child: scaffold,
       );
     }
 
-    return child;
+    return scaffold;
   }
 
   Widget _buildIcon({required NavigationBarType type, bool selected = false}) {
@@ -616,10 +598,10 @@ class _MainAppState extends PopScopeState<MainApp>
         : icon;
   }
 
-  Widget userAndSearchVertical(ThemeData theme) {
+  Widget userAndSearchVertical() {
     return Column(
       children: [
-        userAvatar(theme: theme, mainController: _mainController),
+        userAvatar(colorScheme: _colorScheme, mainController: _mainController),
         const SizedBox(height: 8),
         msgBadge(_mainController),
         IconButton(

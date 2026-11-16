@@ -13,7 +13,6 @@ library;
 
 import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
-import 'package:PiliPlus/common/widgets/flutter/text_field/adaptive_text_selection_toolbar.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/cupertino/spell_check_suggestions_toolbar.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/cupertino/text_field.dart';
@@ -38,16 +37,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart'
     hide
+        TextField,
         EditableText,
         EditableTextState,
         EditableTextContextMenuBuilder,
-        AdaptiveTextSelectionToolbar,
         SystemContextMenu,
         SpellCheckSuggestionsToolbar,
         SpellCheckConfiguration,
         TextSelectionGestureDetectorBuilder,
         TextSelectionOverlay,
-        TextSelectionGestureDetectorBuilderDelegate;
+        TextSelectionGestureDetectorBuilderDelegate,
+        // 本文件只用 SDK 原生 Scrollable（文档引用），compat 版会与
+        // cupertino_ui 再导出的 SDK Scrollable 产生歧义。
+        Scrollable,
+        ScrollableState;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 

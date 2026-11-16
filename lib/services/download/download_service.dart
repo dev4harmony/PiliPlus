@@ -29,7 +29,6 @@ import 'package:flutter/foundation.dart'
     show kDebugMode, debugPrint, VoidCallback;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
-import 'package:os_type/os_type.dart';
 import 'package:path/path.dart' as path;
 import 'package:synchronized/synchronized.dart';
 
@@ -428,6 +427,8 @@ class DownloadService extends GetxService {
   }
 
   Future<void> _startDownload(BiliDownloadEntryInfo entry) async {
+    // 用户刚触发下载、处于前台时申请，成功率最高
+    HarmonyChannel.setBackgroundTask(true);
     try {
       if (!await downloadDanmaku(entry: entry)) {
         return;
@@ -507,7 +508,6 @@ class DownloadService extends GetxService {
         default:
           break;
       }
-      _startBackgroundTask();
     } catch (e) {
       _updateCurStatus(DownloadStatus.failPlayUrl);
       if (kDebugMode) {
@@ -521,18 +521,6 @@ class DownloadService extends GetxService {
     return entryJsonFile.writeAsString(jsonEncode(entry.toJson()));
   }
 
-  /// 启动鸿蒙长时任务，用于后台下载
-  void _startBackgroundTask() {
-    if (!OS.isHarmony) return;
-    HarmonyChannel.startBackgroundTask();
-  }
-
-  /// 停止鸿蒙长时任务
-  void _stopBackgroundTask() {
-    if (!OS.isHarmony) return;
-    HarmonyChannel.stopBackgroundTask();
-  }
-
   void _onReceive(int progress, int total) {
     if (curDownload.value case final entry?) {
       if (progress == 0 && total != 0) {
@@ -542,6 +530,13 @@ class DownloadService extends GetxService {
         ..downloadedBytes = progress
         ..status = DownloadStatus.downloading;
       curDownload.refresh();
+      // dataTransfer 长时任务需周期性更新进度，否则 10 分钟后被系统取消
+      if (total != 0) {
+        HarmonyChannel.updateBackgroundProgress(
+          progress * 100 ~/ total,
+          '剩余${waitDownloadQueue.length}项',
+        );
+      }
     }
   }
 
@@ -599,7 +594,13 @@ class DownloadService extends GetxService {
     curDownload.value = null;
     _downloadManager = null;
     _audioDownloadManager = null;
-    _stopBackgroundTask();
+    HarmonyChannel.updateBackgroundProgress(
+      0,
+      waitDownloadQueue.isEmpty ? '' : '剩余${waitDownloadQueue.length}项',
+    );
+    if (waitDownloadQueue.isEmpty) {
+      HarmonyChannel.setBackgroundTask(false);
+    }
     nextDownload();
   }
 
@@ -675,7 +676,10 @@ class DownloadService extends GetxService {
     } else {
       _updateCurStatus(DownloadStatus.pause);
     }
-    _stopBackgroundTask();
+    // 队列还有后续任务时不 stop，避免 stop/start 震荡
+    if (!downloadNext || waitDownloadQueue.isEmpty) {
+      HarmonyChannel.setBackgroundTask(false);
+    }
     if (downloadNext) {
       nextDownload();
     }

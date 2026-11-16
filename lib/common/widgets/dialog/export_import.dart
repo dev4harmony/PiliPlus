@@ -34,7 +34,6 @@ void exportToLocalFile({
         'piliplus_${localFileName()}_'
         '${DateFormatUtils.only0_9.format(DateTime.now())}.json',
     bytes: res,
-    allowedExtensions: const ['json'],
   );
 }
 
@@ -117,13 +116,12 @@ Future<void> importFromClipBoard<T>(
 Future<void> importFromLocalFile<T>({
   required FutureOr<void> Function(T json) onImport,
 }) async {
-  // 鸿蒙适配 fork 仅提供 FilePicker.platform 实例方法
-  final result = await FilePicker.platform.pickFiles(
-    type: FileType.custom,
+  final result = await FilePicker.pickFile(
+    type: .custom,
     allowedExtensions: const ['json', 'txt'],
   );
-  if (result?.files.firstOrNull case final file?) {
-    final data = await file.xFile.readAsString();
+  if (result != null) {
+    final data = await result.xFile.readAsString();
     final T json;
     try {
       json = jsonDecode(data);

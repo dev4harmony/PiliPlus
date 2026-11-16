@@ -9,23 +9,18 @@ abstract final class StorageUtils {
   static Future<void> saveBytes2File({
     required String name,
     required Uint8List bytes,
-    required List<String> allowedExtensions,
-    FileType type = FileType.custom,
   }) async {
     try {
-      // 鸿蒙适配 fork（br_v10.2.0_ohos）仅提供 FilePicker.platform 实例方法
-      final path = await FilePicker.platform.saveFile(
-        allowedExtensions: allowedExtensions,
-        type: type,
+      final path = await FilePicker.saveFile(
         fileName: name,
-        bytes: PlatformUtils.isDesktop ? null : bytes,
+        bytes: PlatformUtils.isDesktop ? Uint8List(0) : bytes,
       );
       if (path == null) {
         SmartDialog.showToast("取消保存");
         return;
       }
       if (PlatformUtils.isDesktop) {
-        await File(path).writeAsBytes(bytes);
+        await File(path.toFilePath()).writeAsBytes(bytes);
       }
       SmartDialog.showToast("已保存");
     } catch (e) {
