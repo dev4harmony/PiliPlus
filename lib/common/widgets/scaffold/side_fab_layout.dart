@@ -7,11 +7,18 @@ enum FabSide { left, right }
 /// 回到竖屏自动恢复跟随。横竖判定由 SimpleScaffold.build 的重建回调写入
 /// （横竖切换必然触发重建），布局层只读状态，不再自行推断。
 mixin FabSideGate {
-  static bool _landscapeAdapt = Pref.horizontalScreen;
+  /// 「横屏适配」是否开启，直接实时读取设置，不做缓存。
+  ///
+  /// 鸿蒙上该值按设备形态与当前屏幕自动判定，折叠/展开、内外屏切换时都会
+  /// 变化；若缓存成静态字段，FAB 的横屏门控会停在启动时的旧值，直到重启
+  /// 应用。其它平台仍由设置页开关写入存储，实时读取同样成立。
+  static bool get landscapeAdapt => Pref.horizontalScreen;
 
-  static set landscapeAdapt(bool value) {
-    if (_landscapeAdapt == value) return;
-    _landscapeAdapt = value;
+  /// 设置页「横屏适配」开关切换后触发重算。
+  ///
+  /// 开关会先把新值写入存储再回调（见 SetSwitchItem.switchChange），这里
+  /// 只需让 FAB 门控立即生效，值本身由 [landscapeAdapt] 实时提供。
+  static set landscapeAdapt(bool _) {
     FabSideController.instance.recheck();
   }
 }
@@ -69,9 +76,9 @@ class FabSideController extends ValueNotifier<FabSide> {
   /// 期间原生上报在 [syncFromNative] 入口被丢弃，竖屏恢复跟随。
   void recheck({bool? landscape}) {
     if (landscape != null) {
-      _landscape = FabSideGate._landscapeAdapt && landscape;
+      _landscape = FabSideGate.landscapeAdapt && landscape;
     } else {
-      _landscape = _landscape && FabSideGate._landscapeAdapt;
+      _landscape = _landscape && FabSideGate.landscapeAdapt;
     }
     if (_landscape || !_enabled) {
       if (value != FabSide.right) value = FabSide.right;
