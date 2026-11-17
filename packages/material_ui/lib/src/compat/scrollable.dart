@@ -823,8 +823,9 @@ class ScrollableState extends State<Scrollable>
           _gestureRecognizers = <Type, GestureRecognizerFactory>{
             HorizontalDragGestureRecognizer:
                 GestureRecognizerFactoryWithHandlers<HorizontalDragGestureRecognizer>(
-                  () =>
-                      HorizontalDragGestureRecognizer(supportedDevices: _configuration.dragDevices),
+                  // lib/scripts/scrollable_gesture.patch：用调用方提供的工厂
+                  // 顶替内置识别器（图片查看器靠它把缩放/边缘判定接进滚动）。
+                  widget.horizontalDragGestureRecognizer,
                   (HorizontalDragGestureRecognizer instance) {
                     instance
                       ..onDown = _handleDragDown
