@@ -642,8 +642,9 @@ abstract final class Pref {
 
   static bool get horizontalScreen {
     // 鸿蒙：横屏适配不再由用户设置，按「设备形态 + 当前屏幕」自动判定：
-    // 直板机（含 Pura X View、阔直板）、小折叠（Pura X / Pocket）、折叠外屏关闭；
-    // 大折叠 / 阔折叠 / 三折叠内屏与平板 / 2in1 开启。判定见原生 DeviceForm.ets。
+    // 直板机（含 Pura X View、阔直板）、小折叠与折叠外屏（含 Pura X Max 这类
+    // 内外屏都可作主屏的宽折叠外屏）关闭；大折叠 / 阔折叠 / 三折叠内屏与
+    // 平板 / 2in1 开启。判定见原生 DeviceForm.ets。
     if (OS.isHarmony) return HarmonyDeviceForm.horizontalLayout;
     bool? horizontalScreen = _setting.get(SettingBoxKey.horizontalScreen);
     if (horizontalScreen == null) {

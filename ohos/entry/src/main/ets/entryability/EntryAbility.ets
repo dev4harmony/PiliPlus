@@ -274,8 +274,8 @@ export default class EntryAbility extends FlutterAbility {
     windowChrome.attach(w);
     windowState.attach(w, windowChrome);
     // 首帧前先按设备形态定基调：细长竖屏形态（直板机 / 大折叠外屏）先竖屏，
-    // 其余（平板 / 2in1 / 阔折叠 / 折叠内屏）跟随系统。之后 Dart 侧按
-    // 「形态 + 页面类型 + 是否全屏」继续收口。
+    // 其余（平板 / 2in1 / 宽屏手机 / 阔折叠 / 折叠内屏）跟随系统。之后 Dart
+    // 侧按「形态 + 页面类型 + 是否全屏」继续收口。
     windowState.setWindowOrientation(
       deviceFormState.isPortraitForm() ? 'portraitOnly' : 'follow'
     ).catch((err: BusinessError) => {

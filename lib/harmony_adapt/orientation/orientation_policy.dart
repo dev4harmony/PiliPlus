@@ -10,17 +10,29 @@ import 'package:os_type/os_type.dart';
 /// 原则：应用不按设备型号、不读系统旋转锁，只声明「这个状态允许哪些方向」，
 /// 具体朝向仍由系统按重力/智感/旋转锁决定。
 ///
+/// 设备形态有两个方向事实（见 `HarmonyDeviceForm`）：
+/// - [portraitForm]：细长竖屏（屏幕长宽比 ≥1.9 的手机 / 大折叠外屏），决定
+///   **非播放页**锁竖屏与启动方向；
+/// - [portraitPlayerForm]：播放页按手机竖屏形态处理（手机类设备且不是横屏
+///   适配布局，含 Pura X 内屏 / Pura X View / 阔直板等宽屏手机，也含细长
+///   手机与折叠外屏），决定**播放页**方向。
+///
+/// 两者分开：宽屏手机虽然不开横屏适配布局，非播放页仍然允许横屏；但播放页
+/// 必须按手机形态处理，否则退出全屏后系统会保持横屏，出现「竖屏布局 + 横屏
+/// 窗口」，且 `canPop` 的 `horizontalScreen || isPortrait` 不满足导致退不出页面。
+///
 /// 策略 = f(设备形态, 页面类型, 当前视频方向, 是否全屏, 窗口方向)：
 ///
-/// | 设备形态 | 页面类型 | 视频方向 | 全屏 | 策略 |
+/// | 形态 | 页面类型 | 视频方向 | 全屏 | 策略 |
 /// | --- | --- | --- | --- | --- |
-/// | 细长竖屏（直板机 / 大折叠外屏） | 非播放页 | - | - | [portraitOnly] |
-/// | 细长竖屏 | 播放页（视频/直播） | 竖屏视频/竖屏直播流 | 任意 | [portraitOnly] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 否 | [userPortrait] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 是（锁关，窗口已是横屏） | [followSystem] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 是（锁关，窗口是竖屏） | [userLandscape] |
-/// | 细长竖屏 | 播放页 | 横屏视频 | 是（锁开） | [landscapeOnly] |
-/// | 其它（平板/2in1/阔折叠/阔直板/折叠内屏） | 任意 | 任意 | 任意 | [followSystem] |
+/// | 任意 | 非播放页（portraitForm=true） | - | - | [portraitOnly] |
+/// | 任意 | 非播放页（portraitForm=false） | - | - | [followSystem] |
+/// | 非 portraitPlayerForm | 播放页 | 任意 | 任意 | [followSystem] |
+/// | portraitPlayerForm | 播放页（视频/直播） | 竖屏视频/竖屏直播流 | 任意 | [portraitOnly] |
+/// | portraitPlayerForm | 播放页 | 横屏视频 | 否 | [userPortrait] |
+/// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁关，窗口已是横屏） | [followSystem] |
+/// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁关，窗口是竖屏） | [userLandscape] |
+/// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁开） | [landscapeOnly] |
 ///
 /// 竖屏视频锁竖向对齐 B 站：不论旋转锁定与设备方向，非全屏与全屏都保持竖向。
 /// 该策略在**进入播放页、视频方向已知时**就生效（由播放器尺寸回调同步），
@@ -40,8 +52,11 @@ import 'package:os_type/os_type.dart';
 /// `portraitOnly` 由离开播放页的路由事件触发，不存在「退出全屏该回哪个策略」
 /// 的歧义。
 abstract final class OrientationPolicy {
-  /// 当前是否「细长竖屏」形态（原生按 deviceType + 屏幕长宽比判定）。
+  /// 细长竖屏形态（非播放页锁竖屏 / 启动方向用；原生按屏幕长宽比判定）。
   static bool _portraitForm = false;
+
+  /// 播放页是否按手机竖屏形态处理（原生按 deviceType + 横屏适配布局判定）。
+  static bool _portraitPlayerForm = false;
 
   /// 最上层是否播放页（/videoV、/liveRoom），由 ShellBarsObserver 维护。
   static bool _onPlayerPage = false;
@@ -65,8 +80,14 @@ abstract final class OrientationPolicy {
 
   /// 当前状态下应有的策略。
   static HarmonyOrientationPolicy get current {
-    if (!_portraitForm) return .followSystem;
-    if (!_onPlayerPage) return .portraitOnly;
+    // 不是手机竖屏播放形态（平板 / 2in1 / 按横屏适配布局的折叠内屏等）：
+    // 任何页面都跟随系统，横屏布局与方向自洽。
+    if (!_portraitPlayerForm) return .followSystem;
+    // 非播放页：只有细长竖屏形态锁竖屏；宽屏手机（Pura X 内屏 / Pura X View /
+    // 阔直板等）仍然允许横屏，即使它们没有开启横屏适配布局。
+    if (!_onPlayerPage) {
+      return _portraitForm ? .portraitOnly : .followSystem;
+    }
     // 竖屏视频（含竖屏直播流）：非全屏与全屏都锁竖向，对齐 B 站。
     if (_videoVertical) return .portraitOnly;
     // 横屏视频非全屏：USER_ROTATION_PORTRAIT —— 进入播放页 / 退出全屏时向
@@ -114,13 +135,15 @@ abstract final class OrientationPolicy {
       // 横屏适配自动值也在这里落到 Dart 镜像，供 Pref.horizontalScreen 读取。
       HarmonyDeviceForm.update(
         portraitForm: form.portraitForm,
+        portraitPlayerForm: form.portraitPlayerForm,
         horizontalLayout: form.horizontalLayout,
       );
       _portraitForm = form.portraitForm;
+      _portraitPlayerForm = form.portraitPlayerForm;
     }
-    // 旋转锁定状态只影响「竖屏形态设备的横屏视频全屏」，其它形态不读，避免
-    // 多一次通道往返。
-    if (_portraitForm) {
+    // 旋转锁定状态只影响「手机竖屏播放形态设备的横屏视频全屏」，其它形态不读，
+    // 避免多一次通道往返。
+    if (_portraitPlayerForm) {
       final autoRotate = await HarmonyChannel.getAutoRotateEnabled();
       if (autoRotate != null) {
         _autoRotateEnabled = autoRotate;
@@ -135,13 +158,18 @@ abstract final class OrientationPolicy {
   /// 原生推送：折叠/展开、内外屏切换。
   ///
   /// 横屏适配自动值由通道 handler 同步进 `HarmonyDeviceForm`；这里只处理方向
-  /// 策略依赖的竖屏形态。
+  /// 策略依赖的两个形态事实。
   static void _onDeviceFormChanged(
     bool portraitForm,
+    bool portraitPlayerForm,
     bool horizontalLayout,
   ) {
-    if (_portraitForm == portraitForm) return;
+    if (_portraitForm == portraitForm &&
+        _portraitPlayerForm == portraitPlayerForm) {
+      return;
+    }
     _portraitForm = portraitForm;
+    _portraitPlayerForm = portraitPlayerForm;
     _sync();
   }
 
@@ -158,8 +186,8 @@ abstract final class OrientationPolicy {
 
   /// 播放器解析出的视频/直播流方向变化。
   ///
-  /// 竖屏视频在竖屏形态设备的播放页整页锁竖向（非全屏与全屏一致），对齐
-  /// B 站：转动设备窗口不动、也不会先转过去再被拉回来。
+  /// 竖屏视频在手机竖屏播放形态设备的播放页整页锁竖向（非全屏与全屏一致），
+  /// 对齐 B 站：转动设备窗口不动、也不会先转过去再被拉回来。
   static void setVideoVertical(bool value) {
     if (_videoVertical == value) return;
     _videoVertical = value;
@@ -170,11 +198,11 @@ abstract final class OrientationPolicy {
   static Future<void> setFullScreen(bool value) async {
     if (_fullScreen == value) return;
     _fullScreen = value;
-    // 只有「竖屏形态设备 + 横屏视频全屏 + 非受限窗口」需要按旋转锁定状态选
-    // 策略；其它情况（平板/2in1/阔折叠、竖屏视频、分屏/悬浮窗/自由多窗）
-    // 保持原策略，不做额外读取。
+    // 只有「手机竖屏播放形态设备 + 横屏视频全屏 + 非受限窗口」需要按旋转锁定
+    // 状态选策略；其它情况（平板/2in1/横屏布局折叠内屏、竖屏视频、分屏/悬浮窗/
+    // 自由多窗）保持原策略，不做额外读取。
     if (value &&
-        _portraitForm &&
+        _portraitPlayerForm &&
         !_videoVertical &&
         !WindowFacts.isWindowMode &&
         !WindowFacts.isFreeWindowMode) {

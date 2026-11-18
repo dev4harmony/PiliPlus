@@ -75,11 +75,13 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
       this.channel?.invokeMethod("onSafeAreaChange", insets);
     });
     // 设备形态变化：折叠/展开、内外屏切换后重新判定并推给 Dart。
-    // - portraitForm：供方向策略按「形态 + 页面 + 视频方向 + 全屏」重算；
+    // - portraitForm：细长竖屏形态，供非播放页锁竖屏 / 启动方向用；
+    // - portraitPlayerForm：播放页按手机竖屏形态处理，供播放页方向策略用；
     // - horizontalLayout：横屏适配自动值，仅决定布局（全页面统一）。
     deviceFormState.attach((snapshot: DeviceFormSnapshot): void => {
       this.channel?.invokeMethod("onDeviceFormChange", {
         'portraitForm': snapshot.portraitForm,
+        'portraitPlayerForm': snapshot.portraitPlayerForm,
         'horizontalLayout': snapshot.horizontalLayout,
       });
     });
@@ -236,10 +238,11 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
         break;
       }
       case "getDeviceForm": {
-        // 启动时给 Dart 初值：细长竖屏形态（方向策略用）+ 横屏适配自动值（布局用）。
+        // 启动时给 Dart 初值：细长竖屏形态 + 播放页竖屏形态 + 横屏适配自动值。
         const snapshot: DeviceFormSnapshot = deviceFormState.currentSnapshot();
         const form: Record<string, boolean> = {
           'portraitForm': snapshot.portraitForm,
+          'portraitPlayerForm': snapshot.portraitPlayerForm,
           'horizontalLayout': snapshot.horizontalLayout,
         };
         result.success(form);

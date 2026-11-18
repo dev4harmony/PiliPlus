@@ -457,8 +457,8 @@ class VideoDetailController extends GetxController
     heroTag = args['heroTag'];
     cover = RxString(args['cover'] ?? '');
     isVertical = RxBool(args['isVertical'] ?? false);
-    // 竖屏视频在竖屏形态设备的播放页整页锁竖向：路由参数通常已带方向初值，
-    // 尽早同步给方向策略，缩短「方向未知」的窗口（真正的方向在播放器解析
+    // 竖屏视频在手机竖屏播放形态设备的播放页整页锁竖向：路由参数通常已带方向
+    // 初值，尽早同步给方向策略，缩短「方向未知」的窗口（真正的方向在播放器解析
     // 尺寸后会由 PlPlayerController.isVertical 再纠正一次）。
     if (OS.isHarmony) {
       OrientationPolicy.setVideoVertical(isVertical.value);

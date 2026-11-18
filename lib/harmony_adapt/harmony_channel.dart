@@ -105,21 +105,29 @@ abstract class HarmonyChannel {
       case 'onSafeAreaChange':
         _updateSafeArea(call.arguments);
         break;
-      // 设备形态变化（折叠/展开、内外屏切换）：细长竖屏形态 + 横屏适配自动值。
+      // 设备形态变化（折叠/展开、内外屏切换）：细长竖屏形态、播放页竖屏形态
+      // 与横屏适配自动值。
       case 'onDeviceFormChange':
         final portraitForm = call.arguments['portraitForm'] as bool? ?? false;
+        final portraitPlayerForm =
+            call.arguments['portraitPlayerForm'] as bool? ?? false;
         final horizontalLayout =
             call.arguments['horizontalLayout'] as bool? ?? false;
         final layoutChanged =
             HarmonyDeviceForm.horizontalLayout != horizontalLayout;
         HarmonyDeviceForm.update(
           portraitForm: portraitForm,
+          portraitPlayerForm: portraitPlayerForm,
           horizontalLayout: horizontalLayout,
         );
         if (layoutChanged) {
           _syncDynamicsWaterfallFlow();
         }
-        onDeviceFormChange?.call(portraitForm, horizontalLayout);
+        onDeviceFormChange?.call(
+          portraitForm,
+          portraitPlayerForm,
+          horizontalLayout,
+        );
         break;
       // 原生窗口快照（自由多窗/小窗/分屏/标题带状态的整体推送，
       // 见 ArkTS WindowState.emitSnapshot）
@@ -428,12 +436,14 @@ abstract class HarmonyChannel {
     } catch (_) {}
   }
 
-  /// 设备形态（首帧前拉取一次）：细长竖屏形态 + 横屏适配自动值。
+  /// 设备形态（首帧前拉取一次）：细长竖屏形态、播放页竖屏形态 + 横屏适配自动值。
   ///
   /// 原生侧按 `deviceType`、折叠显示模式（内/外屏）与当前屏幕长边/短边判定，
   /// 折叠/展开、内外屏切换后由 [onDeviceFormChange] 推送更新。通道异常返回
   /// null，调用方保留原生首帧策略，而不是擅自当成「跟随系统」。
-  static Future<({bool portraitForm, bool horizontalLayout})?>
+  static Future<
+    ({bool portraitForm, bool portraitPlayerForm, bool horizontalLayout})?
+  >
   getDeviceForm() async {
     if (!OS.isHarmony) return null;
     try {
@@ -441,6 +451,7 @@ abstract class HarmonyChannel {
       if (result == null) return null;
       return (
         portraitForm: result['portraitForm'] == true,
+        portraitPlayerForm: result['portraitPlayerForm'] == true,
         horizontalLayout: result['horizontalLayout'] == true,
       );
     } catch (_) {
@@ -449,7 +460,11 @@ abstract class HarmonyChannel {
   }
 
   /// 原生推送：设备形态变化（折叠/展开、内外屏切换）。
-  static void Function(bool portraitForm, bool horizontalLayout)?
+  static void Function(
+    bool portraitForm,
+    bool portraitPlayerForm,
+    bool horizontalLayout,
+  )?
   onDeviceFormChange;
 
   /// 横屏适配自动值变化时，同步依赖它的「动态页启用瀑布流」。

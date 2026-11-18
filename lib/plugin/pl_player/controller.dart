@@ -274,8 +274,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   set isVertical(bool value) {
     _isVertical = value;
-    // 竖屏视频（含竖屏直播流）：同步给方向策略，在竖屏形态设备的播放页整页
-    // 锁竖向（非全屏与全屏一致），避免转动设备时窗口先转再被拉回。
+    // 竖屏视频（含竖屏直播流）：同步给方向策略，在手机竖屏播放形态设备的
+    // 播放页整页锁竖向（非全屏与全屏一致），避免转动设备时窗口先转再被拉回。
     if (OS.isHarmony) OrientationPolicy.setVideoVertical(value);
   }
 
@@ -2107,9 +2107,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         if (PlatformUtils.isMobile && !WindowFacts.isFreeWindowMode) {
           hideSystemBar();
           if (OS.isHarmony) {
-            // 鸿蒙：方向由 OrientationPolicy 唯一决策——细长竖屏形态下横屏视频
-            // 全屏临时转横屏（锁关时转回竖屏会跟回竖屏并自动退出全屏），
-            // 竖屏视频全屏保持竖向；其它形态保持跟随系统。
+            // 鸿蒙：方向由 OrientationPolicy 唯一决策——手机竖屏播放形态下
+            // 横屏视频全屏临时转横屏（锁关时转回竖屏会跟回竖屏并自动退出
+            // 全屏），竖屏视频全屏保持竖向；其它形态保持跟随系统。
             await OrientationPolicy.setFullScreen(true);
             // 横屏视频等视口真正变横屏再置全屏布局，避免全屏先在竖屏/中间
             // 尺寸渲染导致比例错误和动画跳变。

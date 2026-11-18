@@ -63,8 +63,8 @@ class ShellBarsObserver extends NavigatorObserver {
     final topIsPlayer = topPage != null &&
         (topPage.settings.name == '/videoV' ||
             topPage.settings.name == '/liveRoom');
-    // 方向策略的「页面类型」输入：播放页跟随系统/全屏横屏，其余页面在细长
-    // 竖屏形态下锁竖屏（见 OrientationPolicy）。
+    // 方向策略的「页面类型」输入：播放页按手机竖屏播放形态处理，非播放页只
+    // 有细长竖屏形态锁竖屏（宽屏手机的普通页面仍可横屏，见 OrientationPolicy）。
     OrientationPolicy.setPlayerPage(topIsPlayer);
     // 这里不能带上 _orientationHidden：它表示「横屏（侧栏布局）下原生 HDS 栏不
     // 显示」，与系统状态栏无关。带上它会让横屏退出播放页时本处不恢复状态栏，

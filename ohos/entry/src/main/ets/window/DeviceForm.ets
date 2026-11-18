@@ -3,21 +3,36 @@ import display from '@ohos.display';
 import window from '@ohos.window';
 
 /**
- * 鸿蒙设备形态判定：一次读出两个值。
+ * 鸿蒙设备形态判定：一次读出三个值。
  *
- * 1. `portraitForm`：是否「细长竖屏」形态（直板机 / 大折叠外屏），供方向策略用。
- *    设备类型为 phone 且当前屏幕长边/短边 ≥ 1.9。
+ * 1. `portraitForm`：是否「细长竖屏」形态（直板机 / 大折叠外屏）。设备类型为
+ *    phone 且当前屏幕长边/短边 ≥ 1.9。只用于**非播放页**锁竖屏与启动方向：
+ *    细长手机上的普通页面不应横屏；Pura X 内屏 / Pura X View / 阔直板等宽屏
+ *    手机仍允许横屏（即使没有开启横屏适配布局）。
  *
- * 2. `horizontalLayout`：横屏适配自动值，仅决定布局（全页面统一），鸿蒙上不再
+ * 2. `portraitPlayerForm`：播放页是否按手机竖屏形态处理。手机类设备当前不是
+ *    横屏适配布局时成立——直板机、小折叠（Pura X / Pocket）内外屏、折叠外屏、
+ *    阔直板等都算；平板 / 2in1 以及按横屏布局的折叠内屏不算。用于**播放页**
+ *    的方向：横屏视频非全屏时 USER_ROTATION_PORTRAIT（退出全屏临时转回竖屏），
+ *    竖屏视频锁竖屏，全屏时 USER_ROTATION_LANDSCAPE / AUTO_ROTATION_LANDSCAPE。
+ *    与 `portraitForm` 分开：宽屏手机的非播放页仍可横屏，但播放页按手机形态
+ *    处理，避免退出全屏后卡在横屏非全屏状态。
+ *
+ * 3. `horizontalLayout`：横屏适配自动值，仅决定布局（全页面统一），鸿蒙上不再
  *    由用户设置：
  *    - 平板 / 2in1 → 开启；
  *    - 手机类：直板机（含 Pura X View、阔直板）→ 关闭；
- *      折叠设备看 `getFoldDisplayMode()`：
- *      - 外屏（SUB，含 Pocket 圆形小外屏、Pura X/Pura X Max 外屏）→ 关闭；
+ *      折叠设备按 SDK 的两类 foldDisplayMode 语义处理：
+ *      - 小折叠（外屏仅作辅助屏）：内屏 MAIN、外屏 SUB；
+ *      - 大折叠 / 阔折叠（内外屏都可作主屏，如 Pura X Max）：内屏 FULL、
+ *        外屏 MAIN。**外屏也是 MAIN**，不能只看 displayMode，否则宽折叠的外屏
+ *        会被当成内屏、按比例误开横屏适配；需结合 foldStatus：MAIN + 非展开态
+ *        即外屏作主屏，一律关闭。
+ *      - 外屏（SUB，以及 MAIN+折叠态的大折叠/阔折叠外屏）→ 关闭；
  *      - 未知（UNKNOWN）→ 关闭（保守，等事件纠正）；
- *      - 内屏（MAIN）/ 双屏协同（COORDINATION）→ 当前屏幕长边/短边 < 1.5 才开启。
- *        即只有书本式大折叠、三折叠、阔折叠（Pura X Max 1.414）的内屏开启；
- *        小折叠内屏（Pura X 16:10 = 1.6，Pocket ≈2.35）关闭。
+ *      - 内屏（FULL / 展开态的 MAIN / COORDINATION）→ 当前屏幕长边/短边 < 1.5
+ *        才开启。即只有书本式大折叠、三折叠、阔折叠（Pura X Max 1.414）的内屏
+ *        开启；小折叠内屏（Pura X 16:10 = 1.6，Pocket ≈2.35）关闭。
  *
  * 触发重判有四路保障：
  * 1. `foldDisplayModeChange`：内容完成内/外屏切换——**立即**刷新横屏适配值，
@@ -38,8 +53,10 @@ const STABLE_SAMPLE_DELAY_MS: number = 200;
 const STABLE_MAX_ATTEMPTS: number = 3;
 
 export interface DeviceFormSnapshot {
-  /** 细长竖屏形态（方向策略用）。 */
+  /** 细长竖屏形态（非播放页锁竖屏 / 启动方向用）。 */
   portraitForm: boolean;
+  /** 播放页按手机竖屏形态处理（播放页方向策略用）。 */
+  portraitPlayerForm: boolean;
   /** 横屏适配自动值（布局用，全页面统一）。 */
   horizontalLayout: boolean;
 }
@@ -49,6 +66,7 @@ export type DeviceFormListener = (snapshot: DeviceFormSnapshot) => void;
 export class DeviceFormState {
   private snapshot: DeviceFormSnapshot = {
     portraitForm: false,
+    portraitPlayerForm: false,
     horizontalLayout: false,
   };
   private listener: DeviceFormListener | null = null;
@@ -87,11 +105,12 @@ export class DeviceFormState {
   currentSnapshot(): DeviceFormSnapshot {
     return {
       portraitForm: this.snapshot.portraitForm,
+      portraitPlayerForm: this.snapshot.portraitPlayerForm,
       horizontalLayout: this.snapshot.horizontalLayout,
     };
   }
 
-  /** 细长竖屏形态判定；失败返回 null（区别于「判定为非竖屏形态」）。 */
+  /** 细长竖屏形态判定（非播放页锁竖屏 / 启动方向）；失败返回 null。 */
   private readPortraitFormOrNull(): boolean | null {
     try {
       if (deviceInfo.deviceType !== 'phone') {
@@ -111,6 +130,25 @@ export class DeviceFormState {
     }
   }
 
+  /** 播放页竖屏形态判定：手机类且当前不是横屏适配布局；失败返回 null。 */
+  private readPortraitPlayerFormOrNull(
+    horizontalLayout: boolean | null,
+  ): boolean | null {
+    if (horizontalLayout === null) {
+      return null;
+    }
+    try {
+      if (deviceInfo.deviceType !== 'phone') {
+        return false;
+      }
+      return !horizontalLayout;
+    } catch (err) {
+      const e = err as BusinessError;
+      console.warn('DeviceForm', `read portraitPlayerForm failed: ${e.code} ${e.message}`);
+      return null;
+    }
+  }
+
   /** 横屏适配自动值；失败返回 null。 */
   private readHorizontalLayoutOrNull(): boolean | null {
     try {
@@ -126,12 +164,24 @@ export class DeviceFormState {
         return false;
       }
       const mode = display.getFoldDisplayMode();
+      const status = display.getFoldStatus();
       if (mode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_SUB ||
         mode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN) {
-        // 外屏（大/小外屏）一律关闭；未知状态保守关闭，等 foldDisplayModeChange 纠正。
+        // 小折叠外屏（SUB）一律关闭；未知状态保守关闭，等 foldDisplayModeChange 纠正。
         return false;
       }
-      // 内屏（MAIN）或双屏协同（COORDINATION）：当前屏幕够宽才算平板布局。
+      // 大折叠 / 阔折叠（内外屏都可作主屏）按 SDK 定义：内屏 FULL、外屏 MAIN，
+      // 只有小折叠的内屏才是 MAIN（此时设备必须是展开态）。所以 MAIN 出现在
+      // 非展开态时，当前屏幕是「外屏作主屏」的宽折叠外屏（Pura X Max 等），
+      // 不能按内屏比例开启横屏适配。Pura X Max 外屏 16:10 就会被 ratio 误判。
+      const expanded =
+        status === display.FoldStatus.FOLD_STATUS_EXPANDED ||
+        status === display.FoldStatus.FOLD_STATUS_EXPANDED_WITH_SECOND_EXPANDED;
+      if (mode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_MAIN && !expanded) {
+        return false;
+      }
+      // 内屏（FULL / 展开态的 MAIN）/ 双屏协同（COORDINATION）：当前屏幕够宽
+      // 才算平板布局。
       const d = display.getDefaultDisplaySync();
       const longSide = Math.max(d.width, d.height);
       const shortSide = Math.min(d.width, d.height);
@@ -147,15 +197,24 @@ export class DeviceFormState {
   }
 
   private readSnapshotOrNull(): DeviceFormSnapshot | null {
-    const portraitForm = this.readPortraitFormOrNull();
-    if (portraitForm === null) {
-      return null;
-    }
     const horizontalLayout = this.readHorizontalLayoutOrNull();
     if (horizontalLayout === null) {
       return null;
     }
-    return { portraitForm: portraitForm, horizontalLayout: horizontalLayout };
+    const portraitForm = this.readPortraitFormOrNull();
+    if (portraitForm === null) {
+      return null;
+    }
+    const portraitPlayerForm =
+      this.readPortraitPlayerFormOrNull(horizontalLayout);
+    if (portraitPlayerForm === null) {
+      return null;
+    }
+    return {
+      portraitForm: portraitForm,
+      portraitPlayerForm: portraitPlayerForm,
+      horizontalLayout: horizontalLayout,
+    };
   }
 
   /** 首次读取并开始监听折叠状态（幂等）。 */
@@ -264,8 +323,13 @@ export class DeviceFormState {
       horizontalLayout === this.snapshot.horizontalLayout) {
       return;
     }
+    // 播放页竖屏形态与横屏适配同口径，必须一起更新：否则折展瞬间播放页
+    // 会按旧形态选择方向策略，而布局已经是新形态。
     this.adopt({
       portraitForm: this.snapshot.portraitForm,
+      portraitPlayerForm:
+        this.readPortraitPlayerFormOrNull(horizontalLayout) ??
+        this.snapshot.portraitPlayerForm,
       horizontalLayout: horizontalLayout,
     });
   }
@@ -303,6 +367,7 @@ export class DeviceFormState {
       }
       const stable = first !== null &&
         first.portraitForm === second.portraitForm &&
+        first.portraitPlayerForm === second.portraitPlayerForm &&
         first.horizontalLayout === second.horizontalLayout;
       if (stable || attempt + 1 >= STABLE_MAX_ATTEMPTS) {
         this.adopt(second);
@@ -314,6 +379,7 @@ export class DeviceFormState {
 
   private adopt(next: DeviceFormSnapshot): void {
     if (next.portraitForm === this.snapshot.portraitForm &&
+      next.portraitPlayerForm === this.snapshot.portraitPlayerForm &&
       next.horizontalLayout === this.snapshot.horizontalLayout) {
       return;
     }
@@ -323,6 +389,7 @@ export class DeviceFormState {
     if (listener !== null) {
       listener({
         portraitForm: next.portraitForm,
+        portraitPlayerForm: next.portraitPlayerForm,
         horizontalLayout: next.horizontalLayout,
       });
     }
