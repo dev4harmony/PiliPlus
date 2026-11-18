@@ -39,6 +39,7 @@ class _ZonePageState extends State<ZonePage>
   Widget build(BuildContext context) {
     super.build(context);
     return NativeTopRefreshIndicator(
+      refreshKey: controller.refreshKey,
       onRefresh: controller.onRefresh,
       child: CustomScrollView(
         controller: controller.scrollController,

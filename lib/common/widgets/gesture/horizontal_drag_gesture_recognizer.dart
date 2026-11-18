@@ -42,6 +42,14 @@ class CustomHorizontalDragGestureRecognizer
   DeviceGestureSettings get gestureSettings => _gestureSettings;
   final _gestureSettings = DeviceGestureSettings(touchSlop: touchSlopH);
 
+  /// 横滑判定的角度系数：`|dx| > |dy| * angleFactor`。
+  ///
+  /// 上游（Flutter SDK 补丁版）固定为 3；鸿蒙侧为了简介/评论区页签更容易
+  /// 触发横向切换，默认放宽到 1（见 [_calcAngle] 注释）。图片查看器需要
+  /// 保持上游的 3，避免捏合手势被误判成横滑，见
+  /// `ImageHorizontalDragGestureRecognizer.angleFactor`。
+  double get angleFactor => 1.0;
+
   @override
   bool hasSufficientGlobalDistanceToAccept(
     PointerDeviceKind pointerDeviceKind,
@@ -53,6 +61,7 @@ class CustomHorizontalDragGestureRecognizer
       pointerDeviceKind,
       _initialPosition,
       lastPosition.global,
+      angleFactor,
     );
   }
 
@@ -68,6 +77,7 @@ bool _computeHitSlop(
   PointerDeviceKind kind,
   Offset? initialPosition,
   Offset lastPosition,
+  double angleFactor,
 ) {
   switch (kind) {
     case .mouse:
@@ -77,18 +87,23 @@ bool _computeHitSlop(
     case .unknown:
     case .touch:
       return globalDistanceMoved > settings.touchSlop! &&
-          _calcAngle(initialPosition!, lastPosition);
+          _calcAngle(initialPosition!, lastPosition, angleFactor);
     case .trackpad:
       return globalDistanceMoved > settings.touchSlop! &&
-          _calcAngle(initialPosition!, lastPosition);
+          _calcAngle(initialPosition!, lastPosition, angleFactor);
   }
 }
 
-bool _calcAngle(Offset initialPosition, Offset lastPosition) {
+bool _calcAngle(
+  Offset initialPosition,
+  Offset lastPosition,
+  double angleFactor,
+) {
   final offset = lastPosition - initialPosition;
-  // 判定：只要水平位移 > 垂直位移即算横滑（原为 dx > 3·dy，过于苛刻）。
-  // 约 45° 以内的滑动都会被判定为横向，让简介/评论区左右切换更容易触发。
-  return offset.dx.abs() > offset.dy.abs();
+  // angleFactor == 1：只要水平位移 > 垂直位移即算横滑（上游为 dx > 3·dy，
+  // 过于苛刻，鸿蒙侧为了让简介/评论区左右切换更容易触发而放宽）。
+  // 图片查看器传 3，保持与上游一致的捏合/斜滑判定。
+  return offset.dx.abs() > offset.dy.abs() * angleFactor;
 }
 
 final deviceTouchSlop = _calcDeviceTouchSlop();

@@ -18,7 +18,9 @@ import {
 } from "@ohos/flutter_ohos";
 
 import display from "@ohos.display";
+import settings from "@ohos.settings";
 import { appAppearance } from "../appearance/AppAppearance";
+import { DeviceFormSnapshot, deviceFormState } from "../window/DeviceForm";
 import { MotionHand } from "../common/MotionHand";
 import { windowChrome } from "../window/WindowChrome";
 import { SafeAreaInsets, WindowSnapshot, windowState } from "../window/WindowState";
@@ -72,6 +74,15 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
     windowState.setSafeAreaListener((insets: SafeAreaInsets): void => {
       this.channel?.invokeMethod("onSafeAreaChange", insets);
     });
+    // 设备形态变化：折叠/展开、内外屏切换后重新判定并推给 Dart。
+    // - portraitForm：供方向策略按「形态 + 页面 + 视频方向 + 全屏」重算；
+    // - horizontalLayout：横屏适配自动值，仅决定布局（全页面统一）。
+    deviceFormState.attach((snapshot: DeviceFormSnapshot): void => {
+      this.channel?.invokeMethod("onDeviceFormChange", {
+        'portraitForm': snapshot.portraitForm,
+        'horizontalLayout': snapshot.horizontalLayout,
+      });
+    });
     // // 监听画面方向
     // display.on('change', () => {
     //   // 获取当前旋转角度
@@ -84,6 +95,7 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
     this.channel?.setMethodCallHandler(null);
     windowState.setSnapshotListener(null);
     windowState.setSafeAreaListener(null);
+    deviceFormState.detach();
     this.stopFreeWindowModeListener();
   }
 
@@ -153,8 +165,27 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
     windowState.notifySafeArea();
   }
 
-  async setWindowOrientation(orientation: number) {
-    await windowState.setWindowOrientation(orientation);
+  async setWindowOrientation(policy: string) {
+    await windowState.setWindowOrientation(policy);
+  }
+
+  /// 系统「自动旋转」开关是否开启（即旋转锁定是否关闭）。读取失败按开启处理。
+  ///
+  /// 仅用于横屏视频全屏时选择方向策略：锁关用 USER_ROTATION_LANDSCAPE
+  /// （临时转横后四方向跟随，转竖屏可自动退全屏），锁开用
+  /// AUTO_ROTATION_LANDSCAPE（仅横向两方向、不受锁控制，可 180° 翻转）。
+  private readAutoRotateEnabled(): boolean {
+    try {
+      const value: string = settings.getValueSync(
+        getContext(),
+        settings.general.ACCELEROMETER_ROTATION_STATUS,
+        '1',
+      );
+      return value === '1';
+    } catch (err) {
+      console.warn('HarmonyChannel', `read ACCELEROMETER_ROTATION_STATUS failed: ${err}`);
+      return true;
+    }
   }
 
   async onMethodCall(call: MethodCall, result: MethodResult): Promise<void> {
@@ -199,9 +230,27 @@ export default class HarmonyChannel implements FlutterPlugin, AbilityAware {
         break;
       }
       case "setWindowOrientation": {
-        const orientation: number = call.argument("orientation") ?? 0;
-        await this.setWindowOrientation(orientation);
+        const policy: string = call.argument("policy") ?? 'follow';
+        await this.setWindowOrientation(policy);
         result.success(true);
+        break;
+      }
+      case "getDeviceForm": {
+        // 启动时给 Dart 初值：细长竖屏形态（方向策略用）+ 横屏适配自动值（布局用）。
+        const snapshot: DeviceFormSnapshot = deviceFormState.currentSnapshot();
+        const form: Record<string, boolean> = {
+          'portraitForm': snapshot.portraitForm,
+          'horizontalLayout': snapshot.horizontalLayout,
+        };
+        result.success(form);
+        break;
+      }
+      case "getAutoRotateEnabled": {
+        // 旋转锁定是否关闭（系统「自动旋转」开关），供横屏视频全屏选策略。
+        const state: Record<string, boolean> = {
+          'enabled': this.readAutoRotateEnabled(),
+        };
+        result.success(state);
         break;
       }
       case "setMiniWindowLandscape":

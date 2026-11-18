@@ -7,7 +7,6 @@ import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
-import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
@@ -103,7 +102,7 @@ class _HomePageState extends CommonPageState<HomePage>
       children: [
         if (!useNativeTopBar &&
             !_mainController.useSideBar &&
-            MediaQuery.sizeOf(context).isPortrait)
+            MediaQuery.orientationOf(context) == Orientation.portrait)
           customAppBar(theme)
         else if (!useNativeTopBar)
           SizedBox(height: MediaQuery.of(context).padding.top),

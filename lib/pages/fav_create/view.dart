@@ -1,4 +1,4 @@
-﻿import 'dart:io' show File;
+import 'dart:io' show File;
 
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -35,6 +35,7 @@ class _CreateFavPageState extends State<CreateFavPage> {
   late final _imagePicker = ImagePicker();
   String? _errMsg;
   int? _attr;
+  late ThemeData theme;
 
   @override
   void initState() {
@@ -45,6 +46,12 @@ class _CreateFavPageState extends State<CreateFavPage> {
     if (_mediaId != null) {
       _getFolderInfo();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    theme = Theme.of(context);
   }
 
   void _getFolderInfo() {
@@ -72,7 +79,6 @@ class _CreateFavPageState extends State<CreateFavPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return SimpleScaffold(
       appBar: AppBar(
         title: Text(_mediaId != null ? '编辑' : '创建'),
@@ -108,15 +114,15 @@ class _CreateFavPageState extends State<CreateFavPage> {
       ),
       body: _mediaId != null
           ? _titleController.text.isNotEmpty
-                ? _buildBody(theme)
+                ? _buildBody()
                 : _errMsg?.isNotEmpty == true
                 ? scrollErrorWidget(errMsg: _errMsg, onReload: _getFolderInfo)
                 : m3eLoading
-          : _buildBody(theme),
+          : _buildBody(),
     );
   }
 
-  Future<void> _pickImg(BuildContext context, ThemeData theme) async {
+  Future<void> _pickImg(BuildContext context) async {
     try {
       final pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
@@ -187,7 +193,44 @@ class _CreateFavPageState extends State<CreateFavPage> {
 
   final leadingStyle = const TextStyle(fontSize: 14);
 
-  Widget _buildBody(ThemeData theme) => SingleChildScrollView(
+  void _onEditCover(BuildContext context) {
+    if (_cover?.isNotEmpty == true) {
+      showDialog(
+        context: context,
+        builder: (_) => SimpleDialog(
+          clipBehavior: Clip.hardEdge,
+          contentPadding: const .symmetric(vertical: 12),
+          children: [
+            DialogOption(
+              onPressed: () {
+                Get.back();
+                _pickImg(context);
+              },
+              child: const Text(
+                '替换封面',
+                style: TextStyle(fontSize: 14),
+              ),
+            ),
+            DialogOption(
+              onPressed: () {
+                Get.back();
+                _cover = null;
+                (context as Element).markNeedsBuild();
+              },
+              child: const Text(
+                '移除封面',
+                style: TextStyle(fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      _pickImg(context);
+    }
+  }
+
+  Widget _buildBody() => SingleChildScrollView(
     padding: .only(bottom: MediaQuery.viewPaddingOf(context).bottom + 25),
     child: Column(
       spacing: 12,
@@ -202,42 +245,7 @@ class _CreateFavPageState extends State<CreateFavPage> {
                   EasyThrottle.throttle(
                     'imagePicker',
                     const Duration(milliseconds: 500),
-                    () {
-                      if (_cover?.isNotEmpty == true) {
-                        showDialog(
-                          context: context,
-                          builder: (_) => SimpleDialog(
-                            clipBehavior: Clip.hardEdge,
-                            contentPadding: const .symmetric(vertical: 12),
-                            children: [
-                              DialogOption(
-                                onPressed: () {
-                                  Get.back();
-                                  _pickImg(context, theme);
-                                },
-                                child: const Text(
-                                  '替换封面',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                              DialogOption(
-                                onPressed: () {
-                                  Get.back();
-                                  _cover = null;
-                                  (context as Element).markNeedsBuild();
-                                },
-                                child: const Text(
-                                  '移除封面',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      } else {
-                        _pickImg(context, theme);
-                      }
-                    },
+                    () => _onEditCover(context),
                   );
                 },
                 leading: Text(

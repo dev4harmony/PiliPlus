@@ -1,7 +1,7 @@
+import 'package:PiliPlus/common/widgets/colored_box_transition.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
-    show MainListReply, ReplyInfo, SubjectControl, Mode;
-import 'package:PiliPlus/grpc/bilibili/pagination.pb.dart';
+    show MainListReply, ReplyInfo, SubjectControl, Mode, CursorReply;
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/reply.dart';
 import 'package:PiliPlus/models/common/reply/reply_sort_type.dart';
@@ -10,16 +10,99 @@ import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/pages/common/publish/publish_route.dart';
 import 'package:PiliPlus/pages/video/reply_new/view.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/reply_scheme_helper.dart';
 import 'package:PiliPlus/utils/reply_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:fixnum/fixnum.dart';
+import 'package:collection/collection.dart';
+import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
+mixin MainReplyLocateMixin on ReplyLocateMixin<MainListReply> {
+  final Map args = Get.arguments ?? const {};
+
+  Int64? targetRootRpId; // highlight
+  void clearTargetRootRpId() {
+    args.remove(rootRpIdKey);
+    targetRootRpId = null;
+  }
+
+  @override
+  void onInit() {
+    if (args[rootRpIdKey] case final int rpid) {
+      rootRpId = Int64(rpid);
+    }
+    super.onInit();
+  }
+
+  @override
+  bool customHandleResponse(bool isRefresh, Success<MainListReply> response) {
+    final flag = super.customHandleResponse(isRefresh, response);
+    if (isRefresh && rootRpId != null && args.containsKey(rootRpIdKey)) {
+      final replies = response.response.replies;
+      final rootReply = replies.firstWhereOrNull((e) => e.id == rootRpId);
+      if (rootReply != null) {
+        onAnimRootReply(rootReply);
+      }
+    }
+    return flag;
+  }
+
+  void onAnimRootReply(ReplyInfo rootReply) {
+    targetRootRpId = rootRpId;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => colorAnimController
+          .forward(from: 0)
+          .whenComplete(clearTargetRootRpId),
+    );
+  }
+}
+
+mixin ReplyLocateMixin<T>
+    on ReplyController<T>, GetSingleTickerProviderStateMixin {
+  AnimationController? _animController;
+  bool get hasAnimController => _animController != null;
+  AnimationController get colorAnimController =>
+      _animController ??= AnimationController(
+        duration: const Duration(milliseconds: 1000),
+        vsync: this,
+      );
+
+  Animation<Color?>? _colorAnim;
+  Animation<Color?> colorAnim(ColorScheme colorScheme) =>
+      _colorAnim ??= colorAnimController.drive(
+        ColorTween(
+          begin: colorScheme.onInverseSurface,
+          end: colorScheme.surface,
+        ).chain(CurveTween(curve: const Interval(0.8, 1.0))),
+      );
+
+  Widget colorAnimWrapper(ColorScheme colorScheme, Widget child) =>
+      ColoredBoxTransition(color: colorAnim(colorScheme), child: child);
+
+  @override
+  void didChangeDependencies(BuildContext context) {
+    super.didChangeDependencies(context);
+    _colorAnim = null;
+  }
+
+  @override
+  void onClose() {
+    _colorAnim = null;
+    _animController?.dispose();
+    _animController = null;
+    super.onClose();
+  }
+}
+
 abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   ReplyController({int count = -1}) : count = RxInt(count);
 
+  int get oid;
+  int get replyType;
+
+  Int64? rootRpId;
   late final RxInt count;
 
   late final Rx<ReplySortType> sortType;
@@ -28,13 +111,12 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   final savedReplies = <Object, List<RichTextItem>?>{};
 
   Int64? upMid;
-  Int64? cursorNext;
+  String? nextOffset;
   SubjectControl? subjectControl;
-  FeedPaginationReply? paginationReply;
   late bool hasUpTop = false;
 
   @override
-  bool? get hasFooter => true;
+  bool get hasFooter => true;
 
   // comment antifraud
   late final _enableCommAntifraud = Pref.enableCommAntifraud;
@@ -43,13 +125,18 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
       _enableCommAntifraud || _biliSendCommAntifraud;
   dynamic get sourceId;
 
+  ReplySortType get prefSortType => Pref.replySortType;
+
   @override
   void onInit() {
     super.onInit();
-    final cacheSortType = Pref.replySortType;
+    final cacheSortType = prefSortType;
     sortType = cacheSortType.obs;
     mode = cacheSortType == .time ? Mode.MAIN_LIST_TIME : Mode.MAIN_LIST_HOT;
   }
+
+  @override
+  bool get endIfNullOrEmpty => false;
 
   @override
   void checkIsEnd(int length) {
@@ -59,15 +146,25 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     }
   }
 
+  late final _filterIntro = Pref.filterIntro;
+  String? intro;
+  @pragma('vm:prefer-inline')
+  void _removeIntro(MainListReply data) {
+    final intro = this.intro;
+    if (intro != null &&
+        intro.isNotEmpty &&
+        _filterIntro &&
+        data.replies.isNotEmpty) {
+      data.replies.removeWhere((i) => i.content.message.trim() == intro);
+    }
+  }
+
   @override
   bool customHandleResponse(bool isRefresh, Success<R> response) {
     final data = response.response as MainListReply;
-    cursorNext = data.cursor.next;
-    paginationReply = data.paginationReply;
     count.value = data.subjectControl.count.toInt();
     if (isRefresh) {
-      subjectControl = data.subjectControl;
-      upMid = data.subjectControl.upMid;
+      handleSubjectControl(data.subjectControl);
       if (hasUpTop = data.hasUpTop()) {
         data.replies.insert(0, data.upTop);
       }
@@ -75,15 +172,31 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
         sortType.value = .select;
       }
     }
-    isEnd = data.cursor.isEnd;
+
+    handlePagination(
+      cursor: data.cursor,
+      offset: data.paginationReply.nextOffset,
+    );
+
+    _removeIntro(data);
+
     return false;
+  }
+
+  void handlePagination({required CursorReply cursor, required String offset}) {
+    if (cursor.isEnd || offset.isEmpty || nextOffset == offset) isEnd = true;
+    nextOffset = offset;
+  }
+
+  void handleSubjectControl(SubjectControl control) {
+    subjectControl = control;
+    upMid = control.upMid;
   }
 
   @override
   Future<void> onRefresh() {
-    cursorNext = null;
+    nextOffset = null;
     subjectControl = null;
-    paginationReply = null;
     return super.onRefresh();
   }
 

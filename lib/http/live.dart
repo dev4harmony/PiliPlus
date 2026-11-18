@@ -3,31 +3,34 @@ import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/http/login.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/live/live_contribution_rank_type.dart';
 import 'package:PiliPlus/models/common/live/live_search_type.dart';
 import 'package:PiliPlus/models_new/live/live_area_list/area_item.dart';
 import 'package:PiliPlus/models_new/live/live_area_list/area_list.dart';
+import 'package:PiliPlus/models_new/live/live_config_plugs/data.dart';
 import 'package:PiliPlus/models_new/live/live_contribution_rank/data.dart';
 import 'package:PiliPlus/models_new/live/live_danmaku/danmaku_msg.dart';
-import 'package:PiliPlus/models_new/live/live_dm_block/data.dart';
-import 'package:PiliPlus/models_new/live/live_dm_block/shield_info.dart';
-import 'package:PiliPlus/models_new/live/live_dm_block/shield_user_list.dart';
 import 'package:PiliPlus/models_new/live/live_dm_info/data.dart';
 import 'package:PiliPlus/models_new/live/live_emote/data.dart';
 import 'package:PiliPlus/models_new/live/live_emote/datum.dart';
+import 'package:PiliPlus/models_new/live/live_fans_medal/data.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/data.dart';
 import 'package:PiliPlus/models_new/live/live_follow/data.dart';
+import 'package:PiliPlus/models_new/live/live_info_by_user/data.dart';
+import 'package:PiliPlus/models_new/live/live_info_by_user/medal.dart';
+import 'package:PiliPlus/models_new/live/live_info_by_user/shield_user_list.dart';
 import 'package:PiliPlus/models_new/live/live_medal_wall/data.dart';
 import 'package:PiliPlus/models_new/live/live_room_info_h5/data.dart';
 import 'package:PiliPlus/models_new/live/live_room_play_info/data.dart';
 import 'package:PiliPlus/models_new/live/live_search/data.dart';
 import 'package:PiliPlus/models_new/live/live_second_list/data.dart';
 import 'package:PiliPlus/models_new/live/live_superchat/data.dart';
+import 'package:PiliPlus/models_new/live/live_trace/data.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
 import 'package:PiliPlus/utils/app_sign.dart';
+import 'package:PiliPlus/utils/live_trace_utils.dart';
 import 'package:PiliPlus/utils/wbi_sign.dart';
 import 'package:dio/dio.dart';
 
@@ -80,7 +83,7 @@ abstract final class LiveHttp {
 
   static Future<LoadingState<RoomPlayInfoData>> liveRoomInfo({
     required Object roomId,
-    Object? qn,
+    int? qn,
     bool onlyAudio = false,
   }) async {
     final res = await Request().get(
@@ -223,7 +226,7 @@ abstract final class LiveHttp {
       queryParameters: params,
       options: Options(
         headers: {
-          'buvid': LoginHttp.buvid,
+          'buvid': recommend.buvid,
           'fp_local': '1111111111111111111111111111111111111111111111111111111111111111',
           'fp_remote': '1111111111111111111111111111111111111111111111111111111111111111',
           'session_id': '11111111',
@@ -301,7 +304,7 @@ abstract final class LiveHttp {
       queryParameters: params,
       options: Options(
         headers: {
-          'buvid': LoginHttp.buvid,
+          'buvid': recommend.buvid,
           'fp_local': '1111111111111111111111111111111111111111111111111111111111111111',
           'fp_remote': '1111111111111111111111111111111111111111111111111111111111111111',
           'session_id': '11111111',
@@ -487,7 +490,7 @@ abstract final class LiveHttp {
     }
   }
 
-  static Future<LoadingState<ShieldInfo?>> getLiveInfoByUser(
+  static Future<LoadingState<LiveInfoByUserData>> getLiveInfoByUser(
     Object roomId,
   ) async {
     final res = await Request().get(
@@ -500,7 +503,7 @@ abstract final class LiveHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      return Success(LiveDmBlockData.fromJson(res.data['data']).shieldInfo);
+      return Success(LiveInfoByUserData.fromJson(res.data['data']));
     } else {
       return Error(res.data['message']);
     }
@@ -787,6 +790,225 @@ abstract final class LiveHttp {
     final res = await Request().get(
       Api.liveFeedback,
       queryParameters: params,
+    );
+    if (res.data['code'] == 0) {
+      return const Success(null);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<String?>> liveMedalName(Object uid) async {
+    final res = await Request().get(
+      Api.liveMasterInfo,
+      queryParameters: {'uid': uid},
+    );
+    if (res.data['code'] == 0) {
+      try {
+        return Success(res.data['data']['medal_name'] as String);
+      } catch (e) {
+        return Error(e.toString());
+      }
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<LiveTraceResp>> liveTraceE({
+    required LiveTraceReq traceReq,
+    required Account heartbeat,
+  }) async {
+    final res = await Request().post(
+      Api.liveTraceE,
+      queryParameters: await WbiSign.makSign({
+        'id': traceReq.id,
+        'device': traceReq.device,
+        'ruid': traceReq.ruid,
+        'ts': DateTime.now().millisecondsSinceEpoch,
+        'is_patch': 0,
+        'heart_beat': const [],
+        'ua': BrowserUa.pc,
+        'web_location': '444.8',
+        'csrf': heartbeat.csrf,
+      }),
+    );
+    if (res.data['code'] == 0) {
+      try {
+        traceReq.seqId++;
+        return Success(LiveTraceResp.fromJson(res.data['data']));
+      } catch (e) {
+        return Error(e.toString());
+      }
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<LiveTraceResp>> liveTraceX({
+    required LiveTraceReq traceReq,
+    required LiveTraceResp traceResp,
+    required Account heartbeat,
+  }) async {
+    final tsMs = DateTime.now().millisecondsSinceEpoch;
+    final s = LiveTraceUtils.buildX25KnSignature(
+      traceReq: traceReq,
+      traceResp: traceResp,
+      tsMs: tsMs,
+    );
+    if (s == null) return const Error(null);
+    final res = await Request().post(
+      Api.liveTraceX,
+      queryParameters: await WbiSign.makSign({
+        's': s,
+        'id': traceReq.id,
+        'device': traceReq.device,
+        'ruid': traceReq.ruid,
+        'ets': traceResp.timestamp,
+        'benchmark': traceResp.secretKey,
+        'time': traceResp.interval,
+        'ts': tsMs,
+        'ua': BrowserUa.pc,
+        'trackid': '-99998',
+        'web_location': '444.8',
+        'csrf': heartbeat.csrf,
+      }),
+    );
+    if (res.data['code'] == 0) {
+      try {
+        traceReq.seqId++;
+        return Success(LiveTraceResp.fromJson(res.data['data']));
+      } catch (e) {
+        return Error(e.toString());
+      }
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<FansMedalData>> fansMedalPanel({
+    required int page,
+    int pageSize = 20,
+    Object? roomId,
+    Object? targetId, // ruid
+  }) async {
+    final res = await Request().get(
+      Api.fansMedalPanel,
+      queryParameters: {
+        'page': page,
+        'page_size': pageSize,
+        'room_id': ?roomId,
+        'target_id': ?targetId,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return Success(FansMedalData.fromJson(res.data['data']));
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<Medal>> userMedalInfo({
+    required Object uid,
+    required Object upId,
+  }) async {
+    final res = await Request().get(
+      Api.userMedalInfo,
+      queryParameters: {
+        'uid': uid,
+        'up_uid': upId,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return Success(Medal.fromJson(res.data['data']));
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<void>> wearFansMedal({
+    required Object medalId,
+  }) async {
+    final csrf = Accounts.main.csrf;
+    final res = await Request().post(
+      Api.wearFansMedal,
+      data: {
+        'medal_id': medalId,
+        'target_id': 0,
+        'room_id': 0,
+        'csrf_token': csrf,
+        'csrf': csrf,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    if (res.data['code'] == 0) {
+      return const Success(null);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<void>> takeOffFansMedal() async {
+    final csrf = Accounts.main.csrf;
+    final res = await Request().post(
+      Api.takeOffFansMedal,
+      data: {
+        'target_id': 0,
+        'room_id': 0,
+        'csrf_token': csrf,
+        'csrf': csrf,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    if (res.data['code'] == 0) {
+      return const Success(null);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<void>> delFansMedal({
+    required Object medalId,
+  }) async {
+    final csrf = Accounts.main.csrf;
+    final res = await Request().post(
+      Api.delFansMedal,
+      data: {
+        'medal_id': medalId,
+        'csrf_token': csrf,
+        'csrf': csrf,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    if (res.data['code'] == 0) {
+      return const Success(null);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<ConfigPlusData>> liveConfigPlugs() async {
+    final res = await Request().get(Api.liveConfigPlugs);
+    if (res.data['code'] == 0) {
+      return Success(ConfigPlusData.fromJson(res.data['data']));
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<void>> liveEditPlugs({
+    required String key,
+    required int status,
+  }) async {
+    final csrf = Accounts.main.csrf;
+    final res = await Request().post(
+      Api.liveEditPlugs,
+      data: {
+        'key': key,
+        'status': status,
+        'csrf_token': csrf,
+        'csrf': csrf,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
     );
     if (res.data['code'] == 0) {
       return const Success(null);

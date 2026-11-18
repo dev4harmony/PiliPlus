@@ -35,10 +35,10 @@ void toastUpdateResult(bool dismiss, bool isSuccess) {
 mixin CommonDownloadActionMixin<T extends StatefulWidget>
     on BaseDownloadActionMixin<T, BiliDownloadEntryInfo> {
   @override
-  Future<void> onUpdate(
+  Future<bool> onUpdate(
     Future<bool> Function(BiliDownloadEntryInfo e) toElement,
   ) async {
-    if (checkUpdateCount(multiSelectCtr.checkedCount)) return;
+    if (checkUpdateCount(multiSelectCtr.checkedCount)) return false;
 
     bool dismiss = false;
     SmartDialog.showLoading(
@@ -59,6 +59,8 @@ mixin CommonDownloadActionMixin<T extends StatefulWidget>
     }
 
     toastUpdateResult(dismiss, isSuccess);
+
+    return isSuccess;
   }
 }
 
@@ -77,8 +79,30 @@ mixin BaseDownloadActionMixin<
     colorScheme = ColorScheme.of(context);
   }
 
-  Future<void> updatePageDm(DownloadPageInfo pageInfo) async {
-    if (checkUpdateCount(pageInfo.entries.length)) return;
+  Future<void> updatePageDm(DownloadPageInfo pageInfo) => updatePage(
+    pageInfo,
+    (e) => downloadService.downloadDanmaku(entry: e, isUpdate: true),
+  );
+
+  Future<void> updatePageSeg(DownloadPageInfo pageInfo) =>
+      updatePage(pageInfo, downloadService.updateSegments);
+
+  Future<void> updatePageVolume(DownloadPageInfo pageInfo) =>
+      updatePage(pageInfo, downloadService.updateVolume);
+
+  Future<void> updatePagePlayInfo(DownloadPageInfo pageInfo) =>
+      updatePage(pageInfo, downloadService.updatePlayInfo);
+
+  Future<void> updatePageSeasonInfo(DownloadPageInfo pageInfo) => updatePage(
+    pageInfo,
+    downloadService.updateSeasonInfo,
+  ).then(downloadService.refreshIfUpdated);
+
+  Future<bool> updatePage(
+    DownloadPageInfo pageInfo,
+    Future<bool> Function(BiliDownloadEntryInfo e) toElement,
+  ) async {
+    if (checkUpdateCount(pageInfo.entries.length)) return false;
 
     bool dismiss = false;
     SmartDialog.showLoading(onDismiss: () => dismiss = true);
@@ -86,7 +110,7 @@ mixin BaseDownloadActionMixin<
     bool isSuccess = true;
     for (final chunk in pageInfo.entries.mapChunked(
       kUpdateConcurrency,
-      (e) => downloadService.downloadDanmaku(entry: e, isUpdate: true),
+      toElement,
     )) {
       final res = await Future.wait(chunk);
       if (res.any((e) => !e)) isSuccess = false;
@@ -94,9 +118,11 @@ mixin BaseDownloadActionMixin<
     }
 
     toastUpdateResult(dismiss, isSuccess);
+
+    return isSuccess;
   }
 
-  void onUpdate(
+  Future<bool> onUpdate(
     Future<bool> Function(BiliDownloadEntryInfo e) toElement,
   );
 
@@ -104,9 +130,15 @@ mixin BaseDownloadActionMixin<
     onUpdate((e) => downloadService.downloadDanmaku(entry: e, isUpdate: true));
   }
 
-  void _onUpdateSeg() {
-    onUpdate(downloadService.updateSegments);
-  }
+  void _onUpdateSeg() => onUpdate(downloadService.updateSegments);
+
+  void _onUpdateVolume() => onUpdate(downloadService.updateVolume);
+
+  void _onUpdateSeasonInfo() =>
+      onUpdate(downloadService.updateSeasonInfo)
+          .then(downloadService.refreshIfUpdated);
+
+  void _onUpdatePlayInfo() => onUpdate(downloadService.updatePlayInfo);
 
   void _showUpdateMenu(BuildContext context) {
     final renderBox = context.findRenderObject() as RenderBox;
@@ -123,6 +155,18 @@ mixin BaseDownloadActionMixin<
         PopupMenuItem(
           onTap: _onUpdateSeg,
           child: const Text('更新片段'),
+        ),
+        PopupMenuItem(
+          onTap: _onUpdateSeasonInfo,
+          child: const Text('更新合集信息'),
+        ),
+        PopupMenuItem(
+          onTap: _onUpdateVolume,
+          child: const Text('更新音量均衡'),
+        ),
+        PopupMenuItem(
+          onTap: _onUpdatePlayInfo,
+          child: const Text('更新字幕、分段信息'),
         ),
       ],
     );

@@ -380,9 +380,11 @@ class _PageViewState extends State<PageView> {
         }
         return false;
       },
-      // SDK Scrollable 无 horizontalDragGestureRecognizer 参数；传入了
-      // 自定义识别器的调用点由外挂 RawGestureDetector 注入（同
-      // scroll_physics.tabBarView 手法）。
+      // 未传自定义识别器时保持 SDK Scrollable（首页分类 pager 斜滑漂移的
+      // 修复依赖它）；传入时改用 compat Scrollable，把识别器真正装进滚动
+      // （上游 lib/scripts/scrollable_gesture.patch 的等价实现）。图片查看器
+      // 的缩放/边缘判定、TabBarView 的自定义识别器都依赖这条链路，否则
+      // PageView 会用 SDK 内置识别器，自定义识别器只在外层空转。
       child: widget.horizontalDragGestureRecognizer == null
           ? sdk.Scrollable(
               dragStartBehavior: widget.dragStartBehavior,
@@ -396,28 +398,19 @@ class _PageViewState extends State<PageView> {
                   ScrollConfiguration.of(context).copyWith(scrollbars: false),
               viewportBuilder: _buildViewport,
             )
-          : RawGestureDetector(
-              behavior: widget.hitTestBehavior,
-              gestures: <Type, GestureRecognizerFactory>{
-                HorizontalDragGestureRecognizer:
-                    GestureRecognizerFactoryWithHandlers<
-                      HorizontalDragGestureRecognizer
-                    >(widget.horizontalDragGestureRecognizer!, (_) {}),
-              },
-              child: sdk.Scrollable(
-                dragStartBehavior: widget.dragStartBehavior,
-                axisDirection: axisDirection,
-                controller: _controller,
-                physics: physics,
-                restorationId: widget.restorationId,
-                hitTestBehavior: widget.hitTestBehavior,
-                scrollBehavior:
-                    widget.scrollBehavior ??
-                    ScrollConfiguration.of(context).copyWith(
-                      scrollbars: false,
-                    ),
-                viewportBuilder: _buildViewport,
-              ),
+          : Scrollable(
+              dragStartBehavior: widget.dragStartBehavior,
+              axisDirection: axisDirection,
+              controller: _controller,
+              physics: physics,
+              restorationId: widget.restorationId,
+              hitTestBehavior: widget.hitTestBehavior,
+              scrollBehavior:
+                  widget.scrollBehavior ??
+                  ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              viewportBuilder: _buildViewport,
+              horizontalDragGestureRecognizer:
+                  widget.horizontalDragGestureRecognizer!,
             ),
     );
   }

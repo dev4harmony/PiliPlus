@@ -36,7 +36,6 @@ import 'package:PiliPlus/pages/member_video_web/season_series/view.dart';
 import 'package:PiliPlus/utils/android/android_helper.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
-import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/nested_scroll_ext.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
@@ -51,6 +50,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:os_type/os_type.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 class MemberPage extends StatefulWidget {
   const MemberPage({super.key});
@@ -147,6 +147,7 @@ class _MemberPageState extends State<MemberPage> with WidgetsBindingObserver {
                         chargeCount: _userController.chargeCount,
                         guards: _userController.guards,
                         guardCount: _userController.guardCount,
+                        hasMedal: _userController.medal == 1,
                       ),
                     ),
                   ),
@@ -215,7 +216,7 @@ class _MemberPageState extends State<MemberPage> with WidgetsBindingObserver {
       useSafeArea: true,
       isScrollControlled: true,
       constraints: BoxConstraints(
-        maxWidth: math.min(640, context.mediaQueryShortestSide),
+        maxWidth: math.min(640, MediaQuery.sizeOf(context).shortestSide),
       ),
       builder: (context) {
         final scheme = ColorScheme.of(context);
@@ -541,6 +542,17 @@ class _MemberPageState extends State<MemberPage> with WidgetsBindingObserver {
                   Icon(Icons.linear_scale, size: 18),
                   SizedBox(width: 10),
                   Text('经验记录'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              onTap: () => Get.toNamed('/fansMedal'),
+              child: const Row(
+                spacing: 10,
+                mainAxisSize: .min,
+                children: [
+                  Icon(MdiIcons.medalOutline, size: 18),
+                  Text('粉丝勋章'),
                 ],
               ),
             ),

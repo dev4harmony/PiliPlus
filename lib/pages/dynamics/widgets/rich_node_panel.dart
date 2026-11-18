@@ -11,8 +11,10 @@ import 'package:PiliPlus/models/common/image_preview_type.dart'
     show SourceModel;
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
+import 'package:PiliPlus/pages/article/view.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/vote.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/parse_string.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -34,13 +36,14 @@ TextSpan? richNode(
     List<InlineSpan> spanChildren = [];
 
     final moduleDynamic = item.modules.moduleDynamic;
+    final opus = moduleDynamic?.major?.opus;
     List<RichTextNodeItem>? richTextNodes;
     if (moduleDynamic?.desc case final desc?) {
       richTextNodes = desc.richTextNodes;
       if (richTextNodes == null || richTextNodes.isEmpty) {
         return TextSpan(text: desc.text);
       }
-    } else if (moduleDynamic?.major?.opus case DynamicOpusModel(
+    } else if (opus case DynamicOpusModel(
       :final title,
       :final summary,
     )) {
@@ -155,13 +158,11 @@ TextSpan? richNode(
                   text: '投票：${i.text}',
                   style: style,
                   recognizer: NoDeadlineTapGestureRecognizer()
-                    ..onTap = () {
-                      final dynIdStr = item.basic?.commentIdStr;
-                      final dynId = dynIdStr != null
-                          ? int.tryParse(dynIdStr)
-                          : null;
-                      showVoteDialog(context, int.parse(i.rid!), dynId);
-                    },
+                    ..onTap = () => showVoteDialog(
+                      context,
+                      int.parse(i.rid!),
+                      dynamicId: parseIntOrNull(item.basic?.commentIdStr),
+                    ),
                 ),
               );
             break;
@@ -377,7 +378,21 @@ TextSpan? richNode(
             break;
         }
       }
-      return TextSpan(children: spanChildren);
+      if (opus?.redirect ?? false) {
+        spanChildren.add(
+          TextSpan(
+            text: '\n${DynamicOpusModel.redirectText}',
+            style: style,
+            recognizer: (NoDeadlineTapGestureRecognizer()
+              ..onTap = () =>
+                  ArticlePage.toArticlePage(id: item.idStr, type: .opus)),
+          ),
+        );
+      }
+      return TextSpan(
+        children: spanChildren,
+        style: const TextStyle(height: 1.65),
+      );
     }
   } catch (err) {
     if (kDebugMode) debugPrint('❌rich_node_panel err: $err');

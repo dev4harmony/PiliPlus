@@ -43,6 +43,7 @@ abstract class CommonRichTextPubPage
     this.pics,
     super.onSave,
     super.autofocus,
+    super.panelType,
     super.imageLengthLimit,
   });
 
@@ -55,7 +56,7 @@ abstract class CommonRichTextPubPageState<T extends CommonRichTextPubPage>
   final key = GlobalKey<RichTextFieldState>();
   late final imagePicker = ImagePicker();
   late final RxList<PicModel> imageList;
-  int get limit => widget.imageLengthLimit ?? 9;
+  int get limit => widget.imageLengthLimit;
 
   @override
   late final RichTextEditingController editController;
@@ -232,33 +233,35 @@ abstract class CommonRichTextPubPageState<T extends CommonRichTextPubPage>
     }
   }
 
-  void onPickImage([VoidCallback? callback]) {
+  void onPickImageThrottle([VoidCallback? callback]) {
     EasyThrottle.throttle(
       'imagePicker',
       const Duration(milliseconds: 500),
-      () async {
-        try {
-          final pickedFiles = await imagePicker.pickMultiImage(
-            limit: limit,
-            imageQuality: 100,
-            requestFullMetadata: false,
-          );
-          if (pickedFiles.isNotEmpty) {
-            for (int i = 0; i < pickedFiles.length; i++) {
-              if (imageList.length == limit) {
-                SmartDialog.showToast('最多选择$limit张图片');
-                break;
-              } else {
-                imageList.add(FilePicModel(path: pickedFiles[i].path));
-              }
-            }
-            callback?.call();
-          }
-        } catch (e) {
-          SmartDialog.showToast(e.toString());
-        }
-      },
+      () => _onPickImage(callback),
     );
+  }
+
+  Future<void> _onPickImage([VoidCallback? callback]) async {
+    try {
+      final pickedFiles = await imagePicker.pickMultiImage(
+        limit: limit,
+        imageQuality: 100,
+        requestFullMetadata: false,
+      );
+      if (pickedFiles.isNotEmpty) {
+        for (int i = 0; i < pickedFiles.length; i++) {
+          if (imageList.length == limit) {
+            SmartDialog.showToast('最多选择$limit张图片');
+            break;
+          } else {
+            imageList.add(FilePicModel(path: pickedFiles[i].path));
+          }
+        }
+        callback?.call();
+      }
+    } catch (e) {
+      SmartDialog.showToast(e.toString());
+    }
   }
 
   void onChooseEmote(dynamic emote, double? width, double? height) {

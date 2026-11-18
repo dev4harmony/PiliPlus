@@ -16,7 +16,6 @@ import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/post_panel/popup_menu_text.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
-import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:material_ui/material_ui.dart';
@@ -127,7 +126,7 @@ class PostPanel extends CommonSlidePage {
                     FilteringTextInputFormatter.allow(RegExp(r'[\d:.]+')),
                   ],
                 );
-                if (PlatformUtils.isDesktop || context.isTablet) {
+                if (PlatformUtils.isDesktop || MediaQuery.sizeOf(context).shortestSide >= 600) {
                   res = await showDialog<String>(
                     context: context,
                     builder: (context) => AlertDialog(
@@ -250,7 +249,7 @@ class _PostPanelState extends State<PostPanel>
   double currentPos() => plPlayerController.positionInMilliseconds / 1000;
 
   @override
-  Widget buildPage(ThemeData theme) {
+  Widget buildPage() {
     return SimpleScaffold(
       appBar: AppBar(
         primary: false,
@@ -291,7 +290,39 @@ class _PostPanelState extends State<PostPanel>
           const SizedBox(width: 16),
         ],
       ),
-      body: enableSlide ? slideList(theme) : buildList(theme),
+      body: enableSlide ? slideList() : buildList(),
+      fab: list.isEmpty
+          ? null
+          : Padding(
+              padding: .only(
+                right: kFloatingActionButtonMargin,
+                bottom: kFloatingActionButtonMargin +
+                    MediaQuery.viewPaddingOf(context).bottom,
+              ),
+              child: FloatingActionButton(
+                tooltip: '提交',
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('确定无误再提交'),
+                    actions: [
+                      TextButton(
+                        onPressed: Get.back,
+                        child: Text(
+                          '取消',
+                          style: TextStyle(color: theme.colorScheme.outline),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _onPost,
+                        child: const Text('确定提交'),
+                      ),
+                    ],
+                  ),
+                ),
+                child: const Icon(Icons.check),
+              ),
+            ),
     );
   }
 
@@ -305,51 +336,19 @@ class _PostPanelState extends State<PostPanel>
   }
 
   @override
-  Widget buildList(ThemeData theme) {
+  Widget buildList() {
     if (list.isEmpty) {
       return scrollableError;
     }
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ListView.builder(
-          key: _key,
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(bottom: 88 + bottom),
-          itemCount: list.length,
-          itemBuilder: (context, index) {
-            return _buildItem(theme, index, list[index]);
-          },
-        ),
-        Positioned(
-          right: kFloatingActionButtonMargin,
-          bottom: kFloatingActionButtonMargin + bottom,
-          child: FloatingActionButton(
-            tooltip: '提交',
-            onPressed: () => showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('确定无误再提交'),
-                actions: [
-                  TextButton(
-                    onPressed: Get.back,
-                    child: Text(
-                      '取消',
-                      style: TextStyle(color: theme.colorScheme.outline),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _onPost,
-                    child: const Text('确定提交'),
-                  ),
-                ],
-              ),
-            ),
-            child: const Icon(Icons.check),
-          ),
-        ),
-      ],
+    return ListView.builder(
+      key: _key,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(bottom: 88 + bottom),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        return _buildItem(index, list[index]);
+      },
     );
   }
 
@@ -375,7 +374,7 @@ class _PostPanelState extends State<PostPanel>
     }
   }
 
-  Widget _buildItem(ThemeData theme, int index, PostSegmentModel item) {
+  Widget _buildItem(int index, PostSegmentModel item) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -518,20 +517,20 @@ class _PostPanelState extends State<PostPanel>
               final player = plPlayerController.videoPlayerController;
               if (player != null) {
                 final start = (item.segment.first * 1000).round();
-                Future<void> seekTo() => plPlayerController.seek(
+                Future<void> seekTo() => plPlayerController.seekTo(
                   Duration(milliseconds: (item.segment.second * 1000).round()),
                 );
                 if (start <= 0) {
                   seekTo();
                   if (!player.state.playing) {
-                    await player.play();
+                    await plPlayerController.play();
                   }
                   return;
                 }
                 final seek = max(0, start - 2000);
-                await plPlayerController.seek(Duration(milliseconds: seek));
+                await plPlayerController.seekTo(Duration(milliseconds: seek));
                 if (!player.state.playing) {
-                  await player.play();
+                  await plPlayerController.play();
                 }
                 if (start > seek) {
                   final posSub = player.stream.position.listen(

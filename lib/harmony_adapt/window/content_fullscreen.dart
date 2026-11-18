@@ -8,10 +8,3 @@ Future<bool> enterContentFullScreen() =>
 
 /// 退出「内容全屏」。返回值语义同 [enterContentFullScreen]。
 Future<bool> exitContentFullScreen() => HarmonyChannel.exitContentFullScreen();
-
-/// 强制窗口朝向（1 = 竖屏、0 = 横屏，对应原生 Orientation 常量）。
-///
-/// 部分机型（Mate80）开启系统旋转锁定后无法用 SystemChrome 强制转回竖屏，
-/// 只能走原生接口。
-Future<void> setWindowOrientation(int orientation) =>
-    HarmonyChannel.setWindowOrientation(orientation);

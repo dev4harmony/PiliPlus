@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/widgets/image_viewer/hero_dialog_route.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony_adapt/orientation/orientation_policy.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -62,6 +63,9 @@ class ShellBarsObserver extends NavigatorObserver {
     final topIsPlayer = topPage != null &&
         (topPage.settings.name == '/videoV' ||
             topPage.settings.name == '/liveRoom');
+    // 方向策略的「页面类型」输入：播放页跟随系统/全屏横屏，其余页面在细长
+    // 竖屏形态下锁竖屏（见 OrientationPolicy）。
+    OrientationPolicy.setPlayerPage(topIsPlayer);
     // 这里不能带上 _orientationHidden：它表示「横屏（侧栏布局）下原生 HDS 栏不
     // 显示」，与系统状态栏无关。带上它会让横屏退出播放页时本处不恢复状态栏，
     // 最终由 PlPlayerController.dispose() 里 removeSafeArea 的兜底恢复——那是

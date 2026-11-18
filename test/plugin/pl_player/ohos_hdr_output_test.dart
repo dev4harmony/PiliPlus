@@ -1,4 +1,4 @@
-import 'package:PiliPlus/models/common/video/video_quality.dart';
+import 'package:PiliPlus/models/common/video/base_quality.dart';
 import 'package:PiliPlus/plugin/pl_player/models/ohos_hdr_output.dart';
 import 'package:flutter_test/flutter_test.dart';
 

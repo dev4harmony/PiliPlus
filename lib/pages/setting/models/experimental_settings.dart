@@ -76,8 +76,26 @@ List<SettingsModel> experimentalSettings = [
   ),
   NormalModel(
     title: '应用接续',
-    subtitle: '相同华为用户播放视频可在不同设备中快速流转视频。（始终开启）',
+    subtitle: '登录相同华为账户的设备之间可快速流转正在播放的视频（始终开启）',
     leading: const Icon(Icons.devices_other),
+    getTrailing: (theme) => IgnorePointer(
+      child: Transform.scale(
+        scale: 0.8,
+        alignment: Alignment.centerRight,
+        child: Switch(
+          value: true,
+          onChanged: (_) {},
+          thumbIcon: WidgetStateProperty.all(
+            const Icon(Icons.lock_outline_rounded),
+          ),
+        ),
+      ),
+    ),
+  ),
+  NormalModel(
+    title: '智感旋转',
+    subtitle: '应用屏幕方向始终跟随系统旋转与智感旋转，无需应用内设置；智感旋转需系统支持，并在「设置 > 系统 > 智感旋转」中开启（始终开启）',
+    leading: const Icon(Icons.screen_rotation),
     getTrailing: (theme) => IgnorePointer(
       child: Transform.scale(
         scale: 0.8,

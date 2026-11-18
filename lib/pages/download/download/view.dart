@@ -53,10 +53,10 @@ class _DownloadPageState extends State<DownloadPage>
   }
 
   @override
-  Future<void> onUpdate(
+  Future<bool> onUpdate(
     Future<bool> Function(BiliDownloadEntryInfo e) toElement,
   ) async {
-    if (checkUpdateCount(_controller.checkedCount)) return;
+    if (checkUpdateCount(_controller.checkedCount)) return false;
 
     bool dismiss = false;
     SmartDialog.showLoading(
@@ -99,6 +99,8 @@ class _DownloadPageState extends State<DownloadPage>
     }
 
     toastUpdateResult(dismiss, isSuccess);
+
+    return isSuccess;
   }
 
   Future<void> _shareEntries(List<BiliDownloadEntryInfo> entries) async {
@@ -149,11 +151,34 @@ class _DownloadPageState extends State<DownloadPage>
     );
   }
 
-  Future<void> _updateSeasonDm(DownloadSeasonInfo seasonInfo) async {
+  Future<void> _updateSeasonDm(DownloadSeasonInfo seasonInfo) => _updateSeason(
+    seasonInfo,
+    (e) => downloadService.downloadDanmaku(entry: e, isUpdate: true),
+  );
+
+  Future<void> _updateSeasonSeg(DownloadSeasonInfo seasonInfo) =>
+      _updateSeason(seasonInfo, downloadService.updateSegments);
+
+  Future<void> _updateSeasonVolume(DownloadSeasonInfo seasonInfo) =>
+      _updateSeason(seasonInfo, downloadService.updateVolume);
+
+  Future<void> _updateSeasonPlayInfo(DownloadSeasonInfo seasonInfo) =>
+      _updateSeason(seasonInfo, downloadService.updatePlayInfo);
+
+  Future<void> _updateSeasonSeasonInfo(DownloadSeasonInfo seasonInfo) =>
+      _updateSeason(
+        seasonInfo,
+        downloadService.updateSeasonInfo,
+      ).then(downloadService.refreshIfUpdated);
+
+  Future<bool> _updateSeason(
+    DownloadSeasonInfo seasonInfo,
+    Future<bool> Function(BiliDownloadEntryInfo e) toElement,
+  ) async {
     if (checkUpdateCount(
       seasonInfo.pages.fold(0, (a, b) => a + b.entries.length),
     )) {
-      return;
+      return false;
     }
 
     bool dismiss = false;
@@ -161,21 +186,29 @@ class _DownloadPageState extends State<DownloadPage>
 
     bool isSuccess = true;
 
-    for (final page in seasonInfo.pages) {
-      for (final chunk in page.entries.mapChunked(
-        kUpdateConcurrency,
-        (e) => downloadService.downloadDanmaku(
-          entry: e,
-          isUpdate: true,
-        ),
-      )) {
-        final res = await Future.wait(chunk);
-        if (res.any((e) => !e)) isSuccess = false;
-        if (dismiss) break;
-      }
+    for (final chunk in seasonInfo.pages.mapChunked(
+      kUpdateConcurrency,
+      (page) async {
+        bool isSuccess = true;
+        for (final chunk in page.entries.mapChunked(
+          kUpdateConcurrency,
+          toElement,
+        )) {
+          final res = await Future.wait(chunk);
+          if (res.any((e) => !e)) isSuccess = false;
+          if (dismiss) break;
+        }
+        return isSuccess;
+      },
+    )) {
+      final res = await Future.wait(chunk);
+      if (res.any((e) => !e)) isSuccess = false;
+      if (dismiss) break;
     }
 
     toastUpdateResult(dismiss, isSuccess);
+
+    return isSuccess;
   }
 
   @override
@@ -292,6 +325,10 @@ class _DownloadPageState extends State<DownloadPage>
                                 enableMultiSelect: enableMultiSelect,
                                 progress: _progress,
                                 updateSeasonDm: _updateSeasonDm,
+                                updateSeasonSeg: _updateSeasonSeg,
+                                updateSeasonVolume: _updateSeasonVolume,
+                                updateSeasonPlayInfo: _updateSeasonPlayInfo,
+                                updateSeasonSeasonInfo: _updateSeasonSeasonInfo,
                               );
                             }
 
@@ -326,6 +363,10 @@ class _DownloadPageState extends State<DownloadPage>
                               enableMultiSelect: enableMultiSelect,
                               progress: _progress,
                               updatePageDm: updatePageDm,
+                              updatePageSeg: updatePageSeg,
+                              updatePageVolume: updatePageVolume,
+                              updatePagePlayInfo: updatePagePlayInfo,
+                              updatePageSeasonInfo: updatePageSeasonInfo,
                             );
                           },
                           itemCount: _controller.seasons.length,

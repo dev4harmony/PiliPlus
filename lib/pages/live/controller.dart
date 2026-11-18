@@ -6,13 +6,15 @@ import 'package:PiliPlus/models_new/live/live_feed_index/card_list.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/data.dart';
 import 'package:PiliPlus/models_new/live/live_second_list/data.dart';
 import 'package:PiliPlus/models_new/live/live_second_list/tag.dart';
+import 'package:PiliPlus/pages/common/common_controller.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:flutter/widgets.dart' show ScrollController;
 import 'package:get/get.dart';
 
-class LiveController extends CommonListController with AccountMixin {
+class LiveController extends CommonListController
+    with AccountMixin, RefreshImplMixin {
   @override
   void onInit() {
     super.onInit();
@@ -30,6 +32,11 @@ class LiveController extends CommonListController with AccountMixin {
   // tag
   final RxInt tagIndex = 0.obs;
   List<LiveSecondTag>? newTags;
+
+  double _topHeight = 0.0;
+  void onTopHeightChanged(double value) {
+    _topHeight = value;
+  }
 
   final Rx<Pair<LiveCardList?, LiveCardList?>> topState =
       Pair<LiveCardList?, LiveCardList?>(first: null, second: null).obs;
@@ -129,10 +136,7 @@ class LiveController extends CommonListController with AccountMixin {
     areaId = cardLiveItem?.areaV2Id;
     parentAreaId = cardLiveItem?.areaV2ParentId;
 
-    count = null;
-    page = 1;
-    isEnd = false;
-    queryData();
+    _onSelectAreaTag();
   }
 
   void onSelectTag(int index, String? sortType) {
@@ -142,10 +146,21 @@ class LiveController extends CommonListController with AccountMixin {
     tagIndex.value = index;
     this.sortType = sortType;
 
+    _onSelectAreaTag();
+  }
+
+  void _onSelectAreaTag() {
     count = null;
     page = 1;
     isEnd = false;
-    queryData();
+    queryData().whenComplete(_jumpToListTop);
+  }
+
+  void _jumpToListTop() {
+    if (scrollController.hasClients &&
+        scrollController.position.pixels > _topHeight) {
+      scrollController.jumpTo(_topHeight);
+    }
   }
 
   @override

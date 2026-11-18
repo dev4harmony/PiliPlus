@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony_adapt/orientation/orientation_policy.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';
@@ -14,7 +15,7 @@ import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/audio_normalization.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
-import 'package:PiliPlus/models/common/video/video_quality.dart';
+import 'package:PiliPlus/models/common/video/base_quality.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
@@ -78,7 +79,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 typedef PlayCallback = Future<void>? Function();
-typedef PlayOwner = ({String tag, Type type});
+typedef PlayOwner = ({String tag, Type? type});
 
 class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Player? _videoPlayerController;
@@ -121,7 +122,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   final RxInt position = RxInt(0);
   final RxInt seekPosition = RxInt(0);
-  int get progress => isSeeking.value ? seekPosition.value : position.value;
+  int get progress =>
+      isSeeking.value && hoverDx == null ? seekPosition.value : position.value;
 
   int get positionInMilliseconds =>
       videoPlayerController?.state.position.inMilliseconds ?? 0;
@@ -272,6 +274,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   set isVertical(bool value) {
     _isVertical = value;
+    // 竖屏视频（含竖屏直播流）：同步给方向策略，在竖屏形态设备的播放页整页
+    // 锁竖向（非全屏与全屏一致），避免转动设备时窗口先转再被拉回。
+    if (OS.isHarmony) OrientationPolicy.setVideoVertical(value);
   }
 
   /// 弹幕开关
@@ -534,9 +539,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   late final darkVideoPage = Pref.darkVideoPage;
   late final enableSlideVolumeBrightness = Pref.enableSlideVolumeBrightness;
   late final enableSlideFS = Pref.enableSlideFS;
+  late final enableScrollVolume = Pref.enableScrollVolume;
   late final enableDragSubtitle = Pref.enableDragSubtitle;
+  late final fastForBackwardInSeconds = Pref.fastForBackwardDuration;
   late final fastForBackwardDuration = Duration(
-    seconds: Pref.fastForBackwardDuration,
+    seconds: fastForBackwardInSeconds,
   );
 
   late final horizontalSeasonPanel = Pref.horizontalSeasonPanel;
@@ -784,6 +791,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       return;
     }
     if (Platform.isIOS && !visible) return;
+    // 上游 c36ebfc9e：播控锁定时不更新方向（非鸿蒙平台生效；鸿蒙不创建传感器监听）
+    if (controlsLock.value) return;
     final isFullScreen = this.isFullScreen.value;
     if (checkIsAutoRotate &&
         param.isAutoRotate != true &&
@@ -795,7 +804,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     switch (deviceOrientation) {
       case .portraitUp:
-        if (!_isVertical && controlsLock.value) return;
         if (!horizontalScreen && !_isVertical && isFullScreen) {
           if (!isManualFS) {
             // 自动进的全屏才跟随设备转回竖屏而退出；延迟确认，避免单帧误报
@@ -807,7 +815,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         }
       case .portraitDown:
         if (!horizontalScreen) return;
-        if (!_isVertical && controlsLock.value) return;
         _cancelAutoExitFs();
         portraitDownMode();
       case .landscapeLeft:
@@ -829,7 +836,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   // 添加一个私有构造函数
   PlPlayerController._() {
-    if (PlatformUtils.isMobile) {
+    // 鸿蒙：屏幕方向由系统决定（含智感旋转），应用不再消费传感器方向做任何
+    // 决策——不再设方向、不再按倾斜自动进/退全屏。这里只给 Android/iOS 保留。
+    if (PlatformUtils.isMobile && !OS.isHarmony) {
       _orientationListener = NativeDeviceOrientationCommunicator()
           .onOrientationChanged(
             checkIsAutoRotate: checkIsAutoRotate,
@@ -1954,6 +1963,23 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     onForwardBackward(videoPlayerController!.state.position - duration);
   }
 
+  void multiBackwardStart([_]) {
+    isSeeking.value = true;
+    seekPosition.value = max(
+      0,
+      seekPosition.value - fastForBackwardInSeconds,
+    );
+  }
+
+  void multiBackwardEnd() {
+    if (isSeeking.value) {
+      isSeeking.value = false;
+      onForwardBackward(Duration(seconds: seekPosition.value));
+    } else {
+      onBackward(fastForBackwardDuration);
+    }
+  }
+
   void onForwardBackward(Duration duration) {
     seekTo(
       duration.clamp(Duration.zero, videoPlayerController!.state.duration),
@@ -1996,6 +2022,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     updateSubtitleStyle();
     if (!OS.isHarmony) return;
 
+    // 全屏状态同步给方向策略：它是「是否全屏」的唯一来源，路由叠加/回退时
+    // 也能据此恢复正确策略。
+    unawaited(OrientationPolicy.setFullScreen(val));
     if (!val) {
       HarmonyChannel.onLandscapeOrMiniWindowChange(false, null); // 非横屏
     } else if (!isVertical) {
@@ -2017,15 +2046,18 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       DateTime.now().difference(_lastFsExitAt) <
       const Duration(milliseconds: 600);
   // 每次读取而不缓存：播放器是跨页面存活的单例，缓存会让在设置页改完
-  // 「默认全屏方向」后本次会话仍用旧值，表现为「改了没反应」
+  // 「默认全屏方向」后本次会话仍用旧值，表现为「改了没反应」。
+  // horizontalScreen 同理：鸿蒙上它由设备形态/内外屏自动判定，折叠切换后
+  // 必须读到新值，不能缓存。
   FullScreenMode get mode => Pref.fullScreenMode;
-  late final horizontalScreen = Pref.horizontalScreen;
+  bool get horizontalScreen => Pref.horizontalScreen;
   late final removeSafeArea = Pref.removeSafeArea;
 
   Future<void>? changeOrientation({
     required bool isVertical,
     DeviceOrientation? orientation,
   }) {
+    // 鸿蒙的方向不在这里决策，见 OrientationPolicy（形态 + 页面 + 全屏）。
     if (orientation == null && (mode == .none || mode == .gravity)) {
       return null;
     }
@@ -2074,25 +2106,21 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       if (status) {
         if (PlatformUtils.isMobile && !WindowFacts.isFreeWindowMode) {
           hideSystemBar();
-          await changeOrientation(
-            isVertical: isVertical,
-            orientation: orientation,
-          );
-          if (OS.isHarmony && !WindowFacts.isWindowMode) {
-            // 手动进全屏的目标方向：横屏时等视口真正变横屏再置全屏布局，
-            // 避免全屏先在竖屏/中间尺寸渲染，导致比例错误和动画跳变。
-            final targetLandscape =
-                orientation != null ||
-                switch (mode) {
-                  .vertical => false,
-                  .horizontal => true,
-                  .auto => !isVertical,
-                  .ratio => !isVertical && screenRatio >= kScreenRatio,
-                  _ => false,
-                };
-            if (targetLandscape) {
+          if (OS.isHarmony) {
+            // 鸿蒙：方向由 OrientationPolicy 唯一决策——细长竖屏形态下横屏视频
+            // 全屏临时转横屏（锁关时转回竖屏会跟回竖屏并自动退出全屏），
+            // 竖屏视频全屏保持竖向；其它形态保持跟随系统。
+            await OrientationPolicy.setFullScreen(true);
+            // 横屏视频等视口真正变横屏再置全屏布局，避免全屏先在竖屏/中间
+            // 尺寸渲染导致比例错误和动画跳变。
+            if (!WindowFacts.isWindowMode && !isVertical) {
               await _waitForLandscapeViewport();
             }
+          } else {
+            await changeOrientation(
+              isVertical: isVertical,
+              orientation: orientation,
+            );
           }
         } else {
           await enterDesktopFullScreen(inAppFullScreen: inAppFullScreen);
@@ -2102,19 +2130,31 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           if (!removeSafeArea) {
             showSystemBar();
           }
-          if (orientation == null && mode == .none) {
-            return;
-          }
-          _lastFsExitAt = DateTime.now();
-          // 鸿蒙mate80开启旋转锁定时，原生setPreferredOrientation可能长时间
-          // 不返回。加超时保证退出
-          await resetScreenRotation()?.timeout(
-            const Duration(milliseconds: 500),
-            onTimeout: () {},
-          );
-          // 退出全屏时，延迟等待方向旋转后改变组件
-          if (OS.isHarmony && !WindowFacts.isWindowMode) {
-            await Future<void>.delayed(const Duration(milliseconds: 32));
+          if (OS.isHarmony) {
+            // 退出全屏时人仍在播放页：把「是否全屏」置 false，策略重算为
+            // userPortrait（USER_ROTATION_PORTRAIT）——向系统发一次「临时
+            // 转回竖屏」，让窗口回到竖屏非全屏，避免保持横屏后被自动进全屏
+            // 重新拉回；之后恢复跟随传感器。portraitOnly 由离开播放页的
+            // 路由事件触发。
+            _lastFsExitAt = DateTime.now();
+            await OrientationPolicy.setFullScreen(false);
+            // 退出全屏会向系统发一次「临时转回竖屏」：等窗口真正变成竖屏再切
+            // 非全屏布局，否则旋转过程中会先闪一帧横屏非全屏布局。
+            if (!WindowFacts.isWindowMode &&
+                OrientationPolicy.isTemporaryPortrait) {
+              await _waitForPortraitViewport();
+            }
+          } else {
+            if (orientation == null && mode == .none) {
+              return;
+            }
+            _lastFsExitAt = DateTime.now();
+            // 鸿蒙mate80开启旋转锁定时，原生setPreferredOrientation可能长时间
+            // 不返回。加超时保证退出
+            await resetScreenRotation()?.timeout(
+              const Duration(milliseconds: 500),
+              onTimeout: () {},
+            );
           }
         } else {
           await exitDesktopFullScreen();
@@ -2166,8 +2206,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     SmartDialog.showToast('切换播放画面失败，切换清晰度可重试');
   }
 
-  /// 等待平台视口旋转为横屏（宽>高），带超时兜底。
-  Future<void> _waitForLandscapeViewport({
+  /// 等待平台视口真正旋转到目标方向（按引擎上报的物理尺寸判断），带超时
+  /// 兜底。旋转动画期间先保持当前布局，避免先渲染一帧方向不匹配的布局造成
+  /// 闪烁。
+  Future<void> _waitForViewport({
+    required bool landscape,
     Duration timeout = const Duration(milliseconds: 600),
   }) async {
     final views = WidgetsBinding.instance.platformDispatcher.views;
@@ -2176,10 +2219,20 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     final stopwatch = Stopwatch()..start();
     while (stopwatch.elapsedMilliseconds < timeout.inMilliseconds) {
       final size = view.physicalSize;
-      if (size.width > size.height) return;
+      if ((size.width > size.height) == landscape) return;
       await Future<void>.delayed(const Duration(milliseconds: 16));
     }
   }
+
+  /// 等待平台视口旋转为横屏（宽>高），带超时兜底。
+  Future<void> _waitForLandscapeViewport({
+    Duration timeout = const Duration(milliseconds: 600),
+  }) => _waitForViewport(landscape: true, timeout: timeout);
+
+  /// 等待平台视口旋转为竖屏（高≥宽），带超时兜底。
+  Future<void> _waitForPortraitViewport({
+    Duration timeout = const Duration(milliseconds: 600),
+  }) => _waitForViewport(landscape: false, timeout: timeout);
 
   void addPositionListener(ValueChanged<Duration> listener) {
     if (_playerCount == 0) return;
@@ -2277,18 +2330,19 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   // isCloseAll 由外部页面直接置位（新 ohos 提交的写法），故为公开字段
   bool isCloseAll = false;
 
-  /// 播放器销毁时恢复应用级方向：开着横屏适配跟随系统，否则锁回竖屏
+  /// 播放器销毁时恢复方向。
+  ///
+  /// 鸿蒙上方向策略由 `OrientationPolicy` 统一决策（形态 + 页面 + 全屏）：
+  /// 离开播放页由路由观察器把策略切到该页面应有的值，销毁时不再单独设方向，
+  /// 避免两处写策略互相覆盖。
   Future<void>? resetScreenRotation() {
+    if (OS.isHarmony) {
+      return null;
+    }
     if (horizontalScreen) {
       return fullMode();
-    } else {
-      // 鸿蒙：部分机型开启系统旋转锁定时 setPreferredOrientations 无法把窗口
-      // 从横屏转回竖屏，用不受锁控制的原生接口强制转回，避免退出全屏卡横屏。
-      if (OS.isHarmony) {
-        return harmonyForcePortrait();
-      }
-      return portraitUpMode();
     }
+    return portraitUpMode();
   }
 
   void onCloseAll() {
@@ -2450,6 +2504,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   LoadingState<VideoShotData>? videoShot;
+  // 悬浮进度条预览的横坐标（-1/未悬浮时为 null）
+  double? hoverDx;
   late final RxBool showPreview = false.obs;
   late final showSeekPreview = Pref.showSeekPreview;
   late final previewIndex = RxnInt();
@@ -2462,15 +2518,31 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     if (videoShot case Success(:final response)) {
       showPreview.value = true;
-      previewIndex.value = max(
+      final index = max(
         0,
         (response.index.where((item) => item <= seconds).length - 2),
       );
+      if (previewIndex.value != index) {
+        previewIndex.value = index;
+      } else if (hoverDx != null) {
+        previewIndex.refresh();
+      }
     }
   }
 
-  void _clearPreview() {
+  void hidePreviewIfNeeded() {
+    if (showSeekPreview) {
+      hidePreview();
+    }
+  }
+
+  void hidePreview() {
+    hoverDx = null;
     showPreview.value = false;
+  }
+
+  void _clearPreview() {
+    hidePreview();
     previewIndex.value = null;
     videoShot = null;
     final seen = <ui.Image>{};
