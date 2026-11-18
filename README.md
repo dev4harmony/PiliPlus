@@ -1,6 +1,12 @@
-# PiliPlus鸿蒙版分支
+# PiliPlus 鸿蒙版分支
+
+<p align="center">
+  <a href="README.md">中文</a> | <a href="README.en.md">English</a>
+</p>
 
 此分支目前主要由[dev4harmony/flutter-dev](https://github.com/orgs/dev4harmony/teams/flutter-dev)维护
+
+- QQ 交流群：**1106472996**
 
 > [!WARNING]
 > 此分支只是将PiliPlus适配到鸿蒙
