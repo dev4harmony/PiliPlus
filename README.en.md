@@ -1,8 +1,6 @@
 # PiliPlus HarmonyOS Branch
 
-<p align="center">
-  <a href="README.md">中文</a> | English
-</p>
+[中文](README.md) | English
 
 This branch is currently maintained by [dev4harmony/flutter-dev](https://github.com/orgs/dev4harmony/teams/flutter-dev).
 
