@@ -567,10 +567,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   late final bool tempPlayerConf = Pref.tempPlayerConf;
 
-  // 统一由 VideoDetailController.queryVideoUrl 按当前链路首次赋值，不再按平台预置。
-  // 上游的 `PlatformUtils.isMobile ? null : ...` 是为了绕开 isWiFi 在桌面恒 false，
-  // 该守卫已在 ConnectivityUtils 中移除。
-  int? cacheVideoQa;
+  late int? cacheVideoQa = PlatformUtils.isMobile || Platform.isLinux
+      ? null
+      : Pref.defaultVideoQa;
   late int cacheAudioQa = Pref.defaultAudioQa;
   bool enableHeart = true;
   late final String? hwdec = Pref.enableHA ? Pref.hardwareDecoding : null;
