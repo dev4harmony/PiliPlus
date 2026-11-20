@@ -7,10 +7,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show clampDouble;
 import 'package:flutter/gestures.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vector_math/vector_math_64.dart' show Quad, Vector3;
 
 class MouseInteractiveViewer extends StatefulWidget {
@@ -98,10 +98,7 @@ class _MouseInteractiveViewerState extends State<MouseInteractiveViewer>
   _GestureType? _gestureType;
 
   static final gestureSettings = DeviceGestureSettings(
-    // 鸿蒙平台使用更小的 touchSlop 以便在与 NestedScrollView 的手势竞争中更快识别
-    touchSlop: Platform.isIOS
-        ? 9
-        : (Platform.operatingSystem == 'ohos' ? 1 : 4),
+    touchSlop: Platform.isIOS ? 9 : 4,
   );
 
   late final ScaleGestureRecognizer _scaleGestureRecognizer;

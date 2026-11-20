@@ -14,11 +14,6 @@ class ImageHorizontalDragGestureRecognizer
     super.allowedButtonsFilter,
   });
 
-  /// 图片查看器保持上游的 `dx > 3·dy`，否则捏合手势（两指轻微水平移动）
-  /// 容易被 [hasSufficientGlobalDistanceToAccept] 判成横滑而抢走缩放。
-  @override
-  double get angleFactor => 3.0;
-
   int? _pointer;
 
   bool _reset = true;

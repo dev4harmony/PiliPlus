@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart'
+    show deviceTouchSlop;
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/models/common/bar_hide_type.dart';
@@ -1131,10 +1133,10 @@ abstract final class Pref {
   static bool get showDynDispute =>
       _setting.get(SettingBoxKey.showDynDispute, defaultValue: false);
 
-  // 竖向滚动 slop 已在 main._builder 统一为 8 逻辑像素（鸿蒙），横向取 12
-  // 时约 34° 以内的滑动可赢得竞技场，横竖手势按主导方向竞争。
-  static double get touchSlopH =>
-      _setting.get(SettingBoxKey.touchSlopH, defaultValue: 12.0);
+  static double get touchSlopH => _setting.get(
+    SettingBoxKey.touchSlopH,
+    defaultValue: deviceTouchSlop + 6.0,
+  );
 
   static bool get saveReply =>
       _setting.get(SettingBoxKey.saveReply, defaultValue: true);
