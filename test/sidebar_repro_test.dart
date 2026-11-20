@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide NavigationDrawer, NavigationDrawerDestination;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart'
+    hide Scaffold, Material, InkWell, InkResponse, Theme, AnimatedTheme;
 
 void main() {
   testWidgets('tablet sidebar reproduces drawer layout assert', (tester) async {

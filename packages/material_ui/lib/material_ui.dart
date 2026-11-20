@@ -14,6 +14,18 @@ export 'package:flutter/material.dart'
         TranslateAnimationSource,
         SelectionArea,
         SelectionAreaState,
+        // 以下改由 compat/ 提供同名实现（构造签名一致），把自适应水波纹注入
+        // 到 SDK 内部控件所在的子树：
+        //   Material/Scaffold → 外层套一层只改 splashFactory 的 Theme
+        //   InkWell/InkResponse → 取 factory 时走 resolveSplashFactory
+        Material,
+        Scaffold,
+        InkWell,
+        InkResponse,
+        // 业务侧 Theme(data: 自建 ThemeData) 会把 splashFactory 重置回
+        // InkRipple，这里一并接管。
+        Theme,
+        AnimatedTheme,
         // 这三个类改由 src/selection_widgets.dart 提供同名实现，构造签名与 SDK
         // 一致但不改 SDK 就让鸿蒙用上「杆 + 球」手柄。
         SelectableText,
@@ -70,7 +82,18 @@ export 'src/selection_widgets.dart';
 // 平台判断与带业务语义的 physics 仍留在 app 侧（scroll_physics.dart）。
 export 'src/arkui_scroll_physics.dart';
 
+// 自适应水波纹（Android 12 InkSparkle 的复刻）。只在「通用默认」被选中时
+// 接管，业务显式选的 InkSparkle/NoSplash 保持原样；shader 未就绪时自动降级
+// 为纯 Canvas 圆。
+export 'src/ripple/adaptive_ink_ripple.dart' show AdaptiveInkRipple;
+export 'src/ripple/splash_policy.dart'
+    show isRippleTarget, kAdaptiveSplashFactory, resolveSplashFactory, withRippleSplash;
+
 // SDK 补丁的等价实现（lib/scripts/*.patch），文件结构与上游 lib/scripts 对应。
+export 'src/compat/material.dart' show Material;
+export 'src/compat/scaffold.dart' show Scaffold;
+export 'src/compat/ink_well.dart' show InkWell, InkResponse;
+export 'src/compat/theme.dart' show AnimatedTheme, Theme;
 export 'src/compat/navigation_drawer.dart';
 export 'src/compat/page_view.dart';
 export 'src/compat/scrollable.dart'
