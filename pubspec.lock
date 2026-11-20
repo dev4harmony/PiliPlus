@@ -1021,10 +1021,10 @@ packages:
     dependency: "direct main"
     description:
       name: intl
-      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
+      sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.20.2"
+    version: "0.20.3"
   io:
     dependency: transitive
     description:
@@ -1150,10 +1150,10 @@ packages:
     dependency: transitive
     description:
       name: matcher
-      sha256: dc0b7dc7651697ea4ff3e69ef44b0407ea32c487a39fff6a4004fa585e901861
+      sha256: "31bd099b47c10cd1aeb55146a2d46ce0277630ecef3f7dae54ad7873f36696cd"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.12.19"
+    version: "0.12.20"
   material_color_utilities:
     dependency: "direct main"
     description:
@@ -1191,7 +1191,7 @@ packages:
     description:
       path: media_kit
       ref: feat-simple-video
-      resolved-ref: a511b11c284a78b83e8f175f75a37eb75f5cc5ee
+      resolved-ref: dd58f5ea1b710ea8a99060daa632070e0c5ddc9a
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.2.3"
@@ -1236,7 +1236,7 @@ packages:
     description:
       path: "libs/ohos/media_kit_libs_ohos"
       ref: feat-simple-video
-      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
+      resolved-ref: dd58f5ea1b710ea8a99060daa632070e0c5ddc9a
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.0.0"
@@ -1245,7 +1245,7 @@ packages:
     description:
       path: "libs/universal/media_kit_libs_video"
       ref: feat-simple-video
-      resolved-ref: "4699a46bef9b8b3f4af550982139af9347ab6304"
+      resolved-ref: dd58f5ea1b710ea8a99060daa632070e0c5ddc9a
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "1.0.7"
@@ -1272,7 +1272,7 @@ packages:
     description:
       path: media_kit_video
       ref: feat-simple-video
-      resolved-ref: a511b11c284a78b83e8f175f75a37eb75f5cc5ee
+      resolved-ref: dd58f5ea1b710ea8a99060daa632070e0c5ddc9a
       url: "https://github.com/HelloZeroNick/media-kit.git"
     source: git
     version: "2.0.1"
@@ -1928,10 +1928,10 @@ packages:
     dependency: transitive
     description:
       name: test_api
-      sha256: "949a932224383300f01be9221c39180316445ecb8e7547f70a41a35bf421fb9e"
+      sha256: "2a122cbe059f8b610d3a5415f42e255b6c17b1f21eee1d960f31080237fb4f11"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.7.11"
+    version: "0.7.12"
   tray_manager:
     dependency: "direct main"
     description:
@@ -2090,10 +2090,10 @@ packages:
     dependency: "direct main"
     description:
       name: vector_math
-      sha256: d530bd74fea330e6e364cda7a85019c434070188383e1cd8d9777ee586914c5b
+      sha256: fa49e1674cb84acb900141714e6c6e1f9ae099827c24d141430ff6819db4e1bc
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "2.2.0"
+    version: "2.4.4"
   video_player:
     dependency: "direct overridden"
     description:
