@@ -11,7 +11,9 @@ import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/stateful_builder.dart';
+import 'package:PiliPlus/harmony_adapt/device/horizontal_layout_mode.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
+import 'package:PiliPlus/harmony_adapt/orientation/orientation_policy.dart';
 import 'package:PiliPlus/models/common/bar_hide_type.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
@@ -69,9 +71,27 @@ List<SettingsModel> get styleSettings => [
     ),
   ],
   if (Platform.isLinux) _useSSDModel(),
-  // 鸿蒙：横屏适配按设备形态自动判定（直板机/小折叠/外屏关闭，折叠内屏与
-  // 平板/2in1 开启），不再提供用户开关；其它平台保持原开关。
-  if (!OS.isHarmony)
+  // 鸿蒙：横屏适配默认按设备形态自动判定，这里只提供「自适应/强制启用/
+  // 强制禁用」三档覆盖；其它平台保持原开关。
+  if (OS.isHarmony)
+    PopupModel(
+      title: '横屏适配模式',
+      leading: const Icon(Icons.phonelink_outlined),
+      value: () => Pref.harmonyHorizontalLayoutMode,
+      items: HorizontalLayoutMode.values,
+      onSelected: (value, setState) {
+        GStorage.setting
+            .put(SettingBoxKey.harmonyHorizontalLayoutMode, value.index)
+            .whenComplete(setState);
+        // 横屏适配值被多处 build 直接读取：同步 FAB 门控与非播放页方向策略，
+        // 再整树重建一次
+        FabSideGate.landscapeAdapt =
+            Pref.harmonyHorizontalLayoutMode == HorizontalLayoutMode.forceOn;
+        OrientationPolicy.onHorizontalLayoutModeChanged();
+        Get.forceAppUpdate();
+      },
+    )
+  else
     SwitchModel(
       title: '横屏适配',
       subtitle: '启用横屏布局与逻辑，平板、折叠屏等可开启；建议全屏方向设为【不改变当前方向】',

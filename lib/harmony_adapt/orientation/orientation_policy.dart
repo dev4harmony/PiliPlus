@@ -1,7 +1,9 @@
 import 'package:PiliPlus/harmony_adapt/device/device_form.dart';
+import 'package:PiliPlus/harmony_adapt/device/horizontal_layout_mode.dart';
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:PiliPlus/harmony_adapt/orientation/harmony_orientation.dart';
 import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:os_type/os_type.dart';
 
@@ -78,16 +80,28 @@ abstract final class OrientationPolicy {
   static HarmonyOrientationPolicy? _applied;
   static bool _initialized = false;
 
+  /// 生效的「播放页按手机竖屏形态处理」：强制启用横屏适配后布局已是横屏，
+  /// 播放页方向应与平板一致，不再按手机形态临时转竖屏。
+  static bool get _effectivePortraitPlayerForm =>
+      _portraitPlayerForm &&
+      Pref.harmonyHorizontalLayoutMode != HorizontalLayoutMode.forceOn;
+
   /// 当前状态下应有的策略。
   static HarmonyOrientationPolicy get current {
-    // 不是手机竖屏播放形态（平板 / 2in1 / 按横屏适配布局的折叠内屏等）：
-    // 任何页面都跟随系统，横屏布局与方向自洽。
-    if (!_portraitPlayerForm) return .followSystem;
-    // 非播放页：只有细长竖屏形态锁竖屏；宽屏手机（Pura X 内屏 / Pura X View /
-    // 阔直板等）仍然允许横屏，即使它们没有开启横屏适配布局。
+    // 非播放页：「横屏适配模式」优先——强制启用允许横屏，强制禁用锁竖屏；
+    // 自适应时只有细长竖屏形态锁竖屏，宽屏手机（Pura X 内屏 / Pura X View /
+    // 阔直板等）与平板仍然允许横屏。
     if (!_onPlayerPage) {
-      return _portraitForm ? .portraitOnly : .followSystem;
+      return switch (Pref.harmonyHorizontalLayoutMode) {
+        HorizontalLayoutMode.forceOn => .followSystem,
+        HorizontalLayoutMode.forceOff => .portraitOnly,
+        HorizontalLayoutMode.adaptive =>
+          _portraitForm ? .portraitOnly : .followSystem,
+      };
     }
+    // 播放页：不是手机竖屏播放形态（平板 / 2in1 / 按横屏适配布局的折叠内屏、
+    // 强制启用横屏适配等）跟随系统，横屏布局与方向自洽。
+    if (!_effectivePortraitPlayerForm) return .followSystem;
     // 竖屏视频（含竖屏直播流）：非全屏与全屏都锁竖向，对齐 B 站。
     if (_videoVertical) return .portraitOnly;
     // 横屏视频非全屏：USER_ROTATION_PORTRAIT —— 进入播放页 / 退出全屏时向
@@ -184,6 +198,9 @@ abstract final class OrientationPolicy {
     _sync();
   }
 
+  /// 横屏适配模式变化：非播放页方向随模式变，重新下发一次策略。
+  static void onHorizontalLayoutModeChanged() => _sync(force: true);
+
   /// 播放器解析出的视频/直播流方向变化。
   ///
   /// 竖屏视频在手机竖屏播放形态设备的播放页整页锁竖向（非全屏与全屏一致），
@@ -202,7 +219,7 @@ abstract final class OrientationPolicy {
     // 状态选策略；其它情况（平板/2in1/横屏布局折叠内屏、竖屏视频、分屏/悬浮窗/
     // 自由多窗）保持原策略，不做额外读取。
     if (value &&
-        _portraitPlayerForm &&
+        _effectivePortraitPlayerForm &&
         !_videoVertical &&
         !WindowFacts.isWindowMode &&
         !WindowFacts.isFreeWindowMode) {
