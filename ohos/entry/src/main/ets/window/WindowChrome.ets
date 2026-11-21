@@ -71,15 +71,21 @@ export class WindowChromeController {
   private lastCollapsed: boolean | null = null;
   /// 标题带当前是否被鼠标唤出（仅自动收起态有意义，见 [setTitleBarRevealed]）。
   private titleBarRevealed: boolean = false;
+  /// 当前下发给系统的 title/dock hover 状态；null 表示尚未下发/需要重发。
+  private titleHoverShown: boolean | null = null;
 
   /// 系统栏状态机：窗口级状态在 [SystemBarsController]，本类只按它的 apply 结果
   /// 收起自绘标题带（`barsHidden`）。由 WindowState 注入，本类不拥有它。
   private systemBars: SystemBarsController | null = null;
 
   private statusCallback = (): void => {
+    // 系统窗口操作（最大化/还原、系统标题栏三键、快捷键等）可能重置 title/dock
+    // hover 策略，进入 sync 前清掉去重值，让自绘标题带接管期间重新关掉系统悬停。
+    this.titleHoverShown = null;
     this.sync();
   };
   private freeCallback = (): void => {
+    this.titleHoverShown = null;
     this.sync();
   };
   /// 登记主窗并开始监听状态变化。
@@ -163,6 +169,7 @@ export class WindowChromeController {
     this.contentFullScreen = false;
     this.lastCollapsed = null;
     this.titleBarRevealed = false;
+    this.titleHoverShown = null;
   }
 
   /// 注入窗口级系统栏状态机（WindowState 持有）。本类只消费它的 apply 结果
@@ -224,6 +231,11 @@ export class WindowChromeController {
     }
     const state = this.getState();
     this.applyDecor(state.isFreeWindowMode);
+    // 装饰栏在 loadContent 之前下发会静默失败；首次 sync 失败后 titleHoverShown
+    // 会是 null，这里在每次 sync 时补一次，避免系统浮动标题栏一直留在开启态。
+    if (state.isFreeWindowMode) {
+      this.setTitleHoverShown(false);
+    }
     // 折叠状态要先算：它由「系统栏隐藏」与「全屏自动收起」共同决定，且要在
     // 下面的去重之前落地（签名不变时也可能只翻转了其中一项）。
     this.applyCollapsed(state.titleBarAutoHide);
@@ -298,9 +310,48 @@ export class WindowChromeController {
         this.decorAppliedForFree = previous;
         this.scheduleDecorRetry();
       }
+      // 系统标题栏虽然隐藏了，但在沉浸/全屏态鼠标到顶部仍会唤出系统浮动
+      // 标题栏。自绘标题带接管期间必须关掉这条 hover 热区。
+      this.setTitleHoverShown(false);
     } else if (previous === true) {
       this.setDecorVisible(true);
       this.setTitleButtonsVisible(true);
+      this.setTitleHoverShown(true);
+    }
+  }
+
+  /// 自绘标题带接管期间关闭（show=false）/交还（show=true）系统标题栏与 dock
+  /// 的顶部悬停唤出。系统标题栏隐藏后，全屏/最大化窗口仍可能在鼠标到顶部时
+  /// 弹出浮动系统标题栏，盖住自绘标题带，这是平板自由多窗下两个标题栏重叠的根因。
+  private setTitleHoverShown(show: boolean): void {
+    if (this.titleHoverShown === show) {
+      return;
+    }
+    this.writeTitleHoverShown(show);
+  }
+
+  /// 强制重下发一次 title/dock hover 状态：maximize(EXIT_IMMERSIVE) 等窗口
+  /// 操作可能把系统的默认 hover 策略带回来，不能只靠去重字段判断。
+  private forceTitleHoverShown(show: boolean): void {
+    this.titleHoverShown = null;
+    this.writeTitleHoverShown(show);
+  }
+
+  private writeTitleHoverShown(show: boolean): void {
+    const win = this.win;
+    if (win === null) {
+      return;
+    }
+    this.titleHoverShown = show;
+    try {
+      win.setTitleAndDockHoverShown(show, show).catch((err: BusinessError) => {
+        this.titleHoverShown = null;
+        console.warn('WindowChrome', `setTitleAndDockHoverShown(${show}) failed: ${err.code} ${err.message}`);
+      });
+    } catch (err) {
+      this.titleHoverShown = null;
+      const e = err as BusinessError;
+      console.warn('WindowChrome', `setTitleAndDockHoverShown(${show}) skipped: ${e.code} ${e.message}`);
     }
   }
 
@@ -479,9 +530,9 @@ export class WindowChromeController {
     if (this.contentFullScreen) {
       return true;
     }
-    const status = this.readStatus();
-    this.statusBeforeFullScreen =
-      status === window.WindowStatusType.MAXIMIZE ? window.WindowStatusType.MAXIMIZE : window.WindowStatusType.FLOATING;
+    // 记录精确的进入前状态（含 FULL_SCREEN），退出时按原状态恢复；
+    // 旧实现对 FULL_SCREEN 一律当 FLOATING，会破坏「先窗口全屏再进视频全屏」。
+    this.statusBeforeFullScreen = this.readStatus();
     this.contentFullScreen = true;
     this.sync();
     try {
@@ -490,6 +541,8 @@ export class WindowChromeController {
       const e = err as BusinessError;
       console.error('WindowChrome', `enter content fullscreen failed: ${e.code} ${e.message}`);
     }
+    this.forceTitleHoverShown(false);
+    this.sync();
     return true;
   }
 
@@ -503,14 +556,18 @@ export class WindowChromeController {
     this.contentFullScreen = false;
     const previous = this.statusBeforeFullScreen;
     this.statusBeforeFullScreen = null;
-    // ENTER_IMMERSIVE_DISABLE_TITLE_AND_DOCK_HOVER 会改掉 hover 策略，退出时复位。
-    try {
-      await this.win?.setTitleAndDockHoverShown(true, true);
-    } catch (err) {
-      const e = err as BusinessError;
-      console.warn('WindowChrome', `reset hover shown failed: ${e.code} ${e.message}`);
-    }
-    if (previous === window.WindowStatusType.MAXIMIZE) {
+    // 恢复到进入视频全屏前的精确窗口状态。MAXIMIZE 按系统规范会保留状态栏，
+    // 这是“最大化”而不是“全屏”；需要无系统栏时应显式进入 FULL_SCREEN。
+    if (previous === window.WindowStatusType.FULL_SCREEN) {
+      try {
+        await this.win?.maximize(
+          window.MaximizePresentation.ENTER_IMMERSIVE_DISABLE_TITLE_AND_DOCK_HOVER,
+        );
+      } catch (err) {
+        const e = err as BusinessError;
+        console.error('WindowChrome', `restore fullscreen failed: ${e.code} ${e.message}`);
+      }
+    } else if (previous === window.WindowStatusType.MAXIMIZE) {
       try {
         await this.win?.maximize(window.MaximizePresentation.EXIT_IMMERSIVE);
       } catch (err) {
@@ -520,6 +577,8 @@ export class WindowChromeController {
     } else {
       await this.recoverSafe();
     }
+    // 仍是自由窗口形态：系统 title/dock hover 保持关闭，由自绘标题带接管。
+    this.forceTitleHoverShown(false);
     this.sync();
     return true;
   }
