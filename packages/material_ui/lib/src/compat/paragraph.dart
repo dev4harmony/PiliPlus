@@ -1571,31 +1571,6 @@ class _SelectableFragment
         );
     }
 
-    // 只对触摸/手写笔生效：鸿蒙 PC 用鼠标从右往左拖选是正常操作（反向选区），
-    // 不能按手柄那样夹住。指针类型由 SelectionPointerTracker 的全局路由记录。
-    final bool isMouseInput =
-        SelectionPointerTracker.instance.lastPointerKind ==
-        PointerDeviceKind.mouse;
-    if (isOhosPlatform &&
-        !isMouseInput &&
-        (event.type == SelectionEventType.startEdgeUpdate ||
-            event.type == SelectionEventType.endEdgeUpdate)) {
-      // 鸿蒙原生选区不允许两端交叉：Flutter 默认允许「反向选区」（两端互换），
-      // 于是可以把右侧手柄一路拖到上一行行首、或把左侧手柄拖到下一行行尾，
-      // 出现「手柄停在完全没有选中内容的行上」。这里把拖动端夹在另一端上。
-      final TextPosition? start = _textSelectionStart;
-      final TextPosition? end = _textSelectionEnd;
-      if (start != null && end != null) {
-        if (event.type == SelectionEventType.endEdgeUpdate) {
-          if (end.offset < start.offset) {
-            _textSelectionEnd = start;
-          }
-        } else if (start.offset > end.offset) {
-          _textSelectionStart = end;
-        }
-      }
-    }
-
     if (existingSelectionStart != _textSelectionStart ||
         existingSelectionEnd != _textSelectionEnd) {
       _didChangeSelection();
@@ -1953,9 +1928,10 @@ class _SelectableFragment
       direction: paragraph.textDirection,
     );
 
-    final TextPosition position = _clampTextPosition(
+    TextPosition position = _clampTextPosition(
       paragraph.getPositionForOffset(adjustedOffset),
     );
+    position = _normalizeBoundaryAffinity(position, isEnd: isEnd);
     _setSelectionPosition(position, isEnd: isEnd);
     if (position.offset == range.end) {
       return SelectionResult.next;
@@ -1968,6 +1944,38 @@ class _SelectableFragment
     // not have a way to get accurate text length if its text is truncated due to
     // layout constraint.
     return SelectionUtils.getResultBasedOnRect(_rect, localPosition);
+  }
+
+  /// 行边界处的端点按原生习惯落位。
+  ///
+  /// 拖手柄时 `getPositionForOffset` 在换行处可能返回「下一行行首」
+  /// （downstream）：止手柄看起来就停在一行**什么都没选中**的行首上；起手柄同理
+  /// 会停在上一行行尾。这里按端点角色固定 affinity：
+  ///
+  /// - 止端（isEnd）贴上一行行尾（upstream）；
+  /// - 起端贴下一行行首（downstream）。
+  ///
+  /// 两端仍然可以交换（反向选区），只是可视化位置落在真正的选区边界上。
+  TextPosition _normalizeBoundaryAffinity(
+    TextPosition position, {
+    required bool isEnd,
+  }) {
+    final Offset downstream = paragraph._getOffsetForPosition(
+      TextPosition(offset: position.offset),
+    );
+    final Offset upstream = paragraph._getOffsetForPosition(
+      TextPosition(offset: position.offset, affinity: TextAffinity.upstream),
+    );
+    if (downstream == upstream) {
+      // 不在行边界：affinity 不影响落点，保持引擎给的值。
+      return position;
+    }
+    return isEnd
+        ? TextPosition(offset: position.offset, affinity: TextAffinity.upstream)
+        : TextPosition(
+            offset: position.offset,
+            affinity: TextAffinity.downstream,
+          );
   }
 
   // This method handles updating the start edge by a text boundary that may
