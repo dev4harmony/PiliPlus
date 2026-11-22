@@ -1571,6 +1571,25 @@ class _SelectableFragment
         );
     }
 
+    if (isOhosPlatform &&
+        (event.type == SelectionEventType.startEdgeUpdate ||
+            event.type == SelectionEventType.endEdgeUpdate)) {
+      // 鸿蒙原生选区不允许两端交叉：Flutter 默认允许「反向选区」（两端互换），
+      // 于是可以把右侧手柄一路拖到上一行行首、或把左侧手柄拖到下一行行尾，
+      // 出现「手柄停在完全没有选中内容的行上」。这里把拖动端夹在另一端上。
+      final TextPosition? start = _textSelectionStart;
+      final TextPosition? end = _textSelectionEnd;
+      if (start != null && end != null) {
+        if (event.type == SelectionEventType.endEdgeUpdate) {
+          if (end.offset < start.offset) {
+            _textSelectionEnd = start;
+          }
+        } else if (start.offset > end.offset) {
+          _textSelectionStart = end;
+        }
+      }
+    }
+
     if (existingSelectionStart != _textSelectionStart ||
         existingSelectionEnd != _textSelectionEnd) {
       _didChangeSelection();
