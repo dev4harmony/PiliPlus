@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart'
     show
         GestureBinding,
         PointerCancelEvent,
+        PointerDeviceKind,
         PointerDownEvent,
         PointerEvent,
         PointerUpEvent;
@@ -59,6 +60,14 @@ class SelectionPointerTracker {
   final Set<int> _downPointers = <int>{};
   bool _tracking = false;
 
+  PointerDeviceKind? _lastPointerKind;
+
+  /// 最近一次指针事件的设备类型；第一次指针事件之前为 null。
+  ///
+  /// 选区相关逻辑（比如「两端不允许交叉」）需要区分鼠标和触摸：鸿蒙 PC 用鼠标
+  /// 从右往左拖选是正常操作（反向选区），不能按触摸手柄那样夹住。
+  PointerDeviceKind? get lastPointerKind => _lastPointerKind;
+
   /// 上一次触发触感时的选中文字，用于过滤「内容没变也回调」。
   ///
   /// 每次有指针新按下时清空：不同控件、不同拖动会话之间不会互相压制。
@@ -87,9 +96,11 @@ class SelectionPointerTracker {
     _tracking = false;
     GestureBinding.instance.pointerRouter.removeGlobalRoute(_route);
     _downPointers.clear();
+    _lastPointerKind = null;
   }
 
   void _route(PointerEvent event) {
+    _lastPointerKind = event.kind;
     if (event is PointerDownEvent) {
       if (_downPointers.isEmpty) {
         _lastText = null;

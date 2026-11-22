@@ -1571,7 +1571,13 @@ class _SelectableFragment
         );
     }
 
+    // 只对触摸/手写笔生效：鸿蒙 PC 用鼠标从右往左拖选是正常操作（反向选区），
+    // 不能按手柄那样夹住。指针类型由 SelectionPointerTracker 的全局路由记录。
+    final bool isMouseInput =
+        SelectionPointerTracker.instance.lastPointerKind ==
+        PointerDeviceKind.mouse;
     if (isOhosPlatform &&
+        !isMouseInput &&
         (event.type == SelectionEventType.startEdgeUpdate ||
             event.type == SelectionEventType.endEdgeUpdate)) {
       // 鸿蒙原生选区不允许两端交叉：Flutter 默认允许「反向选区」（两端互换），
