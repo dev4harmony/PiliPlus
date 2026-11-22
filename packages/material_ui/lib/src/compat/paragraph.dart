@@ -1410,14 +1410,16 @@ class _SelectableFragment
     final int selectionStart = _textSelectionStart!.offset;
     final int selectionEnd = _textSelectionEnd!.offset;
     final bool isReversed = selectionStart > selectionEnd;
-    final Offset startOffsetInParagraphCoordinates = paragraph
-        ._getOffsetForPosition(
-          TextPosition(offset: selectionStart),
-        );
+    // 与 SDK 的差别（见下方 _selectionPointAt）：这里必须用存下来的
+    // [TextPosition]（带 affinity），重建 offset 会丢掉换行处的 upstream/downstream，
+    // 止手柄会从「上一行行尾」跳到「下一行行首」。
+    final Offset startOffsetInParagraphCoordinates = _selectionPointAt(
+      _textSelectionStart!,
+    );
     final Offset endOffsetInParagraphCoordinates =
         selectionStart == selectionEnd
         ? startOffsetInParagraphCoordinates
-        : paragraph._getOffsetForPosition(TextPosition(offset: selectionEnd));
+        : _selectionPointAt(_textSelectionEnd!);
     final bool flipHandles =
         isReversed != (TextDirection.rtl == paragraph.textDirection);
     final TextSelection selection = TextSelection(
@@ -1464,6 +1466,35 @@ class _SelectableFragment
           : SelectionStatus.uncollapsed,
       hasContent: true,
     );
+  }
+
+  /// 选区端点（手柄锚点）在段落内的局部坐标。
+  ///
+  /// SDK 直接用 `_getOffsetForPosition`（= caret 顶部 + 行高），得到的是
+  /// [ui.BoxHeightStyle.max] 意义下的行边界；但本 shim 的选中高亮按
+  /// [ui.BoxHeightStyle.includeLineSpacingMiddle] 的行框绘制（对齐 SelectableText/
+  /// 输入框）。两者在行距 > 1 时相差半个行距：高亮到 29.8，手柄锚点在 27.0，
+  /// 于是非最后一行的左右手柄都会「偏上」；最后一行两者相等，看起来正常。
+  ///
+  /// 这里按 caret 的 y 找到同一行、取 includeLineSpacingMiddle 行框的下沿，
+  /// 让手柄锚点与高亮下沿重合（与 RenderEditable 的
+  /// `getEndpointsForSelection` 行为一致）。
+  Offset _selectionPointAt(TextPosition position) {
+    final Offset caret = paragraph._getOffsetForPosition(position);
+    final String plainText = paragraph.text.toPlainText();
+    if (plainText.isEmpty) {
+      return caret;
+    }
+    final List<TextBox> boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: plainText.length),
+      boxHeightStyle: ui.BoxHeightStyle.includeLineSpacingMiddle,
+    );
+    for (final TextBox box in boxes) {
+      if (box.bottom >= caret.dy - 0.5) {
+        return Offset(caret.dx, box.bottom);
+      }
+    }
+    return caret;
   }
 
   @override
