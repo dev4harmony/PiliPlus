@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart' hide SelectionArea;
-import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:material_ui/src/ohos_selection_theme.dart';
+import 'package:material_ui/src/selection_haptics.dart';
 
 /// 鸿蒙（`TargetPlatform.ohos`）下的文本选择手柄：**杆 + 球**造型。
 ///
@@ -282,48 +282,15 @@ class OhosSelectionHandlePainter extends CustomPainter {
 final TextSelectionControls ohosTextSelectionHandleControls =
     OhosTextSelectionHandleControls();
 
-/// 手柄拖动时的触感反馈，**带节流**。
+/// 拖**手柄**时的触感反馈。
 ///
-/// 对应原生 `RichEditorPattern::StartVibratorByIndexChange`
-/// （`VibratorUtils::StartVibraFeedback("slide")`）：拖手柄每越过一个字符轻震一下。
+/// 手柄拖动的手指必然压在把手上（把手跟着手指走），所以这里按命中盒判断是安全的。
+/// 长按拖选（手指可以滑到文字外）不走这条，由 `selection_haptics.dart` 的
+/// [notifySelectionChanged] 按选区变化驱动；两条路径都汇到
+/// [OhosSelectionHaptics.selectionTick] 的 60ms 节流里，重叠时合并成一次。
 ///
-/// 为什么必须节流：`HapticFeedback.*` 是 method channel 调用，最终落到 OHOS 的振动器
-/// 服务上执行；拖手柄时指针 move 每帧都有（一帧内还可能多次），逐次触发会把平台线程和
-/// 马达刷爆 —— 真机表现就是拖动掉帧。这里限制最短间隔 60ms，观感仍是「一格一格」。
-class OhosSelectionHaptics {
-  const OhosSelectionHaptics._();
-
-  /// 两次轻震之间的最短间隔。
-  static const int intervalMs = 60;
-
-  static final Stopwatch _clock = Stopwatch()..start();
-  static int _lastMs = -intervalMs;
-
-  /// 触发一次选区轻震；距上次不足 [intervalMs] 时直接丢弃。
-  static void selectionTick() {
-    final int now = _clock.elapsedMilliseconds;
-    if (now - _lastMs < intervalMs) {
-      return;
-    }
-    _lastMs = now;
-    HapticFeedback.lightImpact();
-  }
-}
-
-/// 只给「真的在拖手柄」的手势发触感反馈。
-///
-/// 直接对 `Listener.onPointerMove` 每次都震是不行的（第一版就是这么踩的）：
-///
-/// 1. `SelectionOverlay` 的手柄外层是 `Visibility.maintain`，**不可见时仍然可命中**
-///    （`maintainInteractivity` 默认为 true），残留的命中盒会吃到附近的点击与滑动；
-/// 2. 手柄命中盒是 28 × (行高 + 28)，手指在选区端点附近、或者从手柄上滑过去滚页面时，
-///    move 会持续送到这里 —— 真机表现就是「没拖也一直震」。
-///
-/// 所以这里加三重门槛，效果等价于原生「每越过一个字符震一下」：
-///
-/// - 指针位移先超过 [kTouchSlop]（纯点击不震）；
-/// - 手柄**自身位置变了**（= 选区端点/光标真的移动了）；
-/// - 指针此刻仍在手柄范围内（页面滚动时手柄会从手指下方滑走，之后自然不再触发）。
+/// 三重门槛（页面滚动时手柄会从手指下方滑走，不加会「没拖也一直震」）：
+/// 指针位移超过 [kTouchSlop]、手柄自身位置变了、指针仍在手柄范围内。
 class _HapticHandle extends StatefulWidget {
   const _HapticHandle({required this.child});
 
@@ -367,7 +334,7 @@ class _HapticHandleState extends State<_HapticHandle> {
       return;
     }
     final Offset topLeft = box.localToGlobal(Offset.zero);
-    // 手指已经离开手柄（滚动/被别的手势接管）：不震。
+    // 手指已离开手柄（页面滚动/被别的手势接管）：不震。
     if (!(topLeft & box.size).contains(event.position)) {
       return;
     }

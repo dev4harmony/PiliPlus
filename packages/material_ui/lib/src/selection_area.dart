@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as flutter;
 import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/widgets.dart';
 import 'package:material_ui/src/selection_edge_clamp.dart';
+import 'package:material_ui/src/selection_haptics.dart';
 import 'package:material_ui/src/selection_handle.dart';
 import 'package:material_ui/src/selection_magnifier.dart';
 import 'package:material_ui/src/selection_menu.dart';
@@ -65,6 +66,10 @@ class SelectionArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 构建期就开始跟踪指针：必须在任何按下之前注册，否则第一个手势会被误判。
+    if (isOhosPlatform) {
+      SelectionPointerTracker.instance.startTracking();
+    }
     return flutter.SelectionArea(
       focusNode: focusNode,
       // 鸿蒙用「杆 + 球」手柄（见 src/selection_handle.dart）；其它平台保持
@@ -77,7 +82,12 @@ class SelectionArea extends StatelessWidget {
       magnifierConfiguration:
           magnifierConfiguration ??
           (isOhosPlatform ? ohosTextMagnifierConfiguration : null),
-      onSelectionChanged: onSelectionChanged,
+      // 选区内容变化时触发触感：与手指位置无关，只要手还按着就震，
+      // 因此手指滑到文字外/手柄外仍然生效（见 selection_haptics.dart）。
+      onSelectionChanged: (SelectedContent? content) {
+        notifySelectionChanged(content?.plainText);
+        onSelectionChanged?.call(content);
+      },
       // 手柄拖出文字左右边界时，SDK 会把端点吸附到整段的首/尾（见
       // selection_edge_clamp.dart 的说明）。这层容器在事件下发到叶子前把坐标夹回
       // 手指所在那一行，让“整段被选中”变回“选到手指那一行”。

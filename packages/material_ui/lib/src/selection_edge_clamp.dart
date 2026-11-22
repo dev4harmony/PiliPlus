@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:material_ui/src/selection_haptics.dart';
 import 'package:material_ui/src/selection_menu.dart';
 
 /// 把“越界拖拽”的选区边吸附到手指所在那一行，而不是整段的首/尾。
@@ -66,9 +67,14 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
   @override
   SelectionResult dispatchSelectionEvent(SelectionEvent event) {
     final SelectionResult result = super.dispatchSelectionEvent(event);
-    SelectionMenuSelectionCache.record(
-      event is ClearSelectionEvent ? null : getSelectedContent()?.plainText,
-    );
+    final String? text =
+        event is ClearSelectionEvent ? null : getSelectedContent()?.plainText;
+    SelectionMenuSelectionCache.record(text);
+    // 只要是「按压 + 选区内容变化」就轻震：手指滑到文字外/手柄外也生效，
+    // 因为按压状态来自全局指针路由而不是命中测试（见 selection_haptics.dart）。
+    if (event is SelectionEdgeUpdateEvent) {
+      notifySelectionChanged(text);
+    }
     return result;
   }
 

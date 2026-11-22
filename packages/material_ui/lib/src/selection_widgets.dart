@@ -29,6 +29,7 @@ import 'package:flutter/material.dart'
 import 'package:flutter/services.dart'
     show MaxLengthEnforcement, TextInputFormatter;
 
+import 'package:material_ui/src/selection_haptics.dart';
 import 'package:material_ui/src/selection_handle.dart';
 import 'package:material_ui/src/selection_menu.dart';
 import 'package:material_ui/src/selection_platform.dart';
@@ -112,6 +113,23 @@ class SelectableText extends flutter.SelectableText {
   TextSelectionControls? get selectionControls =>
       super.selectionControls ??
       (isOhosPlatform ? ohosTextSelectionHandleControls : null);
+
+  /// 拖选时轻震：与手指是否还在文字上无关，只要手按着且选区在变就震。
+  ///
+  /// 只放行手势类 cause（拖选/长按/双击），工具栏与键盘改选区不震；单击只改光标
+  /// 位置，也不震。
+  @override
+  SelectionChangedCallback? get onSelectionChanged {
+    final SelectionChangedCallback? inner = super.onSelectionChanged;
+    return (TextSelection selection, SelectionChangedCause? cause) {
+      if (cause == SelectionChangedCause.drag ||
+          cause == SelectionChangedCause.longPress ||
+          cause == SelectionChangedCause.doubleTap) {
+        notifySelectionChanged('${selection.baseOffset}:${selection.extentOffset}');
+      }
+      inner?.call(selection, cause);
+    };
+  }
 }
 
 /// 见 [SelectableText]。
@@ -196,6 +214,7 @@ class TextField extends flutter.TextField {
   TextSelectionControls? get selectionControls =>
       super.selectionControls ??
       (isOhosPlatform ? ohosTextSelectionHandleControls : null);
+
 }
 
 /// 见 [SelectableText]。

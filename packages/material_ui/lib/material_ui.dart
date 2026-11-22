@@ -61,6 +61,9 @@ export 'src/selection_edge_clamp.dart';
 export 'src/selection_menu.dart';
 export 'src/selection_handle.dart';
 
+// 选区变化时的触感反馈：按「手是否按着」判定，与手指是否在文字/手柄上无关。
+export 'src/selection_haptics.dart';
+
 // 鸿蒙文本选择体系的真实主题值（手柄/光标/选中高亮/工具栏/放大镜），
 // 取自 openharmony/global_system_resources 的主题 json，来源见文件头注释。
 export 'src/ohos_selection_theme.dart';
