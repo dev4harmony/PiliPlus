@@ -7,7 +7,9 @@ import 'package:PiliPlus/common/widgets/selection_text.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/rich_node_panel.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
+import 'package:PiliPlus/utils/extension/selectable_region_ext.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -86,10 +88,10 @@ Widget content(
                   contextMenuBuilder: text == null || text.isEmpty
                       ? null
                       : (_, state) => dynTextMenuBuilder(
-                        state,
-                        text,
-                        moduleDynamic,
-                      ),
+                          state,
+                          text,
+                          item.modules.moduleDynamic,
+                        ),
                 )
               : custom_text.Text.rich(
                   style: floor == 1

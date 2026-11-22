@@ -76,7 +76,9 @@ class SelectionArea extends StatelessWidget {
       // SDK 按平台自选的结果，不传就用 SDK 的默认值。
       selectionControls: selectionControls ??
           (isOhosPlatform ? ohosTextSelectionHandleControls : null),
-      contextMenuBuilder: contextMenuBuilder ?? _nullSafeContextMenuBuilder,
+      contextMenuBuilder:
+          (BuildContext context, SelectableRegionState state) =>
+              _buildContextMenu(context, state, contextMenuBuilder),
       // 鸿蒙用 112×72 的胶囊镜片（见 src/selection_magnifier.dart）；不传时 SDK 会回落到
       // Material 的 77×38。其它平台保持 null，让 SDK 自己按平台挑。
       magnifierConfiguration:
@@ -102,4 +104,23 @@ Widget _nullSafeContextMenuBuilder(
   SelectableRegionState selectableRegionState,
 ) {
   return buildSelectionContextMenu(context, selectableRegionState);
+}
+
+/// 包一层 [contextMenuBuilder]：构建期间把 state 记进
+/// [SelectionMenuSelectionCache]，让 app 侧（上游写法）构造的
+/// `AdaptiveTextSelectionToolbar` 兼容实现仍能拿到选区几何，画出鸿蒙样式工具栏。
+Widget _buildContextMenu(
+  BuildContext context,
+  SelectableRegionState selectableRegionState,
+  SelectableRegionContextMenuBuilder? builder,
+) {
+  SelectionMenuSelectionCache.beginMenu(selectableRegionState);
+  try {
+    return (builder ?? _nullSafeContextMenuBuilder)(
+      context,
+      selectableRegionState,
+    );
+  } finally {
+    SelectionMenuSelectionCache.endMenu();
+  }
 }

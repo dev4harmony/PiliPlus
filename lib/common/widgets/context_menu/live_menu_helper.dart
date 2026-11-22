@@ -2,32 +2,19 @@ part of 'package:PiliPlus/pages/live_room/superchat/superchat_card.dart';
 
 Widget scMenuBuilder(
   BuildContext context,
-  EditableTextState editableTextState,
+  SelectableRegionState state,
 ) {
-  final buttonItems = ensureSelectionMenuButtons(
-    editableTextState.contextMenuButtonItems,
-    selectedTextOf: () =>
-        editableTextState.textEditingValue.selection.isValid &&
-            !editableTextState.textEditingValue.selection.isCollapsed
-        ? editableTextState.textEditingValue.selection.textInside(
-            editableTextState.textEditingValue.text,
-          )
-        : null,
-    hideToolbar: editableTextState.hideToolbar,
-  );
-  final selection = editableTextState.textEditingValue.selection;
-  final String? text = selection.isValid && !selection.isCollapsed
-      ? selection.textInside(editableTextState.textEditingValue.text)
-      : null;
-  if (text != null && text.isNotEmpty) {
+  final buttonItems = state.contextMenuButtonItems;
+  if (state.isUncollapsed) {
     buttonItems
       ..insertOrAdd(
         3,
         ContextMenuButtonItem(
           label: '视频',
           onPressed: () {
-            editableTextState.hideToolbar();
-            PiliScheme.videoPush(null, text);
+            state.onMenuPressed(
+              (text) => PiliScheme.videoPush(null, text),
+            );
           },
         ),
       )
@@ -36,12 +23,18 @@ Widget scMenuBuilder(
         ContextMenuButtonItem(
           label: '搜索',
           onPressed: () {
-            editableTextState.hideToolbar();
-            Get.toNamed('/searchResult', parameters: {'keyword': text});
+            state.onMenuPressed(
+              (text) => Get.toNamed(
+                '/searchResult',
+                parameters: {'keyword': text},
+              ),
+            );
           },
         ),
       );
   }
-  // 鸿蒙上用原生样式的工具栏；其它平台仍是 Material 菜单。
-  return buildEditableTextSelectionMenuWithItems(editableTextState, buttonItems);
+  return AdaptiveTextSelectionToolbar.buttonItems(
+    buttonItems: buttonItems,
+    anchors: state.contextMenuAnchors,
+  );
 }

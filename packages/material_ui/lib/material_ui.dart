@@ -14,6 +14,9 @@ export 'package:flutter/material.dart'
         TranslateAnimationSource,
         SelectionArea,
         SelectionAreaState,
+        // 改由 src/selection_adaptive_toolbar.dart 提供同名实现（构造签名一致）：
+        // 还原成上游菜单写法后，在这里补「分享」按钮并换成鸿蒙样式工具栏。
+        AdaptiveTextSelectionToolbar,
         // 以下改由 compat/ 提供同名实现（构造签名一致），把自适应水波纹注入
         // 到 SDK 内部控件所在的子树：
         //   Material/Scaffold → 外层套一层只改 splashFactory 的 Theme
@@ -60,6 +63,14 @@ export 'src/selection_edge_clamp.dart';
 // `SelectionMenuConfig` 注入实际动作（见 lib/utils/selection_menu_wiring.dart）。
 export 'src/selection_menu.dart';
 export 'src/selection_handle.dart';
+
+// 上游 `SelectableRegionStateExt`（`lib/utils/extension/selectable_region_ext.dart`）
+// 的等价实现，单独从 package:material_ui/selection_region_ext.dart 导出（不在这里
+// 再转一次），让 app 侧那个文件的 import 与上游一样是必要的。
+//
+// SDK `AdaptiveTextSelectionToolbar` 的同名兼容实现：补「分享」按钮，并在
+// SelectionArea 路径下换成鸿蒙样式工具栏（见 src/selection_adaptive_toolbar.dart）。
+export 'src/selection_adaptive_toolbar.dart';
 
 // 选区变化时的触感反馈：按「手是否按着」判定，与手指是否在文字/手柄上无关。
 export 'src/selection_haptics.dart';

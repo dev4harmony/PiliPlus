@@ -62,11 +62,55 @@ bool _isMobile(TargetPlatform platform) =>
 
 final RegExp _schemeRegex = RegExp(r'[\w\-]+://\S');
 
+/// 只加工「分享」一项。
+///
+/// 上游的业务代码还原后，菜单项由 app 侧自己组（`state.contextMenuButtonItems`
+/// + 各种自定义项 + `addLaunchMenuIfNeeded`），「分享」则由
+/// `src/selection_adaptive_toolbar.dart` 的兼容类在渲染前统一补上，
+/// 因此这里单独拆出来；[ensureSelectionMenuButtons] 仍是「分享 + 打开/站内搜索」
+/// 的组合，供 shim 自己的默认菜单与 `SelectableText`/`TextField` 包装使用。
+List<ContextMenuButtonItem> ensureShareButton(
+  List<ContextMenuButtonItem> buttonItems, {
+  required String? Function() selectedTextOf,
+  required VoidCallback hideToolbar,
+
+  /// 覆盖平台判断，仅供测试；缺省取 [defaultTargetPlatform]。
+  TargetPlatform? platform,
+}) {
+  final TargetPlatform target = platform ?? defaultTargetPlatform;
+  if (!_isMobile(target) || SelectionMenuConfig.shareText == null) {
+    return buttonItems;
+  }
+  // framework 默认的分享项在鸿蒙上无效，先清掉再补自己的。
+  buttonItems.removeWhere((item) => item.type == ContextMenuButtonType.share);
+  final ContextMenuButtonItem share = ContextMenuButtonItem(
+    type: ContextMenuButtonType.share,
+    onPressed: () {
+      final String? text = selectedTextOf();
+      hideToolbar();
+      if (text != null && text.trim().isNotEmpty) {
+        SelectionMenuConfig.shareText?.call(text);
+      }
+    },
+  );
+  // 排在「打开 / 站内搜索」之前：工具栏放不下时尾部项会被收进二级菜单，
+  // 还原上游后这两个项由 app 侧先插好，分享保持在其前面才不会先被收起。
+  final int launchIndex = buttonItems.lastIndexWhere(
+    (item) => item.label == '打开' || item.label == '站内搜索',
+  );
+  if (launchIndex == -1) {
+    buttonItems.add(share);
+  } else {
+    buttonItems.insert(launchIndex, share);
+  }
+  return buttonItems;
+}
+
 /// 把「分享 / 打开 / 站内搜索」三项加工进 `buttonItems`。
 ///
-/// **顺序：全部追加在末尾**（app 注入的项统一排在 SDK 自带项之后），这样系统/框架的
-/// 原生项始终占据工具栏前几位，不会被应用自定义动作挤到折叠区里。三项之间的相对
-/// 顺序是：分享 → 打开/站内搜索。
+/// 供 shim 自己的默认菜单与 `SelectableText` / `TextField` 包装使用。顺序：
+/// SDK 自带项（复制 / 全选…）在前，应用动作在后，分享排在打开/站内搜索之前；
+/// 工具栏放不下时尾部项会被收进二级菜单，这个相对顺序与还原前一致。
 ///
 /// 两个路径（`SelectableText` 的 [EditableTextState] 与 [SelectionArea] 的
 /// [SelectableRegionState]）共用这一份逻辑，保证多端一致。
@@ -78,24 +122,12 @@ List<ContextMenuButtonItem> ensureSelectionMenuButtons(
   /// 覆盖平台判断，仅供测试；缺省取 [defaultTargetPlatform]。
   TargetPlatform? platform,
 }) {
-  final TargetPlatform target = platform ?? defaultTargetPlatform;
-  if (_isMobile(target) && SelectionMenuConfig.shareText != null) {
-    // framework 默认的分享项在鸿蒙上无效，先清掉再补自己的。
-    buttonItems
-      ..removeWhere((item) => item.type == ContextMenuButtonType.share)
-      ..add(
-        ContextMenuButtonItem(
-          type: ContextMenuButtonType.share,
-          onPressed: () {
-            final String? text = selectedTextOf();
-            hideToolbar();
-            if (text != null && text.trim().isNotEmpty) {
-              SelectionMenuConfig.shareText?.call(text);
-            }
-          },
-        ),
-      );
-  }
+  ensureShareButton(
+    buttonItems,
+    selectedTextOf: selectedTextOf,
+    hideToolbar: hideToolbar,
+    platform: platform,
+  );
 
   final String? text = selectedTextOf()?.trim();
   final bool isScheme = text != null && _schemeRegex.hasMatch(text);
@@ -139,6 +171,26 @@ class SelectionMenuSelectionCache {
   static void record(String? text) {
     _plainText = (text == null || text.isEmpty) ? null : text;
   }
+
+  static SelectableRegionState? _currentState;
+
+  /// 正在构建上下文菜单的 [SelectableRegionState]，不在菜单构建期时为 null。
+  ///
+  /// app 侧菜单构造器（上游写法）只会拿到 `state.contextMenuAnchors`，而鸿蒙工具栏
+  /// 需要选区端点、行高等几何信息；[SelectionArea] 在调用 `contextMenuBuilder`
+  /// 期间把 state 记在这里，`AdaptiveTextSelectionToolbar` 的兼容实现构造时取走，
+  /// 从而在不改 app 代码的前提下仍能画出鸿蒙样式的工具栏。
+  static SelectableRegionState? get currentState => _currentState;
+
+  /// 由 [SelectionArea] 在调用 `contextMenuBuilder` 前/后调用。
+  static void beginMenu(SelectableRegionState state) {
+    _currentState = state;
+  }
+
+  /// 见 [beginMenu]。
+  static void endMenu() {
+    _currentState = null;
+  }
 }
 
 /// [SelectionArea] 路径（[SelectableRegionState]）的上下文菜单。
@@ -159,7 +211,7 @@ Widget buildSelectionContextMenu(
     hideToolbar: selectableRegionState.hideToolbar,
   );
   if (isOhosPlatform) {
-    final Widget? ohos = _buildOhosToolbarForRegion(
+    final Widget? ohos = buildOhosToolbarForRegion(
       selectableRegionState,
       buttonItems,
     );
@@ -231,7 +283,7 @@ OhosToolbarAnchors ohosToolbarAnchors({
 
 /// [SelectionArea]（[SelectableRegionState]）路径的鸿蒙工具栏；
 /// 拿不到几何信息时返回 null（退回 Material）。
-Widget? _buildOhosToolbarForRegion(
+Widget? buildOhosToolbarForRegion(
   SelectableRegionState selectableRegionState,
   List<ContextMenuButtonItem> buttonItems,
 ) {

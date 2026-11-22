@@ -5,73 +5,37 @@ void showReplyCopyDialog(
   String message,
   Map<String, Emote> emotes,
 ) {
-  var showEmote = false;
+  bool showEmote = false;
   showDialog(
     context: context,
     builder: (context) => Dialog(
       constraints: const BoxConstraints.tightFor(width: 380),
       child: Padding(
         padding: const .symmetric(horizontal: 20, vertical: 16),
-        child: StatefulBuilder(
-            builder: (context, setState) => SelectionText.rich(
-            showEmote
-                ? TextSpan(
-                    children: emotes.entries.mapIndexed((index, entry) {
-                      final emote = entry.value;
-                      final size = emote.size.toInt() * 25.0;
-                      return TextSpan(
-                        children: [
-                          if (index != 0) const TextSpan(text: '\n\n'),
-                          WidgetSpan(
-                            child: NetworkImgLayer(
-                              src: emote.url,
-                              type: .emote,
-                              width: size,
-                              height: size,
-                            ),
-                          ),
-                          TextSpan(text: '\n${entry.key}\n${emote.url}'),
-                        ],
-                      );
-                    }).toList(),
-                  )
-                : TextSpan(text: message),
-            style: const TextStyle(fontSize: 15, height: 1.7),
-            contextMenuBuilder: (_, state) {
-            String? selectedText() {
-              final value = state.textEditingValue;
-              final selection = value.selection;
-              if (!selection.isValid || selection.isCollapsed) return null;
-              return selection.textInside(value.text);
-            }
-
-            final items = ensureSelectionMenuButtons(
-              state.contextMenuButtonItems,
-              selectedTextOf: selectedText,
-              hideToolbar: state.hideToolbar,
-            );
+        child: SelectionArea(
+          contextMenuBuilder: (_, state) {
+            final buttonItems = state.contextMenuButtonItems;
             if (emotes.isNotEmpty) {
-              items.insertOrAdd(
+              buttonItems.insertOrAdd(
                 3,
                 ContextMenuButtonItem(
                   label: showEmote ? '文本' : '表情',
                   onPressed: () {
-                    state.hideToolbar();
-                    setState(() => showEmote = !showEmote);
+                    state.hideAndClear();
+                    showEmote = !showEmote;
+                    (context as Element).markNeedsBuild();
                   },
                 ),
               );
             }
-            final selected = selectedText();
-            if (selected != null && selected.isNotEmpty) {
-              items.add(
+            state.addLaunchMenuIfNeeded(buttonItems, index: 4);
+            if (state.isUncollapsed) {
+              buttonItems.add(
                 ContextMenuButtonItem(
                   onPressed: () {
-                    state.hideToolbar();
-                    final escapedText = RegExp.escape(selected);
-                    final filterText = ReplyGrpc.enableFilter
-                        ? '|$escapedText'
-                        : escapedText;
+                    String text = RegExp.escape(state.selectedText!);
+                    if (ReplyGrpc.enableFilter) text = '|$text';
+
                     showConfirmDialog(
                       context: context,
                       title: const Text('是否确认评论过滤的变更：'),
@@ -80,7 +44,7 @@ void showReplyCopyDialog(
                           text: ReplyGrpc.replyRegExp.pattern,
                           children: [
                             TextSpan(
-                              text: filterText,
+                              text: text,
                               style: const TextStyle(
                                 color: Colors.green,
                                 fontWeight: .bold,
@@ -90,7 +54,7 @@ void showReplyCopyDialog(
                         ),
                       ),
                       onConfirm: () {
-                        final filter = ReplyGrpc.replyRegExp.pattern + filterText;
+                        final filter = ReplyGrpc.replyRegExp.pattern + text;
                         ReplyGrpc.replyRegExp = RegExp(
                           filter,
                           caseSensitive: true,
@@ -108,10 +72,39 @@ void showReplyCopyDialog(
                 ),
               );
             }
-            // 鸿蒙上用原生样式的工具栏（项多时会折行，不会裁边）；
-            // 其它平台仍是 Material 菜单。动态/直播那两处保持上游不变。
-            return buildEditableTextSelectionMenuWithItems(state, items);
-            },
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              buttonItems: buttonItems,
+              anchors: state.contextMenuAnchors,
+            );
+          },
+          child: SingleChildScrollView(
+            child: Text.rich(
+              showEmote
+                  ? TextSpan(
+                      children: emotes.entries.mapIndexed(
+                        (i, e) {
+                          final emote = e.value;
+                          final size = emote.size.toInt() * 25.0;
+                          return TextSpan(
+                            children: [
+                              if (i != 0) const TextSpan(text: '\n\n'),
+                              WidgetSpan(
+                                child: NetworkImgLayer(
+                                  src: emote.url,
+                                  type: .emote,
+                                  width: size,
+                                  height: size,
+                                ),
+                              ),
+                              TextSpan(text: '\n${e.key}\n${emote.url}'),
+                            ],
+                          );
+                        },
+                      ).toList(),
+                    )
+                  : TextSpan(text: message),
+              style: const TextStyle(fontSize: 15, height: 1.7),
+            ),
           ),
         ),
       ),

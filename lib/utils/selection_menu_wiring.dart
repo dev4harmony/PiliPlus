@@ -7,9 +7,13 @@ import 'package:material_ui/material_ui.dart';
 /// 把 shim 包里的选区菜单动作接到 app 实现上。
 ///
 /// `packages/material_ui` 是被 app 依赖的底层包，不能反过来 import `PiliPlus/...`，
-/// 所以「分享 / 打开链接 / 站内搜索」三个动作由这里注入一次。菜单本身的按钮顺序、
-/// 出现条件（移动端才给分享、带 scheme 才给「打开」）都在 shim 的
-/// `ensureSelectionMenuButtons` 里，多端共用一份逻辑。
+/// 所以「分享 / 打开链接 / 站内搜索」三个动作由这里注入一次：
+///
+/// - 分享：[SelectionMenuConfig.shareText]，由 shim 的兼容
+///   `AdaptiveTextSelectionToolbar` 在渲染前补按钮；
+/// - 打开 / 站内搜索：上游的 `SelectableRegionStateExt.addLaunchMenuIfNeeded`
+///   已经把逻辑搬到了 shim（等价 `lib/scripts/selectable_region.patch`），
+///   这里注入它需要的两个路由动作。
 ///
 /// 调用点：`lib/main.dart` 的 `main()`，`runApp` 之前。
 void configureSelectionMenu() {
