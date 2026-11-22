@@ -120,7 +120,7 @@ class RichText extends MultiChildRenderObjectWidget {
     this.textHeightBehavior,
     this.selectionRegistrar,
     this.selectionColor,
-    required this.primary,
+    this.primary,
     this.onShowMore,
   }) : assert(maxLines == null || maxLines > 0),
        assert(selectionRegistrar == null || selectionColor != null),
@@ -236,7 +236,7 @@ class RichText extends MultiChildRenderObjectWidget {
   /// widgets.
   final Color? selectionColor;
 
-  final Color primary;
+  final Color? primary;
 
   final VoidCallback? onShowMore;
 

@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'dart:ui' show BoxHeightStyle, TextBox;
 
+import 'package:flutter/gestures.dart'
+    show PointerCancelEvent, PointerDeviceKind, PointerDownEvent, PointerUpEvent, kTouchSlop;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:material_ui/src/compat/paragraph.dart' as compat;
 import 'package:material_ui/src/selection_haptics.dart';
 import 'package:material_ui/src/selection_menu.dart';
 
@@ -50,12 +53,12 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
   /// [paragraphsOf] 用来枚举本容器子树里的 [RenderParagraph]；不传则退化成
   /// SDK 原行为（整段吸附）。
   EdgeClampingSelectionContainerDelegate({
-    List<RenderParagraph> Function()? paragraphsOf,
+    List<RenderObject> Function()? paragraphsOf,
   }) : _paragraphsOf = paragraphsOf;
 
-  final List<RenderParagraph> Function()? _paragraphsOf;
+  final List<RenderObject> Function()? _paragraphsOf;
 
-  List<RenderParagraph>? _cachedParagraphs;
+  List<RenderObject>? _cachedParagraphs;
   bool _paragraphsDirty = true;
 
   /// 枚举段落；缓存命中时直接复用。
@@ -63,21 +66,32 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
   /// 段落集合在拖选过程中不会变，逐帧重走整棵子树没有必要；滚动只会改变变换，
   /// 而变换是每次查询时现算的，不影响缓存有效性。段落被卸载（attached 为 false）
   /// 或收到非边缘事件（拖选开始）时重建。
-  List<RenderParagraph> _paragraphs() {
-    final List<RenderParagraph> Function()? provider = _paragraphsOf;
+  List<RenderObject> _paragraphs() {
+    final List<RenderObject> Function()? provider = _paragraphsOf;
     if (provider == null) {
-      return const <RenderParagraph>[];
+      return const <RenderObject>[];
     }
-    final List<RenderParagraph>? cached = _cachedParagraphs;
+    final List<RenderObject>? cached = _cachedParagraphs;
     if (cached != null &&
         !_paragraphsDirty &&
-        cached.every((RenderParagraph paragraph) => paragraph.attached)) {
+        cached.every((RenderObject paragraph) => paragraph.attached)) {
       return cached;
     }
-    final List<RenderParagraph> fresh = provider();
+    final List<RenderObject> fresh = provider();
     _cachedParagraphs = fresh;
     _paragraphsDirty = false;
     return fresh;
+  }
+
+  /// 在 [globalPosition] 处选中整段（触摸三击用）。
+  ///
+  /// SDK 的 `SelectableRegion` 只在精确指针（鼠标）时才在第三次点击调
+  /// `_selectParagraphAt`（见 selectable_region.dart 的三击分支），触摸设备直接跳过。
+  /// 这里由 shim 自己的手势检测补上同一条事件。
+  void selectParagraphAt(Offset globalPosition) {
+    dispatchSelectionEvent(
+      SelectParagraphSelectionEvent(globalPosition: globalPosition),
+    );
   }
 
   @override
@@ -126,7 +140,7 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
     if (event is! SelectionEdgeUpdateEvent) {
       return event;
     }
-    final List<RenderParagraph> paragraphs = _paragraphs();
+    final List<RenderObject> paragraphs = _paragraphs();
     if (paragraphs.isEmpty) {
       return event;
     }
@@ -170,16 +184,17 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
   ///
   /// 只考虑与本块 [block] 有交集的段落 —— 否则夹到别的段落上会把事件挪走，
   /// 打断 SDK 的跨段落遍历。同一 dy 命中多行（并排多栏）时取并集。
-  Rect? _rowAt(List<RenderParagraph> paragraphs, Rect block, double dy) {
+  Rect? _rowAt(List<RenderObject> paragraphs, Rect block, double dy) {
     Rect? row;
-    for (final RenderParagraph paragraph in paragraphs) {
-      if (!paragraph.attached || !paragraph.hasSize) {
+    for (final RenderObject paragraph in paragraphs) {
+      final RenderBox parentBox = paragraph as RenderBox;
+      if (!paragraph.attached || !parentBox.hasSize) {
         continue;
       }
       final Matrix4 transform = paragraph.getTransformTo(null);
       final Rect paragraphRect = MatrixUtils.transformRect(
         transform,
-        Offset.zero & paragraph.size,
+        Offset.zero & parentBox.size,
       );
       if (paragraphRect.right < block.left ||
           paragraphRect.left > block.right ||
@@ -190,14 +205,32 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
       if (dy < paragraphRect.top || dy > paragraphRect.bottom) {
         continue;
       }
-      final int length = paragraph.text.toPlainText().length;
+      final String plainText = switch (paragraph) {
+        RenderParagraph p => p.text.toPlainText(),
+        compat.RenderParagraph p => p.text.toPlainText(),
+        _ => '',
+      };
+      final int length = plainText.length;
       if (length == 0) {
         continue;
       }
-      final List<TextBox> boxes = paragraph.getBoxesForSelection(
-        TextSelection(baseOffset: 0, extentOffset: length),
-        boxHeightStyle: BoxHeightStyle.max,
+      final TextSelection entire = TextSelection(
+        baseOffset: 0,
+        extentOffset: length,
       );
+      // shim 接管 Text 后，业务文本由 compat.RenderParagraph 渲染，
+      // 这里两套段落都要能夹取。
+      final List<TextBox> boxes = switch (paragraph) {
+        RenderParagraph p => p.getBoxesForSelection(
+          entire,
+          boxHeightStyle: BoxHeightStyle.max,
+        ),
+        compat.RenderParagraph p => p.getBoxesForSelection(
+          entire,
+          boxHeightStyle: BoxHeightStyle.max,
+        ),
+        _ => const <TextBox>[],
+      };
       for (final TextBox box in boxes) {
         final Rect globalBox = MatrixUtils.transformRect(transform, box.toRect());
         if (dy < globalBox.top || dy > globalBox.bottom) {
@@ -216,12 +249,12 @@ class EdgeClampingSelectionContainerDelegate extends StaticSelectionContainerDel
   }
 }
 
-/// 收集本子树里的 [RenderParagraph]。
+/// 收集本子树里的段落（SDK 与 shim 的 compat 两套 [RenderParagraph] 都算）。
 class _ParagraphScopeBox extends RenderProxyBox {
   /// 递归遍历子树，把段落收集进 [into]。
-  void collect(List<RenderParagraph> into) {
+  void collect(List<RenderObject> into) {
     void visit(RenderObject node) {
-      if (node is RenderParagraph) {
+      if (node is RenderParagraph || node is compat.RenderParagraph) {
         into.add(node);
       }
       node.visitChildren(visit);
@@ -246,12 +279,29 @@ class _ParagraphScope extends SingleChildRenderObjectWidget {
 ///
 /// 必须是 StatefulWidget：delegate 要在整棵子树生命周期内保持同一个实例
 /// （[SelectionContainer] 用它做 registrar，每帧换实例会不断重注册）。
+///
+/// 另外顺带承担两件 SDK 没给触摸设备做的事：
+///
+/// 1. **三击选整段**：SDK 的 `SelectableRegion` 在第三次点击时只有在精确指针
+///    （鼠标）下才调 `_selectParagraphAt`（`_isPrecisePointerDevice` 只认
+///    `PointerDeviceKind.mouse`），触摸/手写笔直接跳过。这里用 raw `Listener`
+///    自己数三击并下发 `SelectParagraphSelectionEvent`。
+/// 2. 三击后重弹菜单：SDK 的三击分支不会调 `_showToolbar`（双击时弹的菜单是
+///    单词选区的旧内容），这里用 `SelectionOverlay.showToolbar` 按新选区重弹一次。
 class EdgeClampingSelectionScope extends StatefulWidget {
   /// 创建作用域。
-  const EdgeClampingSelectionScope({super.key, required this.child});
+  const EdgeClampingSelectionScope({
+    super.key,
+    required this.child,
+    this.contextMenuBuilder,
+  });
 
   /// 被包裹的子树。
   final Widget child;
+
+  /// 与 [SelectionArea] 的 `contextMenuBuilder` 同一份（含记录 state 的包装），
+  /// 三击选中整段后用它重弹菜单。
+  final Widget Function(BuildContext, SelectableRegionState)? contextMenuBuilder;
 
   @override
   State<EdgeClampingSelectionScope> createState() =>
@@ -264,14 +314,105 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
   late final EdgeClampingSelectionContainerDelegate _delegate =
       EdgeClampingSelectionContainerDelegate(paragraphsOf: _paragraphs);
 
-  List<RenderParagraph> _paragraphs() {
+  List<RenderObject> _paragraphs() {
     final RenderObject? root = _scopeKey.currentContext?.findRenderObject();
     if (root is! _ParagraphScopeBox) {
-      return const <RenderParagraph>[];
+      return const <RenderObject>[];
     }
-    final List<RenderParagraph> out = <RenderParagraph>[];
+    final List<RenderObject> out = <RenderObject>[];
     root.collect(out);
     return out;
+  }
+
+  // ---- 触摸三击选段 ----
+
+  Offset? _downPosition;
+  Duration? _downTime;
+  Offset? _lastTapPosition;
+  Duration? _lastTapTime;
+  int _tapCount = 0;
+
+  /// 嵌套 SelectionArea 时内层先处理，外层在同一轮指针序列里跳过。
+  static int _lastHandledMicros = 0;
+
+  /// 与 SDK 的 `_isPrecisePointerDevice` 相反：非鼠标（触摸/手写笔等）才需要补三击。
+  bool _isTouchLike(PointerDeviceKind kind) => kind != PointerDeviceKind.mouse;
+
+  void _onPointerDown(PointerDownEvent event) {
+    _downPosition = event.position;
+    _downTime = event.timeStamp;
+    final Duration? last = _lastTapTime;
+    if (last != null &&
+        event.timeStamp - last > const Duration(milliseconds: 350)) {
+      _tapCount = 0;
+      _lastTapTime = null;
+      _lastTapPosition = null;
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    final Offset? down = _downPosition;
+    final Duration? downTime = _downTime;
+    _downPosition = null;
+    _downTime = null;
+    if (down == null || downTime == null || !_isTouchLike(event.kind)) {
+      return;
+    }
+    // 拖动 / 长按都不算「击」。
+    if ((event.position - down).distance > kTouchSlop) {
+      return;
+    }
+    if (event.timeStamp - downTime > const Duration(milliseconds: 500)) {
+      return;
+    }
+
+    final Duration? lastTime = _lastTapTime;
+    final Offset? lastPosition = _lastTapPosition;
+    final bool continues =
+        lastTime != null &&
+        lastPosition != null &&
+        event.timeStamp - lastTime <= const Duration(milliseconds: 350) &&
+        (event.position - lastPosition).distance <= kTouchSlop;
+    _tapCount = continues ? _tapCount + 1 : 1;
+    _lastTapTime = event.timeStamp;
+    _lastTapPosition = event.position;
+    if (_tapCount < 3) {
+      return;
+    }
+    _tapCount = 0;
+    _lastTapTime = null;
+    _lastTapPosition = null;
+    _handleTripleTap(event.position);
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _downPosition = null;
+    _downTime = null;
+  }
+
+  void _handleTripleTap(Offset globalPosition) {
+    final int now = DateTime.now().microsecondsSinceEpoch;
+    if (now - _lastHandledMicros < 200000) {
+      return;
+    }
+    _lastHandledMicros = now;
+    // 选中整段：delegate 会把事件下发给子树里的段落，并在 super 之后更新缓存。
+    _delegate.selectParagraphAt(globalPosition);
+
+    final Widget Function(BuildContext, SelectableRegionState)? builder =
+        widget.contextMenuBuilder;
+    final SelectableRegionState? state =
+        context.findAncestorStateOfType<SelectableRegionState>();
+    if (builder == null || state == null) {
+      return;
+    }
+    // ignore: invalid_use_of_visible_for_testing_member
+    final SelectionOverlay? overlay = state.selectionOverlay;
+    // `showToolbar` 内部是 ContextMenuController.show，会替换掉双击时弹出的旧菜单。
+    overlay?.showToolbar(
+      context: context,
+      contextMenuBuilder: (BuildContext ctx) => builder(ctx, state),
+    );
   }
 
   @override
@@ -283,9 +424,14 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
 
   @override
   Widget build(BuildContext context) {
-    return _ParagraphScope(
-      key: _scopeKey,
-      child: SelectionContainer(delegate: _delegate, child: widget.child),
+    return Listener(
+      onPointerDown: _onPointerDown,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: _onPointerCancel,
+      child: _ParagraphScope(
+        key: _scopeKey,
+        child: SelectionContainer(delegate: _delegate, child: widget.child),
+      ),
     );
   }
 }

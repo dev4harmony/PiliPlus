@@ -86,7 +86,7 @@ class RenderParagraph extends RenderBox
     List<RenderBox>? children,
     Color? selectionColor,
     SelectionRegistrar? registrar,
-    required Color primary,
+    Color? primary,
     VoidCallback? onShowMore,
   }) : assert(text.debugAssertIsValid()),
        assert(maxLines == null || maxLines > 0),
@@ -157,7 +157,7 @@ class RenderParagraph extends RenderBox
   /// The text to display.
   InlineSpan get text => _textPainter.text!;
   // ↓↓↓ 适配flutter 3.32.4-ohos-0.0.1
-  set setText(({InlineSpan text, Color primary}) params) {
+  set setText(({InlineSpan text, Color? primary}) params) {
     final value = params.text;
     _primary = params.primary;
     if (_morePainter case final textPainter?) {
@@ -726,7 +726,7 @@ class RenderParagraph extends RenderBox
     );
   }
 
-  Color _primary;
+  Color? _primary;
 
   VoidCallback? _onShowMore;
   set onShowMore(VoidCallback? onShowMore) {
@@ -739,7 +739,8 @@ class RenderParagraph extends RenderBox
   TapGestureRecognizer? _tapGestureRecognizer;
 
   TextSpan _moreTextSpan([TextStyle? style]) => TextSpan(
-    style: (style ?? text.style!).copyWith(color: _primary),
+    // shim 的 Text 不传 primary（通用文本没有主题色），退回文本自身颜色。
+    style: (style ?? text.style!).copyWith(color: _primary ?? style?.color),
     text: '查看更多',
     recognizer: _tapGestureRecognizer,
   );
@@ -767,10 +768,10 @@ class RenderParagraph extends RenderBox
     didOverflowHeight =
         size.height < textSize.height || _textPainter.didExceedMaxLines;
 
-    if (didOverflowHeight) {
-      if (_onShowMore != null) {
-        _tapGestureRecognizer ??= TapGestureRecognizer()..onTap = _onShowMore;
-      }
+    // 只有调用方提供了「查看更多」回调才补这一行：shim 接管后的通用 Text
+    // 在 maxLines 溢出时应当保持 SDK 的省略行为，不能凭空多出「查看更多」。
+    if (didOverflowHeight && _onShowMore != null) {
+      _tapGestureRecognizer ??= TapGestureRecognizer()..onTap = _onShowMore;
       _morePainter ??= TextPainter(
         text: _moreTextSpan(),
         textDirection: textDirection,
@@ -894,7 +895,7 @@ class RenderParagraph extends RenderBox
       context.canvas.restore();
     }
 
-    if (didOverflowHeight) {
+    if (didOverflowHeight && _onShowMore != null) {
       _morePainter?.paint(
         context.canvas,
         offset + Offset(0, _textPainter.height),
@@ -3800,7 +3801,13 @@ class _SelectableFragment
       final Paint selectionPaint = Paint()
         ..style = PaintingStyle.fill
         ..color = paragraph.selectionColor!;
-      for (final TextBox textBox in paragraph.getBoxesForSelection(selection)) {
+      // 与 `EditableText.defaultSelectionHeightStyle`（native 上为
+      // `includeLineSpacingMiddle`）保持一致：SDK 的 RenderParagraph 用 tight，
+      // 高亮会比 SelectableText/输入框矮一截。见文件头与 shim 的 Text。
+      for (final TextBox textBox in paragraph.getBoxesForSelection(
+        selection,
+        boxHeightStyle: ui.BoxHeightStyle.includeLineSpacingMiddle,
+      )) {
         context.canvas.drawRect(textBox.toRect().shift(offset), selectionPaint);
       }
     }

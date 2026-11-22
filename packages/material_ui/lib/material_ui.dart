@@ -29,6 +29,11 @@ export 'package:flutter/material.dart'
         // InkRipple，这里一并接管。
         Theme,
         AnimatedTheme,
+        // 改由 src/compat/text.dart 提供同名实现：内部用 compat RichText
+        // （compat RenderParagraph）渲染，选中高亮高度才能对齐 SDK 的
+        // RenderEditable；否则 SelectionArea 会走 SDK RenderParagraph 的 tight 框，
+        // 高亮比还原前的 SelectableText 矮一截。
+        Text,
         // 这三个类改由 src/selection_widgets.dart 提供同名实现，构造签名与 SDK
         // 一致但不改 SDK 就让鸿蒙用上「杆 + 球」手柄。
         SelectableText,
@@ -122,6 +127,7 @@ export 'src/compat/tabs.dart';
 export 'src/compat/draggable_scrollable_sheet.dart' hide DraggableScrollableController;
 export 'src/compat/paragraph.dart';
 export 'src/compat/rich_text.dart';
+export 'src/compat/text.dart' show Text;
 export 'src/compat/bottom_sheet.dart'
     show
         BottomSheet,

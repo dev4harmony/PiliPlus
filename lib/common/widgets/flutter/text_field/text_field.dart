@@ -23,6 +23,8 @@ import 'package:PiliPlus/common/widgets/flutter/text_field/system_context_menu.d
 import 'package:PiliPlus/common/widgets/flutter/text_field/text_selection.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
     hide
+        // Text 由 material_ui 的兼容实现提供，见 packages/material_ui/src/compat/text.dart
+        Text,
         EditableText,
         EditableTextState,
         EditableTextContextMenuBuilder,

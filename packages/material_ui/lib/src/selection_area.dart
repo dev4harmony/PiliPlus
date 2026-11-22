@@ -93,7 +93,12 @@ class SelectionArea extends StatelessWidget {
       // 手柄拖出文字左右边界时，SDK 会把端点吸附到整段的首/尾（见
       // selection_edge_clamp.dart 的说明）。这层容器在事件下发到叶子前把坐标夹回
       // 手指所在那一行，让“整段被选中”变回“选到手指那一行”。
-      child: EdgeClampingSelectionScope(child: child),
+      child: EdgeClampingSelectionScope(
+        // 三击选中整段后重弹菜单用，和 SDK 的三击分支保持一致所需的 state 包装。
+        contextMenuBuilder: (BuildContext context, SelectableRegionState state) =>
+            _buildContextMenu(context, state, contextMenuBuilder),
+        child: child,
+      ),
     );
   }
 }
