@@ -1,8 +1,16 @@
+import 'dart:async' show scheduleMicrotask;
 import 'dart:math' as math;
 import 'dart:ui' show BoxHeightStyle, TextBox;
 
 import 'package:flutter/gestures.dart'
-    show PointerCancelEvent, PointerDeviceKind, PointerDownEvent, PointerUpEvent, kTouchSlop;
+    show
+        GestureBinding,
+        PointerCancelEvent,
+        PointerDeviceKind,
+        PointerDownEvent,
+        PointerEvent,
+        PointerUpEvent,
+        kTouchSlop;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:material_ui/src/compat/paragraph.dart' as compat;
@@ -284,8 +292,9 @@ class _ParagraphScope extends SingleChildRenderObjectWidget {
 ///
 /// 1. **三击选整段**：SDK 的 `SelectableRegion` 在第三次点击时只有在精确指针
 ///    （鼠标）下才调 `_selectParagraphAt`（`_isPrecisePointerDevice` 只认
-///    `PointerDeviceKind.mouse`），触摸/手写笔直接跳过。这里用 raw `Listener`
-///    自己数三击并下发 `SelectParagraphSelectionEvent`。
+///    `PointerDeviceKind.mouse`），触摸/手写笔直接跳过。这里用**全局指针路由**
+///    自己数三击并下发 `SelectParagraphSelectionEvent`（不能用子树 Listener：
+///    第三击常落在选择手柄上，手柄在 Overlay 里会把命中测试截走）。
 /// 2. 三击后重弹菜单：SDK 的三击分支不会调 `_showToolbar`（双击时弹的菜单是
 ///    单词选区的旧内容），这里用 `SelectionOverlay.showToolbar` 按新选区重弹一次。
 class EdgeClampingSelectionScope extends StatefulWidget {
@@ -326,31 +335,80 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
 
   // ---- 触摸三击选段 ----
 
+  /// 手柄热区（见 selection_handle.dart：横向 28vp、纵向向外 28vp）。
+  static const double _kHandleHotZone = 28.0;
+
+  /// 一次「击」的最大间隔与最长按压时长。
+  static const Duration _kTapInterval = Duration(milliseconds: 350);
+  static const Duration _kTapMaxDuration = Duration(milliseconds: 500);
+
   Offset? _downPosition;
   Duration? _downTime;
   Offset? _lastTapPosition;
   Duration? _lastTapTime;
   int _tapCount = 0;
 
-  /// 嵌套 SelectionArea 时内层先处理，外层在同一轮指针序列里跳过。
-  static int _lastHandledMicros = 0;
-
   /// 与 SDK 的 `_isPrecisePointerDevice` 相反：非鼠标（触摸/手写笔等）才需要补三击。
   bool _isTouchLike(PointerDeviceKind kind) => kind != PointerDeviceKind.mouse;
 
-  void _onPointerDown(PointerDownEvent event) {
-    _downPosition = event.position;
-    _downTime = event.timeStamp;
-    final Duration? last = _lastTapTime;
-    if (last != null &&
-        event.timeStamp - last > const Duration(milliseconds: 350)) {
-      _tapCount = 0;
-      _lastTapTime = null;
-      _lastTapPosition = null;
+  /// 指针是否落在本作用域内（额外放宽手柄热区）。
+  bool _containsGlobalPosition(Offset globalPosition) {
+    final RenderObject? renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox ||
+        !renderObject.attached ||
+        !renderObject.hasSize) {
+      return false;
+    }
+    final Offset local = renderObject.globalToLocal(globalPosition);
+    return (Offset.zero & renderObject.size)
+        .inflate(_kHandleHotZone)
+        .contains(local);
+  }
+
+  void _resetTapSequence() {
+    _tapCount = 0;
+    _lastTapTime = null;
+    _lastTapPosition = null;
+  }
+
+  /// 全局指针路由：**不用**子树里的 `Listener`。
+  ///
+  /// 第三击经常正好落在选择手柄上，而手柄在 Overlay 里，命中测试到它就不再往下走，
+  /// SelectionArea 子树里的 Listener 收不到这一击（表现为「碰到手柄就选不了整段」）。
+  /// 全局路由与命中测试无关，手指在哪里都能收到。
+  void _handleGlobalPointerEvent(PointerEvent event) {
+    if (event is PointerDownEvent) {
+      if (!_containsGlobalPosition(event.position)) {
+        _resetTapSequence();
+        _downPosition = null;
+        _downTime = null;
+        return;
+      }
+      _downPosition = event.position;
+      _downTime = event.timeStamp;
+      final Duration? last = _lastTapTime;
+      if (last != null && event.timeStamp - last > _kTapInterval) {
+        _resetTapSequence();
+      }
+      return;
+    }
+    if (event is PointerUpEvent) {
+      if (!_containsGlobalPosition(event.position)) {
+        _resetTapSequence();
+        _downPosition = null;
+        _downTime = null;
+        return;
+      }
+      _handleTapUp(event);
+      return;
+    }
+    if (event is PointerCancelEvent) {
+      _downPosition = null;
+      _downTime = null;
     }
   }
 
-  void _onPointerUp(PointerUpEvent event) {
+  void _handleTapUp(PointerUpEvent event) {
     final Offset? down = _downPosition;
     final Duration? downTime = _downTime;
     _downPosition = null;
@@ -358,11 +416,10 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
     if (down == null || downTime == null || !_isTouchLike(event.kind)) {
       return;
     }
-    // 拖动 / 长按都不算「击」。
-    if ((event.position - down).distance > kTouchSlop) {
-      return;
-    }
-    if (event.timeStamp - downTime > const Duration(milliseconds: 500)) {
+    // 拖动 / 长按都不算「击」，并把已累计的连击清掉，避免下一次单击被当成第三击。
+    if ((event.position - down).distance > kTouchSlop ||
+        event.timeStamp - downTime > _kTapMaxDuration) {
+      _resetTapSequence();
       return;
     }
 
@@ -371,7 +428,7 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
     final bool continues =
         lastTime != null &&
         lastPosition != null &&
-        event.timeStamp - lastTime <= const Duration(milliseconds: 350) &&
+        event.timeStamp - lastTime <= _kTapInterval &&
         (event.position - lastPosition).distance <= kTouchSlop;
     _tapCount = continues ? _tapCount + 1 : 1;
     _lastTapTime = event.timeStamp;
@@ -379,23 +436,47 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
     if (_tapCount < 3) {
       return;
     }
-    _tapCount = 0;
-    _lastTapTime = null;
-    _lastTapPosition = null;
-    _handleTripleTap(event.position);
+    _resetTapSequence();
+    _enqueueTripleTap(event.position);
   }
 
-  void _onPointerCancel(PointerCancelEvent event) {
-    _downPosition = null;
-    _downTime = null;
-  }
+  /// 同一轮指针事件里可能有多个 SelectionArea 命中（浮层 + 下层页面、嵌套区域），
+  /// 延迟到 microtask 末尾统一裁决：取面积最小的那个（最内层/最上层的区域）。
+  static bool _flushScheduled = false;
+  static final List<(_EdgeClampingSelectionScopeState, Offset)> _pending =
+      <(_EdgeClampingSelectionScopeState, Offset)>[];
 
-  void _handleTripleTap(Offset globalPosition) {
-    final int now = DateTime.now().microsecondsSinceEpoch;
-    if (now - _lastHandledMicros < 200000) {
+  void _enqueueTripleTap(Offset globalPosition) {
+    _pending.add((this, globalPosition));
+    if (_flushScheduled) {
       return;
     }
-    _lastHandledMicros = now;
+    _flushScheduled = true;
+    scheduleMicrotask(_flushTripleTaps);
+  }
+
+  static void _flushTripleTaps() {
+    _flushScheduled = false;
+    if (_pending.isEmpty) {
+      return;
+    }
+    final List<(_EdgeClampingSelectionScopeState, Offset)> candidates =
+        List<(_EdgeClampingSelectionScopeState, Offset)>.of(_pending);
+    _pending.clear();
+    candidates.sort((a, b) => a.$1._area.compareTo(b.$1._area));
+    final (scope, position) = candidates.first;
+    scope._dispatchTripleTap(position);
+  }
+
+  double get _area {
+    final RenderObject? renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return double.infinity;
+    }
+    return renderObject.size.width * renderObject.size.height;
+  }
+
+  void _dispatchTripleTap(Offset globalPosition) {
     // 选中整段：delegate 会把事件下发给子树里的段落，并在 super 之后更新缓存。
     _delegate.selectParagraphAt(globalPosition);
 
@@ -416,7 +497,18 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
   }
 
   @override
+  void initState() {
+    super.initState();
+    GestureBinding.instance.pointerRouter.addGlobalRoute(
+      _handleGlobalPointerEvent,
+    );
+  }
+
+  @override
   void dispose() {
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(
+      _handleGlobalPointerEvent,
+    );
     // SelectionContainer 只负责解绑 _selectionContainerContext，不会 dispose delegate。
     _delegate.dispose();
     super.dispose();
@@ -424,14 +516,9 @@ class _EdgeClampingSelectionScopeState extends State<EdgeClampingSelectionScope>
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: _onPointerDown,
-      onPointerUp: _onPointerUp,
-      onPointerCancel: _onPointerCancel,
-      child: _ParagraphScope(
-        key: _scopeKey,
-        child: SelectionContainer(delegate: _delegate, child: widget.child),
-      ),
+    return _ParagraphScope(
+      key: _scopeKey,
+      child: SelectionContainer(delegate: _delegate, child: widget.child),
     );
   }
 }
