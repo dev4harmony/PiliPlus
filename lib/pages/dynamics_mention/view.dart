@@ -38,31 +38,34 @@ class DynMentionPanel extends StatefulWidget {
   }) async {
     final wasVisible = HarmonyChannel.hdsBarVisible;
     HarmonyChannel.setShellBarsHidden(true);
-    final sheet = await showModalBottomSheet(
-      context: Get.context!,
-      useSafeArea: true,
-      isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxWidth: min(600, MediaQuery.sizeOf(context).shortestSide),
-      ),
-      builder: (context) => TopicDraggableScrollableSheet(
-        expand: false,
-        snap: true,
-        minChildSize: 0,
-        maxChildSize: 1,
-        initialChildSize: offset == 0 ? 0.65 : 1,
-        initialScrollOffset: offset,
-        snapSizes: const [0.65],
-        builder: (context, scrollController) => DynMentionPanel(
-          scrollController: scrollController,
-          onCachePos: onCachePos,
-          top: top,
+    try {
+      // 不要用 .then 包住返回值：那会把弹层的 pop 结果吞成 null，
+      // 调用方拿不到选中的用户，表现为「@ 面板能打开但无法 @ 人」。
+      return await showModalBottomSheet(
+        context: Get.context!,
+        useSafeArea: true,
+        isScrollControlled: true,
+        constraints: BoxConstraints(
+          maxWidth: min(600, MediaQuery.sizeOf(context).shortestSide),
         ),
-      ),
-    ).then((_) {
+        builder: (context) => TopicDraggableScrollableSheet(
+          expand: false,
+          snap: true,
+          minChildSize: 0,
+          maxChildSize: 1,
+          initialChildSize: offset == 0 ? 0.65 : 1,
+          initialScrollOffset: offset,
+          snapSizes: const [0.65],
+          builder: (context, scrollController) => DynMentionPanel(
+            scrollController: scrollController,
+            onCachePos: onCachePos,
+            top: top,
+          ),
+        ),
+      );
+    } finally {
       if (wasVisible) HarmonyChannel.setShellBarsHidden(false);
-    });
-    return sheet;
+    }
   }
 
   @override
