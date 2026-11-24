@@ -2076,6 +2076,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             // 尺寸渲染导致比例错误和动画跳变。
             if (!WindowFacts.isWindowMode && !isVertical) {
               await _waitForLandscapeViewport();
+              // 窗口已是横屏：锁关时切 systemDecided，后续设备继续转到
+              // 竖屏倒置（180°）时窗口保持横屏全屏，不跟回竖屏。
+              OrientationPolicy.onLandscapeSettled();
             }
           } else {
             await changeOrientation(
@@ -2092,18 +2095,23 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             showSystemBar();
           }
           if (OS.isHarmony) {
-            // 退出全屏时人仍在播放页：把「是否全屏」置 false，策略重算为
-            // userPortrait（USER_ROTATION_PORTRAIT）——向系统发一次「临时
-            // 转回竖屏」，让窗口回到竖屏非全屏，避免保持横屏后被自动进全屏
-            // 重新拉回；之后恢复跟随传感器。portraitOnly 由离开播放页的
-            // 路由事件触发。
+            // 退出全屏时人仍在播放页：先把窗口稳定回竖屏，避免保持横屏后被
+            // 自动进全屏重新拉回；稳定后切 systemDecided，保留旋转手机自动
+            // 进全屏的能力，同时不主动转到 180° 反向竖屏。
             _lastFsExitAt = DateTime.now();
-            await OrientationPolicy.setFullScreen(false);
-            // 退出全屏会向系统发一次「临时转回竖屏」：等窗口真正变成竖屏再切
-            // 非全屏布局，否则旋转过程中会先闪一帧横屏非全屏布局。
-            if (!WindowFacts.isWindowMode &&
-                OrientationPolicy.isTemporaryPortrait) {
-              await _waitForPortraitViewport();
+            // 退出全屏先临时锁正向竖屏，把窗口从横屏稳定拉回竖屏；稳定后再切
+            // systemDecided（允许转横屏自动进全屏，且不主动转到 180° 倒立）。
+            OrientationPolicy.beginPortraitStabilization();
+            try {
+              await OrientationPolicy.setFullScreen(false);
+              // 等窗口真正变成竖屏再切非全屏布局，否则旋转过程中会先闪一帧
+              // 横屏非全屏布局。
+              if (!WindowFacts.isWindowMode &&
+                  OrientationPolicy.isStabilizingPortrait) {
+                await _waitForPortraitViewport();
+              }
+            } finally {
+              OrientationPolicy.endPortraitStabilization();
             }
           } else {
             if (orientation == null && mode == .none) {

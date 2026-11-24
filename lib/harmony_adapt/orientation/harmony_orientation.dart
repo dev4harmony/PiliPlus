@@ -1,7 +1,7 @@
 import 'package:PiliPlus/harmony_adapt/harmony_channel.dart';
 import 'package:os_type/os_type.dart';
 
-/// 鸿蒙窗口方向策略（三种），对应 `window.Orientation` 的自动旋转族。
+/// 鸿蒙窗口方向策略（六种），对应 `window.Orientation` 的自动旋转族。
 ///
 /// 方向的决策不在这里，见 `OrientationPolicy`：由「设备形态 + 页面类型 +
 /// 是否全屏」唯一决定，本类只负责把策略下发给原生。
@@ -12,17 +12,29 @@ enum HarmonyOrientationPolicy {
   /// 以及横屏视频全屏中「窗口已经横屏」的状态。
   followSystem('follow'),
 
+  /// `PORTRAIT`（1）：固定正向竖屏，不跟随传感器，也不允许反向竖屏。
+  ///
+  /// 用于手机普通 UI（非播放页、竖屏视频）：这些界面不应在用户把手机倒过来
+  /// （180°）时整个旋转到倒立。注意不要用 `AUTO_ROTATION_PORTRAIT`，后者
+  /// 明确支持 portrait + reverse portrait，仍会跟着 180° 转。
+  portraitFixed('portraitFixed'),
+
   /// `USER_ROTATION_PORTRAIT`（13）：**临时**旋转到竖屏，之后跟随传感器
-  /// （受控制中心旋转锁定控制）。用于手机竖屏播放形态设备（`portraitPlayerForm`，
-  /// 含 Pura X 内屏 / Pura X View / 阔直板等宽屏手机）上「横屏视频、非全屏」
-  /// 的播放页：进入播放页 / 退出全屏时向系统发一次「临时转回竖屏」，让页面
-  /// 落到竖屏非全屏；之后用户转动设备时再跟随。
+  /// （受控制中心旋转锁定控制，允许的方向由系统决定）。仅用于退出全屏时
+  /// 把窗口从横屏稳定拉回竖屏，随后切到 [systemDecided]。
+  ///
+  /// 不能把播放页非全屏长期锁在 `portraitFixed`：窗口永远转不到横屏，
+  /// 播放页非全屏下旋转手机就无法自动进入全屏了。
   userPortrait('userPortrait'),
 
-  /// `AUTO_ROTATION_PORTRAIT`（6）：仅竖向，不受旋转锁定控制。用于细长竖屏
-  /// 形态设备（`portraitForm`：直板机 / 大折叠外屏）的非播放页，以及手机竖屏
-  /// 播放形态设备的竖屏视频（含全屏）。
-  portraitOnly('portraitOnly'),
+  /// `AUTO_ROTATION_UNSPECIFIED`（12）：跟随传感器自动旋转，受控制中心旋转
+  /// 锁定控制，**允许哪些方向由系统决定**（通常不会包含反向前摄朝下的
+  /// 反向竖屏）。
+  ///
+  /// 用于手机播放页的横屏视频非全屏，以及锁关时已经落地的横屏全屏：
+  /// 既能通过转成横屏触发/保持全屏，又不会像 AUTO_ROTATION_RESTRICTED 那样
+  /// 主动转到 180° 反向竖屏，避免设备继续转到竖屏倒置时窗口跟着转回竖屏。
+  systemDecided('systemDecided'),
 
   /// `AUTO_ROTATION_LANDSCAPE`（7）：仅横向两方向，不受旋转锁定控制。用于
   /// 手机竖屏播放形态设备、旋转锁定打开时的横屏视频全屏：180° 翻转跟手，

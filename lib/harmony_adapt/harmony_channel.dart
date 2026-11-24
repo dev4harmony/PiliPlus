@@ -424,7 +424,9 @@ abstract class HarmonyChannel {
       _invoke('setFullScreenBars', {'fullscreen': fullscreen});
 
   /// 设置窗口方向策略，取值见 `HarmonyOrientationPolicy`：
-  /// `follow`（跟随系统）/ `portraitOnly`（仅竖屏）/ `landscapeOnly`（仅横屏）。
+  /// `follow`（跟随系统）/ `portraitFixed`（固定正向竖屏）/
+  /// `userPortrait`（临时竖屏后跟随）/ `systemDecided`（系统决定可转方向）/
+  /// `landscapeOnly`（仅横向两方向）/ `userLandscape`（临时横屏后跟随）。
   ///
   /// 应用侧只声明「这个状态允许哪些方向」，不写固定方向，也不读系统旋转锁。
   static Future<void> setWindowOrientation(String policy) async {

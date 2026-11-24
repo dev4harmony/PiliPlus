@@ -27,23 +27,30 @@ import 'package:os_type/os_type.dart';
 ///
 /// | 形态 | 页面类型 | 视频方向 | 全屏 | 策略 |
 /// | --- | --- | --- | --- | --- |
-/// | 任意 | 非播放页（portraitForm=true） | - | - | [portraitOnly] |
+/// | 任意 | 非播放页（portraitForm=true） | - | - | [portraitFixed] |
 /// | 任意 | 非播放页（portraitForm=false） | - | - | [followSystem] |
 /// | 非 portraitPlayerForm | 播放页 | 任意 | 任意 | [followSystem] |
-/// | portraitPlayerForm | 播放页（视频/直播） | 竖屏视频/竖屏直播流 | 任意 | [portraitOnly] |
-/// | portraitPlayerForm | 播放页 | 横屏视频 | 否 | [userPortrait] |
-/// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁关，窗口已是横屏） | [followSystem] |
+/// | portraitPlayerForm | 播放页（视频/直播） | 竖屏视频/竖屏直播流 | 任意 | [portraitFixed] |
+/// | portraitPlayerForm | 播放页 | 横屏视频 | 否 | [systemDecided] |
+/// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁关，窗口已是横屏） | [systemDecided] |
 /// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁关，窗口是竖屏） | [userLandscape] |
 /// | portraitPlayerForm | 播放页 | 横屏视频 | 是（锁开） | [landscapeOnly] |
 ///
-/// 竖屏视频锁竖向对齐 B 站：不论旋转锁定与设备方向，非全屏与全屏都保持竖向。
-/// 该策略在**进入播放页、视频方向已知时**就生效（由播放器尺寸回调同步），
-/// 不是等进全屏才设，因此转动设备时窗口不会先转过去再被拉回来。
+/// 手机普通 UI 用 [portraitFixed]（`PORTRAIT`，固定正向竖屏），而不是
+/// `AUTO_ROTATION_PORTRAIT`：后者允许 portrait + reverse portrait，用户把手
+/// 机倒过来（180°，前摄在下方）时整个应用会跟着倒立。普通页面和竖屏视频
+/// 固定正向竖屏；横屏视频全屏仍允许 180° 翻转。
 ///
-/// 非全屏横屏视频用 [userPortrait]（USER_ROTATION_PORTRAIT）：进入播放页 /
-/// 退出全屏时向系统发一次「临时转回竖屏」，之后恢复跟随传感器（锁开则不再
-/// 跟随）。因此横置手机进入播放页会先正常落到竖屏非全屏；退出全屏也会先转回
-/// 竖屏，不会被「窗口横屏自动进全屏」再拉回全屏。
+/// 非全屏横屏视频和「锁关时已落地的横屏全屏」都使用 [systemDecided]
+/// （AUTO_ROTATION_UNSPECIFIED）：方向由系统在受旋转锁控制的前提下决定。
+/// 这样用户转成横屏时窗口能变横屏并触发自动进入全屏，但设备继续转到 180°
+/// 反向竖屏时系统通常不会允许反向前摄朝下的方向，窗口保持横屏全屏；
+/// 只有转回正向竖屏才退出全屏。退出全屏时先用 [userPortrait] 临时转回竖屏
+/// 稳定下来，再切 [systemDecided]。
+///
+/// 竖屏视频锁竖向对齐 B 站：不论旋转锁定与设备方向，非全屏与全屏都保持正向
+/// 竖向。该策略在**进入播放页、视频方向已知时**就生效（由播放器尺寸回调同步），
+/// 不是等进全屏才设，因此转动设备时窗口不会先转过去再被拉回来。
 ///
 /// 横屏视频全屏会读一次系统「自动旋转」开关（= 旋转锁定是否关闭）来选择策略：
 /// 锁关时 USER_ROTATION_LANDSCAPE 的四方向跟随同时支持 180° 翻转和转竖屏
@@ -51,7 +58,7 @@ import 'package:os_type/os_type.dart';
 /// AUTO_ROTATION_LANDSCAPE（仅横向两方向、不受锁控制）。
 ///
 /// 退出全屏只是把「是否全屏」置 false，重算结果自然是当前页面应有的策略；
-/// `portraitOnly` 由离开播放页的路由事件触发，不存在「退出全屏该回哪个策略」
+/// `portraitFixed` 由离开播放页的路由事件触发，不存在「退出全屏该回哪个策略」
 /// 的歧义。
 abstract final class OrientationPolicy {
   /// 细长竖屏形态（非播放页锁竖屏 / 启动方向用；原生按屏幕长宽比判定）。
@@ -62,6 +69,10 @@ abstract final class OrientationPolicy {
 
   /// 最上层是否播放页（/videoV、/liveRoom），由 ShellBarsObserver 维护。
   static bool _onPlayerPage = false;
+
+  /// 退出全屏后是否正在用 [userPortrait] 把窗口稳定拉回竖屏。
+  /// 稳定完成后切回 [systemDecided]，恢复横屏自动进全屏能力。
+  static bool _stabilizePortrait = false;
 
   /// 播放器是否处于全屏。
   static bool _fullScreen = false;
@@ -94,21 +105,21 @@ abstract final class OrientationPolicy {
     if (!_onPlayerPage) {
       return switch (Pref.harmonyHorizontalLayoutMode) {
         HorizontalLayoutMode.forceOn => .followSystem,
-        HorizontalLayoutMode.forceOff => .portraitOnly,
+        HorizontalLayoutMode.forceOff => .portraitFixed,
         HorizontalLayoutMode.adaptive =>
-          _portraitForm ? .portraitOnly : .followSystem,
+          _portraitForm ? .portraitFixed : .followSystem,
       };
     }
     // 播放页：不是手机竖屏播放形态（平板 / 2in1 / 按横屏适配布局的折叠内屏、
     // 强制启用横屏适配等）跟随系统，横屏布局与方向自洽。
     if (!_effectivePortraitPlayerForm) return .followSystem;
-    // 竖屏视频（含竖屏直播流）：非全屏与全屏都锁竖向，对齐 B 站。
-    if (_videoVertical) return .portraitOnly;
-    // 横屏视频非全屏：USER_ROTATION_PORTRAIT —— 进入播放页 / 退出全屏时向
-    // 系统发一次「临时转回竖屏」，之后恢复跟随传感器（锁开则不跟随）。
-    // 横置手机进入播放页因此会先正常落到竖屏非全屏；退出全屏也会先转回竖屏，
-    // 避免窗口保持横屏后被「窗口横屏自动进全屏」重新拉回全屏。
-    if (!_fullScreen) return .userPortrait;
+    // 竖屏视频（含竖屏直播流）：非全屏与全屏都锁正向竖向，对齐 B 站。
+    if (_videoVertical) return .portraitFixed;
+    // 横屏视频非全屏：退出全屏后先临时转竖屏稳定，再交给系统决定方向。
+    // 系统决定既能保留「转横屏自动进全屏」，又通常不会转到 180° 反向竖屏。
+    if (!_fullScreen) {
+      return _stabilizePortrait ? .userPortrait : .systemDecided;
+    }
     // 横屏视频全屏：
     // - 旋转锁定关闭：临时转横后恢复四方向跟随（180° 翻转、转回竖屏自动退全屏）
     // - 旋转锁定打开：仅横向两方向跟随（180° 翻转可用，但不会转竖屏退出，
@@ -120,15 +131,31 @@ abstract final class OrientationPolicy {
         !_autoRotateEnabled) {
       return .landscapeOnly;
     }
-    // 窗口已经是横屏时（例如用户转动设备后自动进全屏）不再重新请求旋转，
-    // 避免系统重选横屏方向造成「先左转再 180°」；否则临时转到横屏。
-    return _windowIsLandscape ? .followSystem : .userLandscape;
+    // 窗口已经是横屏时（例如用户转动设备后自动进全屏）交给系统决定方向：
+    // 允许横屏两方向，并通常拒绝 180° 反向竖屏，避免设备继续转到竖屏倒置时
+    // 窗口跟着转回竖屏、退出全屏；否则先临时转到横屏。
+    return _windowIsLandscape ? .systemDecided : .userLandscape;
   }
 
-  /// 当前非全屏播放页是否刚向系统发过「临时转竖屏」（USER_ROTATION_PORTRAIT）。
-  /// 退出全屏后调用方可据此等待窗口真正变成竖屏，再切非全屏布局，避免旋转
-  /// 过程中先闪一帧横屏非全屏布局。
-  static bool get isTemporaryPortrait => current == .userPortrait;
+  /// 退出全屏后是否正在把窗口临时稳定回竖屏。
+  /// 调用方可据此等待窗口真正变成竖屏，再切非全屏布局，避免旋转过程中先闪
+  /// 一帧横屏非全屏布局；稳定完成后切回 systemDecided。
+  static bool get isStabilizingPortrait => _stabilizePortrait;
+
+  /// 退出全屏时开始临时竖屏稳定：先把窗口从横屏拉回竖屏，稳定后调用
+  /// [endPortraitStabilization] 切到 systemDecided。
+  static void beginPortraitStabilization() {
+    if (_stabilizePortrait) return;
+    _stabilizePortrait = true;
+    _sync(force: true);
+  }
+
+  /// 结束临时竖屏稳定，恢复 systemDecided（允许转横屏自动进全屏）。
+  static void endPortraitStabilization() {
+    if (!_stabilizePortrait) return;
+    _stabilizePortrait = false;
+    _sync(force: true);
+  }
 
   /// 当前窗口是否已是横屏。按引擎上报的窗口尺寸判断，不读屏幕方向属性。
   static bool get _windowIsLandscape {
@@ -195,11 +222,20 @@ abstract final class OrientationPolicy {
   static void setPlayerPage(bool value) {
     if (_onPlayerPage == value) return;
     _onPlayerPage = value;
+    if (!value) {
+      _stabilizePortrait = false;
+    }
     _sync();
   }
 
   /// 横屏适配模式变化：非播放页方向随模式变，重新下发一次策略。
   static void onHorizontalLayoutModeChanged() => _sync(force: true);
+
+  /// 进入全屏后窗口已真正变成横屏：重新收口一次策略。
+  ///
+  /// 从竖屏进入全屏时先下发 [userLandscape] 把窗口转横；窗口稳定为横屏后
+  /// 切到 [systemDecided]，后续设备继续转到竖屏倒置时不会跟着转回竖屏。
+  static void onLandscapeSettled() => _sync(force: true);
 
   /// 播放器解析出的视频/直播流方向变化。
   ///
@@ -215,6 +251,10 @@ abstract final class OrientationPolicy {
   static Future<void> setFullScreen(bool value) async {
     if (_fullScreen == value) return;
     _fullScreen = value;
+    if (value) {
+      // 进入全屏后不再需要非全屏的临时竖屏稳定。
+      _stabilizePortrait = false;
+    }
     // 只有「手机竖屏播放形态设备 + 横屏视频全屏 + 非受限窗口」需要按旋转锁定
     // 状态选策略；其它情况（平板/2in1/横屏布局折叠内屏、竖屏视频、分屏/悬浮窗/
     // 自由多窗）保持原策略，不做额外读取。

@@ -277,7 +277,7 @@ export default class EntryAbility extends FlutterAbility {
     // 其余（平板 / 2in1 / 宽屏手机 / 阔折叠 / 折叠内屏）跟随系统。之后 Dart
     // 侧按「形态 + 页面类型 + 是否全屏」继续收口。
     windowState.setWindowOrientation(
-      deviceFormState.isPortraitForm() ? 'portraitOnly' : 'follow'
+      deviceFormState.isPortraitForm() ? 'portraitFixed' : 'follow'
     ).catch((err: BusinessError) => {
       console.error(`set initial orientation failed: ${err.code} ${err.message}`);
     });
