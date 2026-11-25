@@ -274,8 +274,21 @@ abstract final class Pref {
     defaultValue: HwDecType.kHwdec,
   );
 
+  /// mpv 的 `--video-sync`。
+  ///
+  /// 鸿蒙上默认 `audio`：`display-*` 这一族都要求 mpv 知道显示刷新率，而
+  /// 我们的 mpv fork 直到最近才上报 `VOCTRL_GET_DISPLAY_FPS`——在此之前
+  /// 它恒为 `VO_NOTIMPL`，`vo_get_vsync_interval()` 返回 -1，
+  /// `handle_display_sync_frame()` 第一步就早退，于是 `display-resample`
+  /// 只是「看起来配置了」，实际一行都没执行。这种「配置意图与运行时行为
+  /// 不一致」的状态本身是隐患：任何一次 mpv 或系统改动让它突然真正生效，
+  /// 行为就会跳变。
+  ///
+  /// 现在刷新率能拿到了，`display-resample` 会真的按屏幕 vsync 对视频帧
+  /// 做重采样（插帧/丢帧），对弹幕这类叠加内容不友好。要追帧的用户仍可在
+  /// 设置里显式切换，但不该是默认值。
   static String get videoSync =>
-      _setting.get(SettingBoxKey.videoSync, defaultValue: 'display-resample');
+      _setting.get(SettingBoxKey.videoSync, defaultValue: 'audio');
 
   static String get autosync => _setting.get(
     SettingBoxKey.autosync,
