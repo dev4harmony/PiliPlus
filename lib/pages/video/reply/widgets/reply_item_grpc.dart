@@ -674,36 +674,86 @@ class ReplyItemGrpc extends StatelessWidget {
     ColorScheme colorScheme,
     ReplyControl replyControl,
   ) {
-    return custom_text.Text.rich(
-      primary: colorScheme.primary,
-      style: const TextStyle(height: 1.75, fontSize: 14),
-      maxLines: replyLevel == 1 ? replyLengthLimit : null,
-      TextSpan(
-        children: [
-          if (replyControl.isUpTop) ...[
-            const WidgetSpan(
-              alignment: .middle,
-              child: PBadge(
-                text: 'TOP',
-                size: .small,
-                isStack: false,
-                type: .line_primary,
-                fontSize: 9,
-                textScaleFactor: 1,
+    final content = replyControl.showTranslation
+        ? replyItem.translatedContent
+        : replyItem.content;
+    final maxLines = replyLevel == 1 ? replyLengthLimit : null;
+
+    Widget buildMessage({String? message, bool showMore = false}) {
+      return custom_text.Text.rich(
+        primary: colorScheme.primary,
+        style: const TextStyle(height: 1.75, fontSize: 14),
+        TextSpan(
+          children: [
+            if (replyControl.isUpTop) ...[
+              const WidgetSpan(
+                alignment: .middle,
+                child: PBadge(
+                  text: 'TOP',
+                  size: .small,
+                  isStack: false,
+                  type: .line_primary,
+                  fontSize: 9,
+                  textScaleFactor: 1,
+                ),
               ),
+              const TextSpan(text: ' '),
+            ],
+            _buildMessage(
+              context,
+              colorScheme,
+              content,
+              replyControl,
+              message: message,
             ),
-            const TextSpan(text: ' '),
+            if (showMore)
+              TextSpan(
+                text: '\n查看更多',
+                style: TextStyle(color: colorScheme.primary),
+                recognizer: replyReply == null
+                    ? null
+                    : (NoDeadlineTapGestureRecognizer()
+                        ..onTap = () => replyReply!(replyItem, null)),
+              ),
           ],
-          _buildMessage(
-            context,
-            colorScheme,
-            replyControl.showTranslation
-                ? replyItem.translatedContent
-                : replyItem.content,
-            replyControl,
+        ),
+      );
+    }
+
+    if (maxLines == null) {
+      return buildMessage();
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const style = TextStyle(height: 1.75, fontSize: 14);
+        final textPainter = TextPainter(
+          text: TextSpan(text: content.message, style: style),
+          maxLines: maxLines,
+          textDirection: Directionality.of(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        if (!textPainter.didExceedMaxLines) {
+          return buildMessage();
+        }
+        // 截到刚好 maxLines 行，末尾另起一行放「查看更多」；点它进评论详情看全文。
+        final position = textPainter.getPositionForOffset(
+          Offset(
+            textPainter.size.width,
+            textPainter.preferredLineHeight * (maxLines - 0.5),
           ),
-        ],
-      ),
+        );
+        var end = position.offset;
+        if (end > 0 && end < content.message.length) {
+          // 不要把一个 UTF-16 代理对从中间切开。
+          final unit = content.message.codeUnitAt(end - 1);
+          if (unit >= 0xD800 && unit <= 0xDBFF) {
+            end--;
+          }
+        }
+        return buildMessage(
+          message: content.message.substring(0, end),
+          showMore: true,
+        );
+      },
     );
   }
 
@@ -997,8 +1047,9 @@ class ReplyItemGrpc extends StatelessWidget {
     BuildContext context,
     ColorScheme colorScheme,
     Content content,
-    ReplyControl replyControl,
-  ) {
+    ReplyControl replyControl, {
+    String? message,
+  }) {
     final List<InlineSpan> spanChildren = <InlineSpan>[];
     bool hasNote = false;
 
@@ -1091,7 +1142,7 @@ class ReplyItemGrpc extends StatelessWidget {
     }
 
     // 分割文本并处理每个部分
-    content.message.splitMapJoin(
+    (message ?? content.message).splitMapJoin(
       pattern,
       onMatch: (Match match) {
         String matchStr = match[0]!;
