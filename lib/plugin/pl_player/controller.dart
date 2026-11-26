@@ -2076,8 +2076,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             // 尺寸渲染导致比例错误和动画跳变。
             if (!WindowFacts.isWindowMode && !isVertical) {
               await _waitForLandscapeViewport();
-              // 窗口已是横屏：锁关时切 systemDecided，后续设备继续转到
-              // 竖屏倒置（180°）时窗口保持横屏全屏，不跟回竖屏。
+              // 从竖屏强制转横时保持 userLandscape，等下一次传感器变化再跟随；
+              // 已经在横屏的自动全屏才收口 systemDecided，防止前摄朝下转竖屏。
               OrientationPolicy.onLandscapeSettled();
             }
           } else {

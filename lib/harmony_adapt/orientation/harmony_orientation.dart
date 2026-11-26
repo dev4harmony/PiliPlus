@@ -30,8 +30,8 @@ enum HarmonyOrientationPolicy {
   /// `AUTO_ROTATION_UNSPECIFIED`（12）：跟随传感器自动旋转，受控制中心旋转
   /// 锁定控制，**允许哪些方向由系统决定**（直板机不包含反向竖屏）。
   ///
-  /// 用于锁关时已经落地的横屏全屏：允许横屏两方向与正向竖屏，不会像
-  /// AUTO_ROTATION_RESTRICTED 那样转到 180° 反向竖屏而误退出全屏。
+  /// 用于锁关且进入全屏时窗口已是横屏的场景：允许横屏两方向与正向竖屏，
+  /// 不会像 AUTO_ROTATION_RESTRICTED 那样转到 180° 反向竖屏而误退出全屏。
   systemDecided('systemDecided'),
 
   /// `AUTO_ROTATION_LANDSCAPE`（7）：仅横向两方向，不受旋转锁定控制。用于
@@ -39,10 +39,10 @@ enum HarmonyOrientationPolicy {
   /// 但窗口不会转竖屏退出（只能点按钮退出）。
   landscapeOnly('landscapeOnly'),
 
-  /// `USER_ROTATION_LANDSCAPE`（14）：**临时**旋转到横屏，之后跟随传感器
-  /// （受控制中心旋转锁定控制）。用于手机竖屏播放形态设备的横屏视频全屏：
-  /// - 旋转锁关闭：转到竖屏时窗口跟着转回竖屏 → 触发自动退出全屏；
-  /// - 旋转锁打开：不再跟随传感器，保持横屏，只能点按钮退出。
+  /// `USER_ROTATION_LANDSCAPE`（14）：先临时旋转到横屏，之后跟随传感器
+  /// （受控制中心旋转锁定控制，允许方向由系统决定）。用于手机从竖屏进入
+  /// 横屏视频全屏：窗口转横后仍保持该策略，等下一次传感器变化再跟随；
+  /// 直板机不允许反向竖屏，因此前摄朝下时仍保持横屏全屏。
   userLandscape('userLandscape');
 
   const HarmonyOrientationPolicy(this.value);

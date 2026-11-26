@@ -42,21 +42,22 @@ import 'package:os_type/os_type.dart';
 /// 固定正向竖屏；横屏视频全屏仍允许 180° 翻转。
 ///
 /// 非全屏横屏视频保持 [userPortrait]（USER_ROTATION_PORTRAIT）：进入播放页 /
-/// 退出全屏时先转回正向竖屏，之后等下一次传感器变化再跟随，用户再次转横时
-/// 仍能自动进入全屏。尤其不能在退出后视口刚变竖屏时补发 [systemDecided]：
-/// 设备仍横置时系统会立即重新转横，形成「横屏非全屏 + 系统状态栏」。
-/// 该策略后续可转方向同样由系统判定，直板机不包含 180° 反向竖屏。
+/// 退出全屏时先转回正向竖屏，之后等下一次传感器变化再跟随。不能在视口刚变
+/// 竖屏时补发 [systemDecided]，否则设备仍横置时会立即重新转横。
 ///
-/// 锁关且已落地的横屏全屏使用 [systemDecided]（AUTO_ROTATION_UNSPECIFIED），
-/// 允许横屏两方向与正向竖屏，但不转到反向竖屏，避免设备倒置时误退出全屏。
+/// 从竖屏进入的横屏全屏保持 [userLandscape]（USER_ROTATION_LANDSCAPE）：窗口
+/// 转横后也等下一次传感器变化再跟随，避免竖向正置的手机刚进全屏就被拉回竖屏。
+/// 从横屏自动进入全屏时使用 [systemDecided]（AUTO_ROTATION_UNSPECIFIED）。
+/// 两种策略在直板机上都不包含反向竖屏，前摄朝下时保持横屏全屏；转回正向竖屏
+/// 才自动退出全屏。
 ///
 /// 竖屏视频锁竖向对齐 B 站：不论旋转锁定与设备方向，非全屏与全屏都保持正向
 /// 竖向。该策略在**进入播放页、视频方向已知时**就生效（由播放器尺寸回调同步），
 /// 不是等进全屏才设，因此转动设备时窗口不会先转过去再被拉回来。
 ///
 /// 横屏视频全屏会读一次系统「自动旋转」开关（= 旋转锁定是否关闭）来选择策略：
-/// 锁关时从竖屏进入先下发 USER_ROTATION_LANDSCAPE，落地后切 systemDecided；
-/// 锁开时用 AUTO_ROTATION_LANDSCAPE（仅横向两方向、不受锁控制）。
+/// 锁关时按进入全屏前的窗口方向选择上述策略；锁开时用
+/// AUTO_ROTATION_LANDSCAPE（仅横向两方向、不受锁控制）。
 ///
 /// 退出全屏只把「是否全屏」置 false，横屏视频据此重算为 userPortrait，不再
 /// 额外补发自动旋转策略；portraitFixed 由离开播放页的路由事件触发。
@@ -72,6 +73,12 @@ abstract final class OrientationPolicy {
 
   /// 播放器是否处于全屏。
   static bool _fullScreen = false;
+
+  /// 是否从竖屏请求进入横屏全屏，需要保持 [userLandscape]。
+  ///
+  /// 窗口转横不能作为清除条件：设备仍竖向正置时立即切自动旋转，会被系统
+  /// 马上拉回竖屏。保持临时横屏策略，下一次传感器变化再跟随。
+  static bool _keepUserLandscape = false;
 
   /// 当前播放的视频/直播流是否为竖屏（由播放器解析尺寸后同步）。
   static bool _videoVertical = false;
@@ -115,8 +122,8 @@ abstract final class OrientationPolicy {
     // 改发 systemDecided，否则设备仍横置时系统会马上再次转横。
     if (!_fullScreen) return .userPortrait;
     // 横屏视频全屏：
-    // - 旋转锁定关闭：临时转横后跟随系统决定的三向旋转（180° 横向翻转、
-    //   转回正向竖屏自动退全屏，不转到反向竖屏）
+    // - 旋转锁定关闭：从竖屏进入时保持临时横屏；从横屏进入时跟随系统决定的
+    //   三向旋转。两者都允许横向 180° 翻转，不转到反向竖屏。
     // - 旋转锁定打开：仅横向两方向跟随（180° 翻转可用，但不会转竖屏退出，
     //   只能点按钮退出）
     // 受限窗口（分屏/悬浮窗/自由多窗）里系统忽略方向策略，保持原逻辑，不按
@@ -126,9 +133,10 @@ abstract final class OrientationPolicy {
         !_autoRotateEnabled) {
       return .landscapeOnly;
     }
-    // 窗口已经是横屏时（例如用户转动设备后自动进全屏）交给系统决定方向：
-    // 允许横屏两方向，并通常拒绝 180° 反向竖屏，避免设备继续转到竖屏倒置时
-    // 窗口跟着转回竖屏、退出全屏；否则先临时转到横屏。
+    // 从竖屏点击全屏后，窗口尺寸已经变横也不能立刻改发 systemDecided。
+    if (_keepUserLandscape) return .userLandscape;
+    // 已经是横屏时（例如用户转动设备后自动进全屏）交给系统决定方向，避免
+    // 重选横屏默认朝向；否则先临时转横。
     return _windowIsLandscape ? .systemDecided : .userLandscape;
   }
 
@@ -207,11 +215,15 @@ abstract final class OrientationPolicy {
   /// 横屏适配模式变化：非播放页方向随模式变，重新下发一次策略。
   static void onHorizontalLayoutModeChanged() => _sync(force: true);
 
-  /// 进入全屏后窗口已真正变成横屏：重新收口一次策略。
+  /// 进入全屏后窗口已真正变成横屏：按进入前的窗口方向收口策略。
   ///
-  /// 从竖屏进入全屏时先下发 [userLandscape] 把窗口转横；窗口稳定为横屏后
-  /// 切到 [systemDecided]，后续设备继续转到竖屏倒置时不会跟着转回竖屏。
-  static void onLandscapeSettled() => _sync(force: true);
+  /// 从竖屏进入且旋转锁关闭时保持 [userLandscape]，否则竖向正置的设备会被
+  /// 自动旋转立即拉回竖屏。原本已在横屏的全屏切到 [systemDecided]，避免设备
+  /// 前摄朝下时转到反向竖屏。
+  static void onLandscapeSettled() {
+    if (_keepUserLandscape && _autoRotateEnabled) return;
+    _sync(force: true);
+  }
 
   /// 播放器解析出的视频/直播流方向变化。
   ///
@@ -226,6 +238,15 @@ abstract final class OrientationPolicy {
   /// 播放器进出全屏；返回策略下发完成的 Future，供进入全屏后等待转向。
   static Future<void> setFullScreen(bool value) async {
     if (_fullScreen == value) return;
+    // 必须在请求转屏前记录窗口方向。窗口一旦变横，才据此判断是否刚进入全屏，
+    // 就无法区分「从竖屏强制转横」和「用户转横后自动进入全屏」。
+    _keepUserLandscape =
+        value &&
+        _effectivePortraitPlayerForm &&
+        !_videoVertical &&
+        !WindowFacts.isWindowMode &&
+        !WindowFacts.isFreeWindowMode &&
+        !_windowIsLandscape;
     _fullScreen = value;
     // 只有「手机竖屏播放形态设备 + 横屏视频全屏 + 非受限窗口」需要按旋转锁定
     // 状态选策略；其它情况（平板/2in1/横屏布局折叠内屏、竖屏视频、分屏/悬浮窗/
