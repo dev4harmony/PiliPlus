@@ -1405,6 +1405,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       fontSize: 12,
     );
     final isLive = plPlayerController.isLive;
+    final fullBleedContent = widget.videoDetailController != null;
 
     final child = Stack(
       fit: StackFit.passthrough,
@@ -1420,6 +1421,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                 context,
                 isFullScreen: isFullScreen,
                 removeSafeArea: plPlayerController.removeSafeArea,
+                fullBleedContent: fullBleedContent,
               ),
               child: danmaku,
             ),
@@ -1667,6 +1669,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                     controller: _animationController,
                     isFullScreen: isFullScreen,
                     removeSafeArea: plPlayerController.removeSafeArea,
+                    fullBleedContent: fullBleedContent,
                     child: plPlayerController.isDesktopPip
                         ? GestureDetector(
                             behavior: HitTestBehavior.translucent,
@@ -1680,6 +1683,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                     controller: _animationController,
                     isFullScreen: isFullScreen,
                     removeSafeArea: plPlayerController.removeSafeArea,
+                    fullBleedContent: fullBleedContent,
                     child:
                         widget.bottomControl ??
                         BottomControl(

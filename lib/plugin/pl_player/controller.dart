@@ -980,7 +980,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       // 初始化数据加载状态
       dataStatus.value = DataStatus.loading;
       // 初始化全屏方向
-      _isVertical = isVertical ?? false;
+      this.isVertical = isVertical ?? false;
       _aid = aid;
       _bvid = bvid;
       this.cid = cid;

@@ -515,6 +515,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       return;
     }
 
+    if (OS.isHarmony) {
+      // 播放器跨页面复用，返回时先恢复本页视频方向，避免沿用下一页状态。
+      videoDetailController.plPlayerController.isVertical =
+          videoDetailController.isVertical.value;
+    }
+
     // 从覆盖页面返回播放页时重新进入沉浸模式：移除安全边距（页面级沉浸）
     // 或仍处于全屏（全屏沉浸）时恢复隐藏
     if (videoDetailController.removeSafeArea || isFullScreen) {
@@ -619,7 +625,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   bool removeAppBar(bool isFullScreen) =>
       videoDetailController.removeSafeArea ||
-      (OS.isHarmony && WindowFacts.isWindowMode && isFullScreen) ||
+      (OS.isHarmony && isFullScreen) ||
       (isWindowMode && isFullScreen && !isPortrait);
 
   Widget get childWhenDisabled {
@@ -1443,6 +1449,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                         isFullScreen: plPlayerController!.isFullScreen.value,
                         isFileSource: videoDetailController.isFileSource,
                         size: Size(width, height),
+                        fullBleedContent: true,
                       ),
                     ),
               showEpisodes: showEpisodes,
@@ -1464,11 +1471,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   /// 显现导致画面下移。null 表示未捕获到（如移除安全边距场景），退化为 0。
   double? _fixedTopInset;
 
-  /// 鸿蒙受限窗口（分屏/自由多窗/悬浮窗）内没有系统状态栏，但引擎仍会上报
-  /// 设备状态栏高度。仅在全屏时顶部安全区应被移除（视频铺满窗口、plplayer
-  /// 顶部控件/弹幕不再避让），非全屏仍按正常布局避让，故只作用于全屏路径。
-  bool get _harmonyFullscreenNoSafeArea =>
-      OS.isHarmony && WindowFacts.isWindowMode && isFullScreen;
+  /// 鸿蒙全屏时画面本身铺满窗口，不再通过页面顶部黑色占位避让安全区；
+  /// 顶部播控和弹幕仍通过 harmonyDecorTopInset 单独避让。非全屏布局不变。
+  bool get _harmonyFullscreenNoSafeArea => OS.isHarmony && isFullScreen;
 
   /// 「左视频 + 右侧栏」的横屏布局（childWhenDisabledLandscape）是否生效。
   bool get _usesLandscapeLayout =>

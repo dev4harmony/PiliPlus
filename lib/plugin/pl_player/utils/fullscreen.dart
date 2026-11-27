@@ -10,22 +10,20 @@ import 'package:flutter/services.dart'
 import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:os_type/os_type.dart';
 
-/// 鸿蒙：窗口化（小窗/分屏/自由窗口）全屏且未移除播放页安全边距时，原生
-/// 装饰（状态栏/挖孔/自绘标题带）合并出的顶部安全区（逻辑像素，已按
-/// uiScale 换算）。
+/// 鸿蒙全屏且未移除播放页安全边距时，播控和弹幕的顶部避让值（逻辑像素，
+/// 已按 uiScale 换算）。原生避让包含状态栏、挖孔和自由窗口自绘标题带。
 ///
-/// 原生侧已把自由窗口标题带并进顶部上报，[HarmonyChannel.rootTopInset] 即
-/// 「播放器顶部必须让出的高度」。普通全屏页面自身已有黑边占位（上游行为），
-/// 不在此重复让位。
+/// [fullBleedContent] 表示画面本身已铺满窗口：普通全屏也返回避让值，仅让
+/// 覆盖层下移。为 false 时保留普通页面自身已有顶部占位的旧行为，避免重复
+/// 避让；窗口化全屏仍沿用原有避让逻辑。
 ///
 /// [allowRevealedTitleBar] 供播控顶栏使用：自由窗口全屏下鼠标唤出自绘标题带时，
-/// 原生会把标题带高度并进顶部安全区（见 ArkTS WindowState.readSafeArea），
-/// 顶栏据此整体下移一条标题带的高度，避免被呼出的标题带盖住点不到。
-/// 弹幕等其它消费方保持 false，避免唤出/收回时整片弹幕跳动。
+/// 顶栏跟着下移，弹幕等其它消费方保持 false，避免唤出/收回时整片弹幕跳动。
 double? harmonyDecorTopInset(
   BuildContext context, {
   required bool isFullScreen,
   required bool removeSafeArea,
+  bool fullBleedContent = false,
   bool allowRevealedTitleBar = false,
 }) {
   if (!OS.isHarmony || !isFullScreen || removeSafeArea) {
@@ -34,7 +32,7 @@ double? harmonyDecorTopInset(
   final windowMode = WindowFacts.isWindowMode;
   final revealedTitleBar =
       allowRevealedTitleBar && WindowFacts.titleBarRevealed;
-  if (!windowMode && !revealedTitleBar) {
+  if (!fullBleedContent && !windowMode && !revealedTitleBar) {
     return null;
   }
   final inset = HarmonyChannel.rootTopInset(context);

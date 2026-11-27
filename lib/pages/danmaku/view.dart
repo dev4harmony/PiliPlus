@@ -20,6 +20,7 @@ class PlDanmaku extends StatefulWidget {
   final bool isFullScreen;
   final bool isFileSource;
   final Size size;
+  final bool fullBleedContent;
 
   const PlDanmaku({
     super.key,
@@ -29,6 +30,7 @@ class PlDanmaku extends StatefulWidget {
     required this.isFullScreen,
     required this.isFileSource,
     required this.size,
+    this.fullBleedContent = false,
   });
 
   @override
@@ -175,12 +177,13 @@ class _PlDanmakuState extends State<PlDanmaku> {
       notFullscreen: widget.notFullscreen,
       speed: playerController.playbackSpeed,
     );
-    // 与顶部控件共用同一套顶部避让（鸿蒙窗口化全屏原生安全区），
-    // 并把可视高度同步减去，让弹幕轨道按缩小后的区域正确排布
+    // 与顶部控件共用同一套顶部避让，并把可视高度同步减去，让弹幕轨道按
+    // 缩小后的区域正确排布；非全屏或普通未铺满布局不额外避让。
     final inset = harmonyDecorTopInset(
       context,
       isFullScreen: widget.isFullScreen,
       removeSafeArea: playerController.removeSafeArea,
+      fullBleedContent: widget.fullBleedContent,
     );
     final danmakuSize = inset == null
         ? widget.size
