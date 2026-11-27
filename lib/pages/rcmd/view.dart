@@ -22,23 +22,33 @@ class RcmdPage extends StatefulWidget {
 }
 
 class _RcmdPageState extends State<RcmdPage>
-    with AutomaticKeepAliveClientMixin {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final controller = Get.put(RcmdController());
 
   Worker? _fillWorker;
+  bool _fillScheduled = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     controller.scrollController.addListener(_onScroll);
-    // 大屏多列下一页数据可能填不满视口：此时列表不可滚动，_onScroll 永远不会
-    // 触发，页面就一直空着下半屏，只有手动下拉刷新才会变多。每次数据变化后
-    // 补一次判断，不可滚动就继续拉下一页，直到出现可滚动区域。
+    // 大屏多列下一页数据可能填不满视口，列表没有可滚动距离时 _onScroll 不会
+    // 触发。首帧、数据变化和窗口尺寸变化都补一次检查，直到出现可滚动区域。
     _fillWorker = ever(controller.loadingState, (_) => _fillViewport());
+    _fillViewport();
+  }
+
+  @override
+  void didChangeMetrics() {
+    _fillViewport();
   }
 
   void _fillViewport() {
+    if (_fillScheduled) return;
+    _fillScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
+      _fillScheduled = false;
       if (!mounted || controller.isLoading) return;
       // 只在已有数据时续拉：错误态下列表同样不可滚动，重试交给 HttpError
       if (controller.loadingState.value.dataOrNull?.isNotEmpty != true) return;
@@ -62,6 +72,7 @@ class _RcmdPageState extends State<RcmdPage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _fillWorker?.dispose();
     controller.scrollController.removeListener(_onScroll);
     super.dispose();
