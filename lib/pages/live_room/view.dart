@@ -14,6 +14,7 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/harmony_adapt/window/window_facts.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models/common/live/live_contribution_rank_type.dart';
 import 'package:PiliPlus/models_new/live/live_room_info_h5/data.dart';
@@ -268,6 +269,33 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   bool isWindowMode = false;
   late EdgeInsets padding;
   late bool isPortrait;
+  bool _windowWasLandscapeInFullScreen = false;
+
+  void _syncHarmonyFullScreen() {
+    if (!OS.isHarmony ||
+        Pref.horizontalScreen ||
+        WindowFacts.isWindowMode ||
+        WindowFacts.isFreeWindowMode) {
+      return;
+    }
+    final enterFullScreen =
+        !isPortrait &&
+        !isFullScreen &&
+        !plPlayerController.suppressAutoFullScreen;
+    final exitFullScreen =
+        isPortrait &&
+        isFullScreen &&
+        _windowWasLandscapeInFullScreen &&
+        !plPlayerController.controlsLock.value;
+    if (!enterFullScreen && !exitFullScreen) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      plPlayerController.triggerFullScreen(
+        status: enterFullScreen,
+        isManualFS: false,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -453,6 +481,12 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   Widget get childWhenDisabled {
     return Obx(() {
       final isFullScreen = this.isFullScreen || plPlayerController.isDesktopPip;
+      if (isFullScreen) {
+        if (!isPortrait) _windowWasLandscapeInFullScreen = true;
+      } else {
+        _windowWasLandscapeInFullScreen = false;
+      }
+      _syncHarmonyFullScreen();
       return Stack(
         clipBehavior: Clip.none,
         children: [
